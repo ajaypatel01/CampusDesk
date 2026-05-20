@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS attendance_records;
+DROP TABLE IF EXISTS enrollments;
+DROP TABLE IF EXISTS student_guardians;
+DROP TABLE IF EXISTS guardians;
+DROP TABLE IF EXISTS students;
+DROP TABLE IF EXISTS class_sections;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS grade_levels;
+DROP TABLE IF EXISTS academic_years;
+DROP TABLE IF EXISTS schools;
