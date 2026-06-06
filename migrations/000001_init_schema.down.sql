@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS student_result_subjects;
+DROP TABLE IF EXISTS student_results;
 DROP TABLE IF EXISTS attendance_records;
 DROP TABLE IF EXISTS enrollments;
 DROP TABLE IF EXISTS student_guardians;

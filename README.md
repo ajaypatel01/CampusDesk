@@ -15,6 +15,7 @@ internal/
     student/
     user/
     academic/
+    result/
     enrollment/
     guardian/
     health/
@@ -61,6 +62,7 @@ Health: `GET /health`, `GET /ready`
 | Enrollments | `GET/POST /enrollments`, `PUT /enrollments/{id}` |
 | Attendance | `GET/POST /attendance` |
 | Guardians | `GET/POST /guardians`, `POST /guardians/link`, `GET /guardians/{id}` |
+| Results | `GET/POST /results?school_id=&academic_year_id=`, `GET/PUT/DELETE /results/{id}` full result cards with subjects |
 
 List endpoints support `limit` and `offset` query params (default limit 20).
 

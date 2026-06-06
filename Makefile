@@ -1,6 +1,6 @@
 .PHONY: run migrate-up migrate-down test build docker-up
 
-DATABASE_URL ?= postgres://campusdesk:campusdesk@localhost:5432/campusdesk?sslmode=disable
+DATABASE_URL ?= postgres://postgres:root@localhost:5432/school?sslmode=disable
 
 run:
 	go run ./cmd/server

@@ -12,6 +12,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/enrollment"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/health"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/result"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/school"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/student"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/user"
@@ -76,6 +77,7 @@ func mountModules(r chi.Router, pool *pgxpool.Pool) {
 		academic.New(pool),
 		enrollment.New(pool),
 		guardian.New(pool),
+		result.New(pool),
 	}
 	for _, m := range mods {
 		log.Printf("mount module: %s", m.Name())

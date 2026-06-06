@@ -120,8 +120,45 @@ CREATE TABLE attendance_records (
     UNIQUE (student_id, record_date)
 );
 
+CREATE TABLE student_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+    academic_year_id UUID NOT NULL REFERENCES academic_years(id) ON DELETE CASCADE,
+    class_section_id UUID REFERENCES class_sections(id) ON DELETE SET NULL,
+    exam_name VARCHAR(100) NOT NULL,
+    total_marks NUMERIC(8,2) NOT NULL DEFAULT 0,
+    max_total_marks NUMERIC(8,2) NOT NULL DEFAULT 0,
+    percentage NUMERIC(5,2) NOT NULL DEFAULT 0,
+    final_grade VARCHAR(20),
+    remarks TEXT,
+    result_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (student_id, academic_year_id, exam_name)
+);
+
+CREATE TABLE student_result_subjects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    result_id UUID NOT NULL REFERENCES student_results(id) ON DELETE CASCADE,
+    subject_name VARCHAR(100) NOT NULL,
+    marks_obtained NUMERIC(6,2) NOT NULL,
+    max_marks NUMERIC(6,2) NOT NULL,
+    grade VARCHAR(20),
+    remarks TEXT,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (result_id, subject_name)
+);
+
 CREATE INDEX idx_students_school ON students(school_id);
 CREATE INDEX idx_students_status ON students(status);
 CREATE INDEX idx_enrollments_school_year ON enrollments(school_id, academic_year_id);
 CREATE INDEX idx_attendance_school_date ON attendance_records(school_id, record_date);
 CREATE INDEX idx_users_school ON users(school_id);
+CREATE INDEX idx_student_results_school_year ON student_results(school_id, academic_year_id);
+CREATE INDEX idx_student_results_student ON student_results(student_id);
+CREATE INDEX idx_student_results_class_section ON student_results(class_section_id);
+CREATE INDEX idx_student_result_subjects_result ON student_result_subjects(result_id);

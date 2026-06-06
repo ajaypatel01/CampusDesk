@@ -38,6 +38,13 @@ const (
 	AttendanceExcused AttendanceStatus = "excused"
 )
 
+type ResultStatus string
+
+const (
+	ResultStatusDraft     ResultStatus = "draft"
+	ResultStatusPublished ResultStatus = "published"
+)
+
 type Timestamps struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
