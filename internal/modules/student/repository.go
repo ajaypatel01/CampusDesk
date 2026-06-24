@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
@@ -13,7 +14,15 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-const studentCols = `id, school_id, student_code, first_name, last_name, date_of_birth,
+const studentCols = `s.id, s.school_id, s.student_code, s.first_name, s.last_name, s.date_of_birth,
+	COALESCE(s.gender,''), COALESCE(s.email,''), COALESCE(s.phone,''), COALESCE(s.address,''),
+	s.admission_date, COALESCE(s.caste,''), COALESCE(s.category,''), COALESCE(s.aadhar_number,''),
+	COALESCE(s.samagra_id,''), COALESCE(s.pen_number,''), COALESCE(s.apar_id,''),
+	COALESCE(s.previous_school,''), COALESCE(s.bank_name,''), COALESCE(s.bank_ifsc,''),
+	COALESCE(s.bank_account_number,''), COALESCE(s.bank_holder_name,''), COALESCE(s.bank_branch,''),
+	s.status, s.created_at, s.updated_at`
+
+const studentColsSingle = `id, school_id, student_code, first_name, last_name, date_of_birth,
 	COALESCE(gender,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(address,''),
 	admission_date, COALESCE(caste,''), COALESCE(category,''), COALESCE(aadhar_number,''),
 	COALESCE(samagra_id,''), COALESCE(pen_number,''), COALESCE(apar_id,''),
@@ -21,10 +30,22 @@ const studentCols = `id, school_id, student_code, first_name, last_name, date_of
 	COALESCE(bank_account_number,''), COALESCE(bank_holder_name,''), COALESCE(bank_branch,''),
 	status, created_at, updated_at`
 
+var sortColumns = map[string]string{
+	"name":           "s.last_name %s, s.first_name %s",
+	"student_code":   "s.student_code %s",
+	"admission_date": "s.admission_date %s NULLS LAST",
+	"class":          "gl.sort_order %s, gl.name %s",
+}
+
 type ListFilter struct {
-	SchoolID uuid.UUID
-	Status   string
-	Search   string
+	SchoolID       uuid.UUID
+	AcademicYearID uuid.UUID
+	Status         string
+	Search         string
+	Category       string
+	GradeLevel     string
+	SortBy         string
+	SortOrder      string
 }
 
 type Repository struct {
@@ -55,33 +76,68 @@ func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Student, error) {
-	return r.scanOne(ctx, `SELECT `+studentCols+` FROM students WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT `+studentColsSingle+` FROM students WHERE id=$1`, id)
 }
 
-func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) ([]domain.Student, int, error) {
+func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) ([]StudentListItem, int, error) {
 	args := []interface{}{f.SchoolID}
-	where := "WHERE school_id = $1"
 	argN := 2
 
+	// Build JOINs for grade level resolution via fee_structures
+	joins := " FROM students s"
+	joins += " LEFT JOIN student_fee_accounts sfa ON sfa.student_id = s.id"
+	if f.AcademicYearID != uuid.Nil {
+		joins += fmt.Sprintf(" AND sfa.academic_year_id = $%d", argN)
+		args = append(args, f.AcademicYearID)
+		argN++
+	}
+	joins += " LEFT JOIN fee_structures fs ON fs.id = sfa.fee_structure_id"
+	joins += " LEFT JOIN grade_levels gl ON gl.id = fs.grade_level_id"
+	joins += ` LEFT JOIN LATERAL (
+		SELECT COALESCE(SUM(fp.amount), 0) AS total
+		FROM fee_payments fp
+		WHERE fp.student_fee_account_id = sfa.id AND fp.voided = FALSE
+	) paid ON TRUE`
+
+	where := " WHERE s.school_id = $1"
+
 	if f.Status != "" {
-		where += fmt.Sprintf(" AND status = $%d", argN)
+		where += fmt.Sprintf(" AND s.status = $%d", argN)
 		args = append(args, f.Status)
 		argN++
 	}
 	if f.Search != "" {
-		where += fmt.Sprintf(" AND (first_name ILIKE $%d OR last_name ILIKE $%d OR student_code ILIKE $%d)", argN, argN, argN)
+		where += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.student_code ILIKE $%d)", argN, argN, argN)
 		args = append(args, "%"+f.Search+"%")
+		argN++
+	}
+	if f.Category != "" {
+		where += fmt.Sprintf(" AND s.category = $%d", argN)
+		args = append(args, f.Category)
+		argN++
+	}
+	if f.GradeLevel != "" {
+		where += fmt.Sprintf(" AND gl.name = $%d", argN)
+		args = append(args, f.GradeLevel)
 		argN++
 	}
 
 	var total int
-	countQ := "SELECT COUNT(*) FROM students " + where
+	countQ := "SELECT COUNT(*)" + joins + where
 	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	q := `SELECT ` + studentCols + ` FROM students ` +
-		where + fmt.Sprintf(" ORDER BY last_name, first_name LIMIT $%d OFFSET $%d", argN, argN+1)
+	order := buildOrderClause(f.SortBy, f.SortOrder)
+
+	q := fmt.Sprintf(`SELECT %s,
+		COALESCE(gl.name, '') AS grade_level_name,
+		(CASE WHEN sfa.id IS NOT NULL THEN sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues END) AS total_due,
+		(CASE WHEN sfa.id IS NOT NULL THEN paid.total::int END) AS total_paid,
+		(CASE WHEN sfa.id IS NOT NULL THEN (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int END) AS pending_fees,
+		COALESCE(sfa.discount_reason, '') AS fee_remarks
+		%s %s ORDER BY %s LIMIT $%d OFFSET $%d`,
+		studentCols, joins, where, order, argN, argN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.pool.Query(ctx, q, args...)
@@ -90,15 +146,31 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 	}
 	defer rows.Close()
 
-	var items []domain.Student
+	var items []StudentListItem
 	for rows.Next() {
-		s, err := scanRow(rows)
+		item, err := scanListRow(rows)
 		if err != nil {
 			return nil, 0, err
 		}
-		items = append(items, *s)
+		items = append(items, *item)
 	}
 	return items, total, rows.Err()
+}
+
+func buildOrderClause(sortBy, sortOrder string) string {
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
+	pattern, ok := sortColumns[sortBy]
+	if !ok {
+		pattern = sortColumns["name"]
+	}
+	n := strings.Count(pattern, "%s")
+	args := make([]interface{}, n)
+	for i := range args {
+		args[i] = sortOrder
+	}
+	return fmt.Sprintf(pattern, args...)
 }
 
 func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
@@ -162,4 +234,24 @@ func scanRow(row scannable) (*domain.Student, error) {
 		return nil, err
 	}
 	return &s, nil
+}
+
+func scanListRow(row scannable) (*StudentListItem, error) {
+	var item StudentListItem
+	err := row.Scan(
+		&item.ID, &item.SchoolID, &item.StudentCode, &item.FirstName, &item.LastName, &item.DateOfBirth,
+		&item.Gender, &item.Email, &item.Phone, &item.Address,
+		&item.AdmissionDate, &item.Caste, &item.Category, &item.AadharNumber,
+		&item.SamagraID, &item.PenNumber, &item.AparID,
+		&item.PreviousSchool, &item.BankName, &item.BankIFSC,
+		&item.BankAccountNumber, &item.BankHolderName, &item.BankBranch,
+		&item.Status, &item.CreatedAt, &item.UpdatedAt,
+		&item.GradeLevelName,
+		&item.TotalDue, &item.TotalPaid, &item.PendingFees,
+		&item.FeeRemarks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
 }

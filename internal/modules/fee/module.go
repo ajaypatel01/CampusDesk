@@ -44,6 +44,10 @@ func (m *Module) Mount(r chi.Router) {
 		r.Delete("/{id}", h.VoidPayment)
 	})
 
+	r.Route("/fee-receipts", func(r chi.Router) {
+		r.Get("/{payment_id}", h.DownloadReceipt)
+	})
+
 	r.Route("/fee-summary", func(r chi.Router) {
 		r.Get("/", h.SchoolFeeSummary)
 		r.Get("/student/{student_id}", h.StudentFeeSummary)

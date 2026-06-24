@@ -2,7 +2,9 @@ package fee
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
@@ -222,6 +224,24 @@ func (h *Handler) SchoolFeeSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, summary)
+}
+
+func (h *Handler) DownloadReceipt(w http.ResponseWriter, r *http.Request) {
+	paymentID, err := uuid.Parse(chi.URLParam(r, "payment_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid payment_id")
+		return
+	}
+	pdfBytes, filename, err := h.svc.GenerateReceipt(r.Context(), paymentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(pdfBytes)
 }
 
 func (h *Handler) StudentFeeSummary(w http.ResponseWriter, r *http.Request) {

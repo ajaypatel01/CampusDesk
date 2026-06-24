@@ -2,6 +2,7 @@ package fee
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
@@ -159,6 +160,39 @@ type StudentFeeSummaryResponse struct {
 	TotalPaid        int                 `json:"total_paid"`
 	BalanceRemaining int                 `json:"balance_remaining"`
 	Payments         []domain.FeePayment `json:"payments"`
+}
+
+type ReceiptData struct {
+	PaymentID       uuid.UUID
+	FeeType         string
+	InstallmentNum  *int
+	Amount          int
+	PaymentDate     time.Time
+	PaymentMode     string
+	ReferenceNumber string
+	Notes           string
+
+	SchoolName    string
+	SchoolAddress string
+	SchoolPhone   string
+	SchoolEmail   string
+
+	StudentName    string
+	StudentCode    string
+	GradeLevelName string
+	FatherName     string
+
+	TuitionFee       int
+	DiscountAmount   int
+	VanFee           int
+	PreviousYearDues int
+	TotalDue         int
+	TotalPaidOther   int
+	TotalPaidAfter   int
+	BalanceAfter     int
+
+	AcademicYearName string
+	FeeAccountID     uuid.UUID
 }
 
 // ---- Service methods ----
@@ -424,6 +458,19 @@ func (s *Service) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid.UU
 		return nil, apperr.ErrInvalidInput
 	}
 	return s.repo.SchoolFeeSummary(ctx, schoolID, yearID)
+}
+
+func (s *Service) GenerateReceipt(ctx context.Context, paymentID uuid.UUID) ([]byte, string, error) {
+	data, err := s.repo.GetReceiptData(ctx, paymentID)
+	if err != nil {
+		return nil, "", err
+	}
+	pdfBytes, err := generateReceiptPDF(*data)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate receipt: %w", err)
+	}
+	filename := fmt.Sprintf("receipt_%s.pdf", paymentID.String()[:8])
+	return pdfBytes, filename, nil
 }
 
 func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.UUID) (*StudentFeeSummaryResponse, error) {

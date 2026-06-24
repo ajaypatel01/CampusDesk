@@ -54,9 +54,21 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	p := pagination.FromRequest(r)
 	f := ListFilter{
-		SchoolID: schoolID,
-		Status:   r.URL.Query().Get("status"),
-		Search:   r.URL.Query().Get("search"),
+		SchoolID:  schoolID,
+		Status:    r.URL.Query().Get("status"),
+		Search:    r.URL.Query().Get("search"),
+		Category:  r.URL.Query().Get("category"),
+		GradeLevel: r.URL.Query().Get("grade_level"),
+		SortBy:    r.URL.Query().Get("sort_by"),
+		SortOrder: r.URL.Query().Get("sort_order"),
+	}
+	if ayID := r.URL.Query().Get("academic_year_id"); ayID != "" {
+		yearID, err := uuid.Parse(ayID)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid academic_year_id")
+			return
+		}
+		f.AcademicYearID = yearID
 	}
 	items, total, err := h.svc.List(r.Context(), f, p.Limit, p.Offset)
 	if err != nil {

@@ -18,6 +18,15 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
+type StudentListItem struct {
+	domain.Student
+	GradeLevelName string `json:"grade_level_name,omitempty"`
+	TotalDue       *int   `json:"total_due,omitempty"`
+	TotalPaid      *int   `json:"total_paid,omitempty"`
+	PendingFees    *int   `json:"pending_fees,omitempty"`
+	FeeRemarks     string `json:"fee_remarks,omitempty"`
+}
+
 type CreateInput struct {
 	SchoolID          uuid.UUID  `json:"school_id"`
 	StudentCode       string     `json:"student_code"`
@@ -69,6 +78,8 @@ type UpdateInput struct {
 	Status            string     `json:"status"`
 }
 
+var validSorts = map[string]bool{"name": true, "student_code": true, "admission_date": true, "class": true}
+
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, error) {
 	if in.SchoolID == uuid.Nil || strings.TrimSpace(in.StudentCode) == "" ||
 		strings.TrimSpace(in.FirstName) == "" || strings.TrimSpace(in.LastName) == "" {
@@ -113,9 +124,15 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*domain.Student, error
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context, f ListFilter, limit, offset int) ([]domain.Student, int, error) {
+func (s *Service) List(ctx context.Context, f ListFilter, limit, offset int) ([]StudentListItem, int, error) {
 	if f.SchoolID == uuid.Nil {
 		return nil, 0, apperr.ErrInvalidInput
+	}
+	if f.SortOrder != "desc" {
+		f.SortOrder = "asc"
+	}
+	if !validSorts[f.SortBy] {
+		f.SortBy = "name"
 	}
 	return s.repo.List(ctx, f, limit, offset)
 }

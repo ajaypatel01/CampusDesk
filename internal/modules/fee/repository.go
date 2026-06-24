@@ -398,6 +398,59 @@ func (r *Repository) GetFeeAccountByStudent(ctx context.Context, studentID, year
 	return &fa, nil
 }
 
+func (r *Repository) GetReceiptData(ctx context.Context, paymentID uuid.UUID) (*ReceiptData, error) {
+	var d ReceiptData
+	err := r.pool.QueryRow(ctx, `
+		SELECT fp.id, fp.fee_type, fp.installment_number, fp.amount, fp.payment_date,
+			fp.payment_mode, COALESCE(fp.reference_number,''), COALESCE(fp.notes,''),
+			sch.name, COALESCE(sch.address,''), COALESCE(sch.phone,''), COALESCE(sch.email,''),
+			s.first_name || ' ' || s.last_name, s.student_code,
+			COALESCE(gl.name, ''),
+			COALESCE(g.first_name || ' ' || g.last_name, ''),
+			sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues,
+			ay.name,
+			sfa.id
+		FROM fee_payments fp
+		JOIN student_fee_accounts sfa ON sfa.id = fp.student_fee_account_id
+		JOIN students s ON s.id = sfa.student_id
+		JOIN schools sch ON sch.id = sfa.school_id
+		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
+		JOIN grade_levels gl ON gl.id = fs.grade_level_id
+		JOIN academic_years ay ON ay.id = sfa.academic_year_id
+		LEFT JOIN student_guardians sg ON sg.student_id = s.id AND sg.is_primary = TRUE
+		LEFT JOIN guardians g ON g.id = sg.guardian_id
+		WHERE fp.id = $1 AND fp.voided = FALSE`, paymentID,
+	).Scan(&d.PaymentID, &d.FeeType, &d.InstallmentNum, &d.Amount, &d.PaymentDate,
+		&d.PaymentMode, &d.ReferenceNumber, &d.Notes,
+		&d.SchoolName, &d.SchoolAddress, &d.SchoolPhone, &d.SchoolEmail,
+		&d.StudentName, &d.StudentCode,
+		&d.GradeLevelName, &d.FatherName,
+		&d.TuitionFee, &d.DiscountAmount, &d.VanFee, &d.PreviousYearDues,
+		&d.AcademicYearName, &d.FeeAccountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get receipt data: %w", err)
+	}
+
+	d.TotalDue = d.TuitionFee - d.DiscountAmount + d.VanFee + d.PreviousYearDues
+
+	// Total paid before this payment
+	err = r.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM fee_payments
+		WHERE student_fee_account_id = $1 AND voided = FALSE AND id != $2`, d.FeeAccountID, paymentID,
+	).Scan(&d.TotalPaidOther)
+	if err != nil {
+		return nil, err
+	}
+	d.TotalPaidAfter = d.TotalPaidOther + d.Amount
+	d.BalanceAfter = d.TotalDue - d.TotalPaidAfter
+
+	return &d, nil
+}
+
 func (r *Repository) GetStudentInfo(ctx context.Context, studentID uuid.UUID) (name, code, gradeName string, err error) {
 	err = r.pool.QueryRow(ctx, `
 		SELECT s.first_name || ' ' || s.last_name, s.student_code, COALESCE(gl.name, '')

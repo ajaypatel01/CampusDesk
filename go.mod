@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/go-pdf/fpdf v0.9.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
