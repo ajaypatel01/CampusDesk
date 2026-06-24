@@ -13,6 +13,14 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+const studentCols = `id, school_id, student_code, first_name, last_name, date_of_birth,
+	COALESCE(gender,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(address,''),
+	admission_date, COALESCE(caste,''), COALESCE(category,''), COALESCE(aadhar_number,''),
+	COALESCE(samagra_id,''), COALESCE(pen_number,''), COALESCE(apar_id,''),
+	COALESCE(previous_school,''), COALESCE(bank_name,''), COALESCE(bank_ifsc,''),
+	COALESCE(bank_account_number,''), COALESCE(bank_holder_name,''), COALESCE(bank_branch,''),
+	status, created_at, updated_at`
+
 type ListFilter struct {
 	SchoolID uuid.UUID
 	Status   string
@@ -29,10 +37,16 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO students (school_id, student_code, first_name, last_name, date_of_birth, gender, email, phone, address, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		INSERT INTO students (school_id, student_code, first_name, last_name, date_of_birth,
+			gender, email, phone, address, admission_date, caste, category, aadhar_number,
+			samagra_id, pen_number, apar_id, previous_school, bank_name, bank_ifsc,
+			bank_account_number, bank_holder_name, bank_branch, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 		RETURNING id, created_at, updated_at`,
-		s.SchoolID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth, s.Gender, s.Email, s.Phone, s.Address, s.Status,
+		s.SchoolID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
+		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
+		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.PreviousSchool,
+		s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
 	if err := row.Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -41,7 +55,7 @@ func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Student, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, student_code, first_name, last_name, date_of_birth, gender, email, phone, address, status, created_at, updated_at FROM students WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT `+studentCols+` FROM students WHERE id=$1`, id)
 }
 
 func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) ([]domain.Student, int, error) {
@@ -66,7 +80,7 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		return nil, 0, err
 	}
 
-	q := `SELECT id, school_id, student_code, first_name, last_name, date_of_birth, gender, email, phone, address, status, created_at, updated_at FROM students ` +
+	q := `SELECT ` + studentCols + ` FROM students ` +
 		where + fmt.Sprintf(" ORDER BY last_name, first_name LIMIT $%d OFFSET $%d", argN, argN+1)
 	args = append(args, limit, offset)
 
@@ -89,10 +103,16 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 
 func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE students SET student_code=$2, first_name=$3, last_name=$4, date_of_birth=$5, gender=$6,
-			email=$7, phone=$8, address=$9, status=$10, updated_at=NOW()
+		UPDATE students SET student_code=$2, first_name=$3, last_name=$4, date_of_birth=$5,
+			gender=$6, email=$7, phone=$8, address=$9, admission_date=$10, caste=$11,
+			category=$12, aadhar_number=$13, samagra_id=$14, pen_number=$15, apar_id=$16,
+			previous_school=$17, bank_name=$18, bank_ifsc=$19, bank_account_number=$20,
+			bank_holder_name=$21, bank_branch=$22, status=$23, updated_at=NOW()
 		WHERE id=$1`,
-		s.ID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth, s.Gender, s.Email, s.Phone, s.Address, s.Status,
+		s.ID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
+		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
+		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.PreviousSchool,
+		s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
 	if err != nil {
 		return database.MapError(err)
@@ -129,7 +149,15 @@ type scannable interface {
 
 func scanRow(row scannable) (*domain.Student, error) {
 	var s domain.Student
-	err := row.Scan(&s.ID, &s.SchoolID, &s.StudentCode, &s.FirstName, &s.LastName, &s.DateOfBirth, &s.Gender, &s.Email, &s.Phone, &s.Address, &s.Status, &s.CreatedAt, &s.UpdatedAt)
+	err := row.Scan(
+		&s.ID, &s.SchoolID, &s.StudentCode, &s.FirstName, &s.LastName, &s.DateOfBirth,
+		&s.Gender, &s.Email, &s.Phone, &s.Address,
+		&s.AdmissionDate, &s.Caste, &s.Category, &s.AadharNumber,
+		&s.SamagraID, &s.PenNumber, &s.AparID,
+		&s.PreviousSchool, &s.BankName, &s.BankIFSC,
+		&s.BankAccountNumber, &s.BankHolderName, &s.BankBranch,
+		&s.Status, &s.CreatedAt, &s.UpdatedAt,
+	)
 	if err != nil {
 		return nil, err
 	}

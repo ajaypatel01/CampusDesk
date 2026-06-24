@@ -38,6 +38,23 @@ const (
 	AttendanceExcused AttendanceStatus = "excused"
 )
 
+type FeeType string
+
+const (
+	FeeTypeTuition      FeeType = "tuition"
+	FeeTypeVan          FeeType = "van"
+	FeeTypePreviousDues FeeType = "previous_dues"
+)
+
+type PaymentMode string
+
+const (
+	PaymentModeCash   PaymentMode = "cash"
+	PaymentModeOnline PaymentMode = "online"
+	PaymentModeCheque PaymentMode = "cheque"
+	PaymentModeUPI    PaymentMode = "upi"
+)
+
 type Timestamps struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

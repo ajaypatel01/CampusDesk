@@ -1,0 +1,244 @@
+package fee
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+)
+
+type Handler struct {
+	svc *Service
+}
+
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+// ---- Fee Structures ----
+
+func (h *Handler) CreateFeeStructure(w http.ResponseWriter, r *http.Request) {
+	var in CreateFeeStructureInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	fs, err := h.svc.CreateFeeStructure(r.Context(), in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, fs)
+}
+
+func (h *Handler) GetFeeStructure(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	fs, err := h.svc.GetFeeStructure(r.Context(), id)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, fs)
+}
+
+func (h *Handler) ListFeeStructures(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	items, err := h.svc.ListFeeStructures(r.Context(), schoolID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *Handler) UpdateFeeStructure(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in UpdateFeeStructureInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	fs, err := h.svc.UpdateFeeStructure(r.Context(), id, in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, fs)
+}
+
+// ---- Fee Accounts ----
+
+func (h *Handler) CreateFeeAccount(w http.ResponseWriter, r *http.Request) {
+	var in CreateFeeAccountInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	fa, err := h.svc.CreateFeeAccount(r.Context(), in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, fa)
+}
+
+func (h *Handler) GetFeeAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	detail, err := h.svc.GetFeeAccount(r.Context(), id)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, detail)
+}
+
+func (h *Handler) ListFeeAccounts(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	p := pagination.FromRequest(r)
+	f := FeeAccountFilter{
+		SchoolID:       schoolID,
+		AcademicYearID: yearID,
+		Search:         r.URL.Query().Get("search"),
+	}
+	items, total, err := h.svc.ListFeeAccounts(r.Context(), f, p.Limit, p.Offset)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, pagination.NewListResponse(items, total, p.Limit, p.Offset))
+}
+
+func (h *Handler) UpdateFeeAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in UpdateFeeAccountInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	fa, err := h.svc.UpdateFeeAccount(r.Context(), id, in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, fa)
+}
+
+// ---- Payments ----
+
+func (h *Handler) RecordPayment(w http.ResponseWriter, r *http.Request) {
+	var in RecordPaymentInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	p, err := h.svc.RecordPayment(r.Context(), in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, p)
+}
+
+func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
+	accountID, err := uuid.Parse(r.URL.Query().Get("student_fee_account_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "student_fee_account_id required")
+		return
+	}
+	items, err := h.svc.ListPayments(r.Context(), accountID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *Handler) VoidPayment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.VoidPayment(r.Context(), id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.NoContent(w)
+}
+
+// ---- Summaries ----
+
+func (h *Handler) SchoolFeeSummary(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	summary, err := h.svc.SchoolFeeSummary(r.Context(), schoolID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, summary)
+}
+
+func (h *Handler) StudentFeeSummary(w http.ResponseWriter, r *http.Request) {
+	studentID, err := uuid.Parse(chi.URLParam(r, "student_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid student_id")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	summary, err := h.svc.StudentFeeSummary(r.Context(), studentID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, summary)
+}
