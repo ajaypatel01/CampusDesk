@@ -44,7 +44,8 @@ func (r *Repository) LinkStudent(ctx context.Context, studentID, guardianID uuid
 
 func (r *Repository) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]domain.Guardian, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT g.id, g.first_name, g.last_name, g.email, g.phone, g.relation, sg.is_primary, g.created_at, g.updated_at
+		SELECT g.id, g.first_name, g.last_name, COALESCE(g.email,''), COALESCE(g.phone,''),
+			COALESCE(g.relation,''), COALESCE(g.aadhar_number,''), sg.is_primary, g.created_at, g.updated_at
 		FROM guardians g
 		JOIN student_guardians sg ON sg.guardian_id = g.id
 		WHERE sg.student_id = $1 ORDER BY sg.is_primary DESC, g.last_name`, studentID,
@@ -56,7 +57,7 @@ func (r *Repository) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]
 	var items []domain.Guardian
 	for rows.Next() {
 		var g domain.Guardian
-		if err := rows.Scan(&g.ID, &g.FirstName, &g.LastName, &g.Email, &g.Phone, &g.Relation, &g.IsPrimary, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.FirstName, &g.LastName, &g.Email, &g.Phone, &g.Relation, &g.AadharNumber, &g.IsPrimary, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, g)
@@ -67,9 +68,10 @@ func (r *Repository) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Guardian, error) {
 	var g domain.Guardian
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, first_name, last_name, email, phone, relation, created_at, updated_at
+		SELECT id, first_name, last_name, COALESCE(email,''), COALESCE(phone,''),
+			COALESCE(relation,''), COALESCE(aadhar_number,''), created_at, updated_at
 		FROM guardians WHERE id=$1`, id,
-	).Scan(&g.ID, &g.FirstName, &g.LastName, &g.Email, &g.Phone, &g.Relation, &g.CreatedAt, &g.UpdatedAt)
+	).Scan(&g.ID, &g.FirstName, &g.LastName, &g.Email, &g.Phone, &g.Relation, &g.AadharNumber, &g.CreatedAt, &g.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}

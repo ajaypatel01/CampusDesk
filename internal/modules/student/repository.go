@@ -84,21 +84,24 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 	args := []interface{}{f.SchoolID}
 	argN := 2
 
-	// Build JOINs for grade level resolution via fee_structures
+	hasFeeJoin := f.AcademicYearID != uuid.Nil || f.GradeLevel != "" || f.PaymentStatus != ""
+
 	joins := " FROM students s"
-	joins += " LEFT JOIN student_fee_accounts sfa ON sfa.student_id = s.id"
-	if f.AcademicYearID != uuid.Nil {
-		joins += fmt.Sprintf(" AND sfa.academic_year_id = $%d", argN)
-		args = append(args, f.AcademicYearID)
-		argN++
+	if hasFeeJoin {
+		joins += " LEFT JOIN student_fee_accounts sfa ON sfa.student_id = s.id"
+		if f.AcademicYearID != uuid.Nil {
+			joins += fmt.Sprintf(" AND sfa.academic_year_id = $%d", argN)
+			args = append(args, f.AcademicYearID)
+			argN++
+		}
+		joins += " LEFT JOIN fee_structures fs ON fs.id = sfa.fee_structure_id"
+		joins += " LEFT JOIN grade_levels gl ON gl.id = fs.grade_level_id"
+		joins += ` LEFT JOIN LATERAL (
+			SELECT COALESCE(SUM(fp.amount), 0) AS total
+			FROM fee_payments fp
+			WHERE fp.student_fee_account_id = sfa.id AND fp.voided = FALSE
+		) paid ON TRUE`
 	}
-	joins += " LEFT JOIN fee_structures fs ON fs.id = sfa.fee_structure_id"
-	joins += " LEFT JOIN grade_levels gl ON gl.id = fs.grade_level_id"
-	joins += ` LEFT JOIN LATERAL (
-		SELECT COALESCE(SUM(fp.amount), 0) AS total
-		FROM fee_payments fp
-		WHERE fp.student_fee_account_id = sfa.id AND fp.voided = FALSE
-	) paid ON TRUE`
 
 	where := " WHERE s.school_id = $1"
 
@@ -117,20 +120,22 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		args = append(args, f.Category)
 		argN++
 	}
-	if f.GradeLevel != "" {
-		where += fmt.Sprintf(" AND gl.name = $%d", argN)
-		args = append(args, f.GradeLevel)
-		argN++
-	}
-	switch f.PaymentStatus {
-	case "paid":
-		where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int <= 0"
-	case "due":
-		where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
-	case "partial":
-		where += " AND sfa.id IS NOT NULL AND paid.total > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
-	case "unpaid":
-		where += " AND (sfa.id IS NULL OR paid.total = 0)"
+	if hasFeeJoin {
+		if f.GradeLevel != "" {
+			where += fmt.Sprintf(" AND gl.name = $%d", argN)
+			args = append(args, f.GradeLevel)
+			argN++
+		}
+		switch f.PaymentStatus {
+		case "paid":
+			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int <= 0"
+		case "due":
+			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+		case "partial":
+			where += " AND sfa.id IS NOT NULL AND paid.total > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+		case "unpaid":
+			where += " AND (sfa.id IS NULL OR paid.total = 0)"
+		}
 	}
 
 	var total int
@@ -141,14 +146,20 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 
 	order := buildOrderClause(f.SortBy, f.SortOrder)
 
-	q := fmt.Sprintf(`SELECT %s,
+	var feeCols string
+	if hasFeeJoin {
+		feeCols = `,
 		COALESCE(gl.name, '') AS grade_level_name,
 		(CASE WHEN sfa.id IS NOT NULL THEN sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues END) AS total_due,
 		(CASE WHEN sfa.id IS NOT NULL THEN paid.total::int END) AS total_paid,
 		(CASE WHEN sfa.id IS NOT NULL THEN (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int END) AS pending_fees,
-		COALESCE(sfa.discount_reason, '') AS fee_remarks
-		%s %s ORDER BY %s LIMIT $%d OFFSET $%d`,
-		studentCols, joins, where, order, argN, argN+1)
+		COALESCE(sfa.discount_reason, '') AS fee_remarks`
+	} else {
+		feeCols = `, '' AS grade_level_name, NULL::int AS total_due, NULL::int AS total_paid, NULL::int AS pending_fees, '' AS fee_remarks`
+	}
+
+	q := fmt.Sprintf(`SELECT %s %s %s %s ORDER BY %s LIMIT $%d OFFSET $%d`,
+		studentCols, feeCols, joins, where, order, argN, argN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.pool.Query(ctx, q, args...)
