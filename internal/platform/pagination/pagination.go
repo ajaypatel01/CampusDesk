@@ -18,12 +18,16 @@ const (
 func FromRequest(r *http.Request) Params {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 
 	if limit <= 0 {
 		limit = defaultLimit
 	}
 	if limit > maxLimit {
 		limit = maxLimit
+	}
+	if page > 0 {
+		offset = (page - 1) * limit
 	}
 	if offset < 0 {
 		offset = 0

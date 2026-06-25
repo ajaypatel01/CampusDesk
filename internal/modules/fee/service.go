@@ -117,6 +117,8 @@ type FeeAccountFilter struct {
 	SchoolID       uuid.UUID
 	AcademicYearID uuid.UUID
 	Search         string
+	GradeLevel     string
+	PaymentStatus  string // "paid", "due", "partial"
 }
 
 type SchoolFeeSummaryResponse struct {

@@ -44,6 +44,7 @@ type ListFilter struct {
 	Search         string
 	Category       string
 	GradeLevel     string
+	PaymentStatus  string // "paid", "due", "partial"
 	SortBy         string
 	SortOrder      string
 }
@@ -120,6 +121,16 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		where += fmt.Sprintf(" AND gl.name = $%d", argN)
 		args = append(args, f.GradeLevel)
 		argN++
+	}
+	switch f.PaymentStatus {
+	case "paid":
+		where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int <= 0"
+	case "due":
+		where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+	case "partial":
+		where += " AND sfa.id IS NOT NULL AND paid.total > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+	case "unpaid":
+		where += " AND (sfa.id IS NULL OR paid.total = 0)"
 	}
 
 	var total int

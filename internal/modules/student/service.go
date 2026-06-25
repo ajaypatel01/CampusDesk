@@ -79,6 +79,7 @@ type UpdateInput struct {
 }
 
 var validSorts = map[string]bool{"name": true, "student_code": true, "admission_date": true, "class": true}
+var validPaymentStatus = map[string]bool{"paid": true, "due": true, "partial": true, "unpaid": true}
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, error) {
 	if in.SchoolID == uuid.Nil || strings.TrimSpace(in.StudentCode) == "" ||
@@ -133,6 +134,9 @@ func (s *Service) List(ctx context.Context, f ListFilter, limit, offset int) ([]
 	}
 	if !validSorts[f.SortBy] {
 		f.SortBy = "name"
+	}
+	if f.PaymentStatus != "" && !validPaymentStatus[f.PaymentStatus] {
+		f.PaymentStatus = ""
 	}
 	return s.repo.List(ctx, f, limit, offset)
 }

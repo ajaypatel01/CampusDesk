@@ -134,6 +134,8 @@ func (h *Handler) ListFeeAccounts(w http.ResponseWriter, r *http.Request) {
 		SchoolID:       schoolID,
 		AcademicYearID: yearID,
 		Search:         r.URL.Query().Get("search"),
+		GradeLevel:     r.URL.Query().Get("grade_level"),
+		PaymentStatus:  r.URL.Query().Get("payment_status"),
 	}
 	items, total, err := h.svc.ListFeeAccounts(r.Context(), f, p.Limit, p.Offset)
 	if err != nil {

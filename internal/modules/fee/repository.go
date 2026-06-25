@@ -190,9 +190,31 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
+	if f.GradeLevel != "" {
+		where += fmt.Sprintf(" AND gl.name = $%d", argN)
+		args = append(args, f.GradeLevel)
+		argN++
+	}
+
+	having := ""
+	switch f.PaymentStatus {
+	case "paid":
+		having = " HAVING (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) <= 0"
+	case "due":
+		having = " HAVING (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0"
+	case "partial":
+		having = " HAVING COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0"
+	}
+
+	countBase := `FROM student_fee_accounts sfa
+		JOIN students s ON s.id = sfa.student_id
+		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
+		JOIN grade_levels gl ON gl.id = fs.grade_level_id
+		LEFT JOIN fee_payments fp ON fp.student_fee_account_id = sfa.id `
 
 	var total int
-	countQ := `SELECT COUNT(*) FROM student_fee_accounts sfa JOIN students s ON s.id = sfa.student_id ` + where
+	countQ := `SELECT COUNT(*) FROM (SELECT sfa.id ` + countBase + where +
+		` GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name, sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues` + having + `) sub`
 	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -208,15 +230,11 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 			COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) AS total_paid,
 			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues)
 				- COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) AS balance_remaining
-		FROM student_fee_accounts sfa
-		JOIN students s ON s.id = sfa.student_id
-		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
-		JOIN grade_levels gl ON gl.id = fs.grade_level_id
-		LEFT JOIN fee_payments fp ON fp.student_fee_account_id = sfa.id
-		%s
+		%s %s
 		GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name
+		%s
 		ORDER BY s.last_name, s.first_name
-		LIMIT $%d OFFSET $%d`, where, argN, argN+1)
+		LIMIT $%d OFFSET $%d`, countBase, where, having, argN, argN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.pool.Query(ctx, q, args...)
