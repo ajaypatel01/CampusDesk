@@ -70,7 +70,7 @@ type RecordPaymentInput struct {
 	FeeType             string    `json:"fee_type"`
 	InstallmentNumber   *int      `json:"installment_number"`
 	Amount              int       `json:"amount"`
-	PaymentDate         time.Time `json:"payment_date"`
+	PaymentDate         string    `json:"payment_date"`
 	PaymentMode         string    `json:"payment_mode"`
 	ReferenceNumber     string    `json:"reference_number"`
 	Notes               string    `json:"notes"`
@@ -424,8 +424,18 @@ func (s *Service) RecordPayment(ctx context.Context, in RecordPaymentInput) (*do
 	if _, err := s.repo.GetFeeAccountByID(ctx, in.StudentFeeAccountID); err != nil {
 		return nil, err
 	}
-	payDate := in.PaymentDate
-	if payDate.IsZero() {
+	var payDate time.Time
+	if in.PaymentDate != "" {
+		for _, layout := range []string{"2006-01-02", time.RFC3339, "02/01/2006", "2006-01-02T15:04:05Z"} {
+			if t, err := time.Parse(layout, in.PaymentDate); err == nil {
+				payDate = t
+				break
+			}
+		}
+		if payDate.IsZero() {
+			return nil, apperr.ErrInvalidInput
+		}
+	} else {
 		payDate = time.Now().UTC()
 	}
 	p := &domain.FeePayment{
