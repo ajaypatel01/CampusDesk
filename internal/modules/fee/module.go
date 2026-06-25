@@ -1,6 +1,7 @@
 package fee
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -9,10 +10,10 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool) *Module {
+func New(pool *pgxpool.Pool, wa *whatsapp.Client) *Module {
 	repo := NewRepository(pool)
 	svc := NewService(repo)
-	return &Module{handler: NewHandler(svc)}
+	return &Module{handler: NewHandler(svc, wa)}
 }
 
 func (m *Module) Name() string { return "fee" }
@@ -46,6 +47,7 @@ func (m *Module) Mount(r chi.Router) {
 
 	r.Route("/fee-receipts", func(r chi.Router) {
 		r.Get("/{payment_id}", h.DownloadReceipt)
+		r.Post("/{payment_id}/whatsapp", h.SendReceiptWhatsApp)
 	})
 
 	r.Route("/fee-summary", func(r chi.Router) {

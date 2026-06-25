@@ -13,6 +13,30 @@ type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
+	Email    EmailConfig
+	Storage  StorageConfig
+	WhatsApp WhatsAppConfig
+}
+
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	Bucket          string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+}
+
+type WhatsAppConfig struct {
+	PhoneNumberID string
+	AccessToken   string
+	APIVersion    string
+}
+
+type EmailConfig struct {
+	SendGridAPIKey string
+	FromEmail      string
+	FromName       string
 }
 
 type ServerConfig struct {
@@ -59,7 +83,25 @@ func Load() (*Config, error) {
 			WriteTimeout: time.Duration(writeSec) * time.Second,
 		},
 		Database: DatabaseConfig{URL: dbURL},
-		Auth:     AuthConfig{JWTSecret: jwtSecret},
+		Auth:  AuthConfig{JWTSecret: jwtSecret},
+		Email: EmailConfig{
+			SendGridAPIKey: os.Getenv("SENDGRID_API_KEY"),
+			FromEmail:      getEnv("EMAIL_FROM", "noreply@campusdesk.app"),
+			FromName:       getEnv("EMAIL_FROM_NAME", "CampusDesk"),
+		},
+		Storage: StorageConfig{
+			Endpoint:        os.Getenv("S3_ENDPOINT"),
+			Region:          getEnv("S3_REGION", "ap-south-1"),
+			Bucket:          os.Getenv("S3_BUCKET"),
+			AccessKeyID:     os.Getenv("S3_ACCESS_KEY"),
+			SecretAccessKey: os.Getenv("S3_SECRET_KEY"),
+			UseSSL:          getEnv("S3_USE_SSL", "true") == "true",
+		},
+		WhatsApp: WhatsAppConfig{
+			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
+			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
+			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
+		},
 	}, nil
 }
 

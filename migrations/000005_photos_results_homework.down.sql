@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS homework_submissions;
+DROP TABLE IF EXISTS homework_assignments;
+DROP TABLE IF EXISTS exam_marks;
+DROP TABLE IF EXISTS exams;
+DROP TABLE IF EXISTS subjects;
+ALTER TABLE users DROP COLUMN IF EXISTS department;
+ALTER TABLE users DROP COLUMN IF EXISTS employee_id;
+ALTER TABLE users DROP COLUMN IF EXISTS photo_url;
+ALTER TABLE students DROP COLUMN IF EXISTS blood_group;
+ALTER TABLE students DROP COLUMN IF EXISTS photo_url;

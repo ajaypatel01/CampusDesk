@@ -3,17 +3,19 @@ module github.com/ajaypatel01/CampusDesk
 go 1.17
 
 require (
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/google/uuid v1.3.1
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/joho/godotenv v1.5.1
+	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	golang.org/x/crypto v0.20.0
 )
 
 require (
-	github.com/go-pdf/fpdf v0.9.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -21,5 +23,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/puddle v1.3.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	golang.org/x/text v0.14.0 // indirect
 )

@@ -8,16 +8,18 @@ import (
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type Handler struct {
 	svc *Service
+	wa  *whatsapp.Client
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, wa *whatsapp.Client) *Handler {
+	return &Handler{svc: svc, wa: wa}
 }
 
 // ---- Fee Structures ----
@@ -263,4 +265,35 @@ func (h *Handler) StudentFeeSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, summary)
+}
+
+func (h *Handler) SendReceiptWhatsApp(w http.ResponseWriter, r *http.Request) {
+	if h.wa == nil || !h.wa.Enabled() {
+		httpx.Error(w, http.StatusServiceUnavailable, "WhatsApp not configured")
+		return
+	}
+	paymentID, err := uuid.Parse(chi.URLParam(r, "payment_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid payment_id")
+		return
+	}
+	var body struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Phone == "" {
+		httpx.Error(w, http.StatusBadRequest, "phone required")
+		return
+	}
+
+	pdfBytes, filename, err := h.svc.GenerateReceipt(r.Context(), paymentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+
+	if err := h.wa.SendDocument(body.Phone, "Fee Receipt", filename, pdfBytes); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "failed to send WhatsApp: "+err.Error())
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent", "phone": body.Phone})
 }
