@@ -1,0 +1,88 @@
+.header {
+  height: var(--header-height);
+  background: var(--surface);
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.header__menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--gray-500);
+  transition: all var(--transition);
+}
+
+.header__menu-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.header__selectors {
+  display: flex;
+  gap: 10px;
+}
+
+.header__select {
+  padding: 7px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.header__select:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--primary-50);
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header__school-code {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray-400);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.header__theme-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--gray-500);
+  transition: all var(--transition);
+}
+
+.header__theme-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}

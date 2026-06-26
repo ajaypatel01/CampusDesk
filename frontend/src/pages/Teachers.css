@@ -1,0 +1,210 @@
+.teachers-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.tstat-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tstat-card__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tstat-card__icon--primary { background: var(--primary-50); color: var(--primary); }
+.tstat-card__icon--success { background: var(--success-light); color: var(--success); }
+.tstat-card__icon--info { background: var(--info-light); color: var(--info); }
+.tstat-card__icon--warning { background: var(--warning-light); color: var(--warning); }
+
+.tstat-card__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.tstat-card__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1.2;
+}
+
+.tstat-card__label {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.view-toggle {
+  display: flex;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.view-toggle__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 34px;
+  color: var(--gray-400);
+  background: var(--surface);
+  transition: all var(--transition);
+}
+
+.view-toggle__btn:hover {
+  background: var(--gray-50);
+  color: var(--gray-600);
+}
+
+.view-toggle__btn--active {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.view-toggle__btn + .view-toggle__btn {
+  border-left: 1px solid var(--gray-200);
+}
+
+.teacher-table__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-table__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), #a78bfa);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.teacher-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gray-300);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.teacher-status-dot--active {
+  background: var(--success);
+}
+
+.teachers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.teacher-card {
+  display: block;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 20px;
+  transition: all var(--transition);
+}
+
+.teacher-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--primary-100);
+}
+
+.teacher-card__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.teacher-card__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), #a78bfa);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.teacher-card__top h3 {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.teacher-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teacher-card__info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.83rem;
+  color: var(--gray-500);
+}
+
+.teacher-card__info-item svg {
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+.teacher-card__status {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--gray-400);
+}
+
+.teacher-card__status--active {
+  color: var(--success);
+}
+
+@media (max-width: 1024px) {
+  .teachers-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .teachers-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .teachers-grid {
+    grid-template-columns: 1fr;
+  }
+}

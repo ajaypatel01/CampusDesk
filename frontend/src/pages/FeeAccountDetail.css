@@ -1,0 +1,136 @@
+.fee-detail__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  background: var(--surface);
+  padding: 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.fee-detail__top h1 {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+
+.fee-detail__code {
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.fee-detail__grade {
+  font-size: 0.78rem;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  padding: 2px 10px;
+  border-radius: 20px;
+  margin-right: 8px;
+}
+
+.fee-detail__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fee-detail__summary-item {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.fee-detail__summary-item span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.fee-detail__summary-item strong {
+  font-size: 1.1rem;
+  color: var(--gray-900);
+}
+
+.fee-detail__summary-item small {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+.fee-detail__summary-item--highlight {
+  border-color: var(--primary-light);
+  background: var(--primary-50);
+}
+
+.fee-detail__summary-item--highlight strong {
+  color: var(--primary);
+}
+
+.fee-detail__summary-item--green strong {
+  color: var(--success);
+}
+
+.fee-detail__summary-item--red strong {
+  color: var(--danger);
+}
+
+.fee-detail__breakdown {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding: 14px 20px;
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+}
+
+.fee-detail__breakdown-item {
+  display: flex;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.fee-detail__breakdown-value {
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.fee-detail__payments {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.fee-detail__payments h2 {
+  font-size: 1rem;
+  margin-bottom: 16px;
+}
+
+.fee-detail__voided-row td {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+@media (max-width: 768px) {
+  .fee-detail__top {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .fee-detail__breakdown {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

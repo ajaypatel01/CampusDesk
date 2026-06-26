@@ -1,0 +1,241 @@
+.teacher-detail__hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--surface);
+  padding: 28px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  margin-bottom: 24px;
+}
+
+.teacher-detail__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), #a78bfa);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.teacher-detail__hero-info h1 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.teacher-detail__hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  padding: 3px 12px 3px 8px;
+  background: var(--gray-100);
+  border-radius: 20px;
+}
+
+.teacher-status-pill--active {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.teacher-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.td-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 22px;
+}
+
+.td-card--full {
+  grid-column: 1 / -1;
+}
+
+.td-card h3 {
+  font-size: 0.95rem;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.td-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.td-card__header h3 {
+  margin-bottom: 0;
+}
+
+.td-card__year {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--primary);
+  background: var(--primary-50);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.td-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.td-field {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.td-field__icon {
+  color: var(--gray-400);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.td-field__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.td-field__value {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+.td-empty-assign {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  color: var(--gray-300);
+  text-align: center;
+}
+
+.td-empty-assign p {
+  font-size: 0.85rem;
+  color: var(--gray-400);
+}
+
+.td-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.td-section-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.td-section-card:hover {
+  border-color: var(--primary-100);
+  background: var(--primary-50);
+}
+
+.td-section-card__grade {
+  padding: 6px 14px;
+  background: var(--primary-50);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.td-section-card__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.td-section-card__name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.td-section-card__cap {
+  font-size: 0.78rem;
+  color: var(--gray-400);
+}
+
+.td-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.td-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.td-meta-item__label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.td-meta-item__value {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}
+
+.td-meta-item__value--mono {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .teacher-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-detail__hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .teacher-detail__hero-meta {
+    justify-content: center;
+  }
+}
