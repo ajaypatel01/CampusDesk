@@ -57,13 +57,13 @@ func (r *Repository) GetStudentCardData(ctx context.Context, studentID, yearID u
 	var d StudentCardData
 	d.StudentID = studentID
 
+	// Core query — no optional columns (blood_group/photo_url added in migration 005)
 	err := r.pool.QueryRow(ctx, `
 		SELECT
 			sch.name, COALESCE(sch.address,''), COALESCE(sch.phone,''),
 			s.first_name || ' ' || s.last_name, s.student_code,
-			s.date_of_birth, COALESCE(s.gender,''), COALESCE(s.blood_group,''),
+			s.date_of_birth, COALESCE(s.gender,''),
 			COALESCE(s.phone,''), COALESCE(s.address,''),
-			COALESCE(s.photo_url,''),
 			COALESCE(gl_cs.name, gl_fs.name, ''),
 			COALESCE(ay.name,'')
 		FROM students s
@@ -79,8 +79,8 @@ func (r *Repository) GetStudentCardData(ctx context.Context, studentID, yearID u
 	).Scan(
 		&d.SchoolName, &d.SchoolAddress, &d.SchoolPhone,
 		&d.StudentName, &d.StudentCode,
-		&d.DOB, &d.Gender, &d.BloodGroup,
-		&d.Phone, &d.Address, &d.PhotoKey,
+		&d.DOB, &d.Gender,
+		&d.Phone, &d.Address,
 		&d.ClassName, &d.AcYear,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -89,6 +89,13 @@ func (r *Repository) GetStudentCardData(ctx context.Context, studentID, yearID u
 	if err != nil {
 		return nil, fmt.Errorf("get student card data: %w", err)
 	}
+
+	// Optional extended fields (migration 005) — ignore if columns not yet added
+	_ = r.pool.QueryRow(ctx, `
+		SELECT COALESCE(blood_group,''), COALESCE(photo_url,'')
+		FROM students WHERE id = $1`, studentID,
+	).Scan(&d.BloodGroup, &d.PhotoKey)
+
 	return &d, nil
 }
 
@@ -96,20 +103,18 @@ func (r *Repository) GetTeacherCardData(ctx context.Context, userID uuid.UUID) (
 	var d TeacherCardData
 	d.UserID = userID
 
+	// Core query — role column always present
 	err := r.pool.QueryRow(ctx, `
 		SELECT
 			COALESCE(sch.name,''), COALESCE(sch.address,''), COALESCE(sch.phone,''),
 			u.first_name || ' ' || u.last_name,
-			COALESCE(u.employee_id,''), u.role,
-			COALESCE(u.department,''), COALESCE(u.phone,''),
-			u.email, COALESCE(u.photo_url,'')
+			u.role, COALESCE(u.phone,''), u.email
 		FROM users u
 		LEFT JOIN schools sch ON sch.id = u.school_id
 		WHERE u.id = $1`, userID,
 	).Scan(
 		&d.SchoolName, &d.SchoolAddress, &d.SchoolPhone,
-		&d.TeacherName, &d.EmployeeID, &d.Designation,
-		&d.Department, &d.Phone, &d.Email, &d.PhotoKey,
+		&d.TeacherName, &d.Designation, &d.Phone, &d.Email,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
@@ -117,5 +122,12 @@ func (r *Repository) GetTeacherCardData(ctx context.Context, userID uuid.UUID) (
 	if err != nil {
 		return nil, fmt.Errorf("get teacher card data: %w", err)
 	}
+
+	// Optional extended fields (migration 005) — ignore if columns not yet added
+	_ = r.pool.QueryRow(ctx, `
+		SELECT COALESCE(employee_id,''), COALESCE(department,''), COALESCE(photo_url,'')
+		FROM users WHERE id = $1`, userID,
+	).Scan(&d.EmployeeID, &d.Department, &d.PhotoKey)
+
 	return &d, nil
 }

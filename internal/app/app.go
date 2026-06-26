@@ -84,7 +84,28 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	api := chi.NewRouter()
 	api.Use(middleware.StripSlashes)
-	mountModules(api, pool, emailClient, storageClient, waClient)
+
+	userMod := user.New(pool, cfg.Auth.JWTSecret)
+
+	// Public routes (no auth required)
+	api.Group(func(r chi.Router) {
+		health.New(pool).Mount(r)
+		userMod.MountPublic(r) // only /auth/login
+	})
+
+	// Protected routes — JWT required
+	api.Group(func(r chi.Router) {
+		r.Use(httpx.JWTMiddleware(cfg.Auth.JWTSecret))
+		// expose feature flags so frontend can adapt UI
+		r.Get("/config", func(w http.ResponseWriter, r *http.Request) {
+			httpx.JSON(w, http.StatusOK, map[string]bool{
+				"whatsapp_enabled": waClient.Enabled(),
+			})
+		})
+		userMod.Mount(r) // /users CRUD
+		mountProtectedModules(r, pool, emailClient, storageClient, waClient, cfg.Auth.JWTSecret)
+	})
+
 	router.Mount("/api/v1", api)
 
 	srv := &http.Server{
@@ -97,12 +118,10 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	return &App{cfg: cfg, pool: pool, server: srv}, nil
 }
 
-func mountModules(r chi.Router, pool *pgxpool.Pool, emailClient *email.Client, storageClient *storage.Client, waClient *whatsapp.Client) {
+func mountProtectedModules(r chi.Router, pool *pgxpool.Pool, emailClient *email.Client, storageClient *storage.Client, waClient *whatsapp.Client, jwtSecret string) {
 	mods := []modules.Module{
-		health.New(pool),
 		school.New(pool),
 		student.New(pool),
-		user.New(pool),
 		academic.New(pool),
 		enrollment.New(pool),
 		guardian.New(pool),

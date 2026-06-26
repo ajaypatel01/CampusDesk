@@ -6,16 +6,18 @@ import (
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
-	repo *Repository
+	repo      *Repository
+	jwtSecret string
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, jwtSecret string) *Service {
+	return &Service{repo: repo, jwtSecret: jwtSecret}
 }
 
 type CreateInput struct {
@@ -33,8 +35,8 @@ type LoginInput struct {
 }
 
 type LoginResponse struct {
-	User *domain.User `json:"user"`
-	// Token will be added when JWT auth is implemented.
+	User  *domain.User `json:"user"`
+	Token string       `json:"token"`
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.User, error) {
@@ -97,5 +99,9 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 		return nil, apperr.ErrUnauthorized
 	}
 	u.PasswordHash = ""
-	return &LoginResponse{User: u}, nil
+	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), s.jwtSecret)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginResponse{User: u, Token: token}, nil
 }

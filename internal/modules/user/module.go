@@ -9,14 +9,20 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool) *Module {
+func New(pool *pgxpool.Pool, jwtSecret string) *Module {
 	repo := NewRepository(pool)
-	svc := NewService(repo)
+	svc := NewService(repo, jwtSecret)
 	return &Module{handler: NewHandler(svc)}
 }
 
 func (m *Module) Name() string { return "user" }
 
+// MountPublic registers only the login endpoint (no auth required).
+func (m *Module) MountPublic(r chi.Router) {
+	r.Post("/auth/login", m.handler.Login)
+}
+
+// Mount registers all user management endpoints (auth required).
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/users", func(r chi.Router) {
 		r.Get("/", m.handler.List)
@@ -25,5 +31,4 @@ func (m *Module) Mount(r chi.Router) {
 			r.Get("/", m.handler.Get)
 		})
 	})
-	r.Post("/auth/login", m.handler.Login)
 }
