@@ -18,6 +18,7 @@ import Transport from './pages/Transport'
 import Rte from './pages/Rte'
 import Books from './pages/Books'
 import Admissions from './pages/Admissions'
+import Staff from './pages/Staff'
 import Login from './pages/Login'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
@@ -62,6 +63,7 @@ function App() {
             <Route path="fees/:id" element={<FeeAccountDetail />} />
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/:id" element={<TeacherDetail />} />
+            <Route path="staff" element={<Staff />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />
             <Route path="results" element={<Results />} />

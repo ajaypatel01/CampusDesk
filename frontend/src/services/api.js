@@ -240,3 +240,9 @@ export const mediaApi = {
 export const configApi = {
   get: () => request('/config'),
 }
+
+export const staffApi = {
+  list: (params = {}) => request(`/staff${qs(params)}`),
+  get: (id) => request(`/staff/${id}`),
+  upsertProfile: (id, body) => request(`/staff/${id}/profile`, { method: 'PUT', body: JSON.stringify(body) }),
+}
