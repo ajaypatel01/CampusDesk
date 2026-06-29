@@ -12,7 +12,7 @@ type Params struct {
 
 const (
 	defaultLimit = 20
-	maxLimit     = 100
+	maxLimit     = 2000
 )
 
 func FromRequest(r *http.Request) Params {

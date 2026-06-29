@@ -80,8 +80,8 @@ export default function Admissions() {
       setStats({
         total: joined.length,
         active: joined.filter(r => r.status === 'active').length,
-        girls: joined.filter(r => r.gender === 'female' || r.gender === 'Female').length,
-        boys: joined.filter(r => r.gender === 'male' || r.gender === 'Male').length,
+        girls: joined.filter(r => r.gender?.toLowerCase() === 'female' || r.gender?.toLowerCase() === 'girl').length,
+        boys: joined.filter(r => r.gender?.toLowerCase() === 'male' || r.gender?.toLowerCase() === 'boy').length,
       })
     }).catch(() => {}).finally(() => setLoading(false))
   }, [currentSchool, selectedYearId])
