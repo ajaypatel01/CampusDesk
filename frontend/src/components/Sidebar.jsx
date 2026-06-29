@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
+  ClipboardList,
   IndianRupee,
   UserCog,
   Settings,
@@ -20,6 +21,7 @@ import './Sidebar.css'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admissions', icon: ClipboardList, label: 'Admissions' },
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/fees', icon: IndianRupee, label: 'Fees' },
   { to: '/teachers', icon: UserCog, label: 'Teachers' },

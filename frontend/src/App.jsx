@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
@@ -17,8 +17,11 @@ import IdCards from './pages/IdCards'
 import Transport from './pages/Transport'
 import Rte from './pages/Rte'
 import Books from './pages/Books'
+import Admissions from './pages/Admissions'
 import Login from './pages/Login'
 import { getToken, clearToken } from './services/api'
+import { SchoolProvider } from './services/SchoolContext'
+import { ConfigProvider } from './services/ConfigContext'
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -47,27 +50,32 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route element={<Layout onLogout={handleLogout} user={user} />}>
-        <Route index element={<Dashboard />} />
-        <Route path="students" element={<Students />} />
-        <Route path="students/:id" element={<StudentDetail />} />
-        <Route path="fees" element={<Fees />} />
-        <Route path="fees/:id" element={<FeeAccountDetail />} />
-        <Route path="teachers" element={<Teachers />} />
-        <Route path="teachers/:id" element={<TeacherDetail />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="broadcasts" element={<Broadcasts />} />
-        <Route path="results" element={<Results />} />
-        <Route path="homework" element={<Homework />} />
-        <Route path="id-cards" element={<IdCards />} />
-        <Route path="transport" element={<Transport />} />
-        <Route path="rte" element={<Rte />} />
-        <Route path="books" element={<Books />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="login" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <ConfigProvider>
+      <SchoolProvider>
+        <Routes>
+          <Route element={<Layout onLogout={handleLogout} user={user} />}>
+            <Route index element={<Dashboard />} />
+            <Route path="admissions" element={<Admissions />} />
+            <Route path="students" element={<Students />} />
+            <Route path="students/:id" element={<StudentDetail />} />
+            <Route path="fees" element={<Fees />} />
+            <Route path="fees/:id" element={<FeeAccountDetail />} />
+            <Route path="teachers" element={<Teachers />} />
+            <Route path="teachers/:id" element={<TeacherDetail />} />
+            <Route path="documents" element={<Documents />} />
+            <Route path="broadcasts" element={<Broadcasts />} />
+            <Route path="results" element={<Results />} />
+            <Route path="homework" element={<Homework />} />
+            <Route path="id-cards" element={<IdCards />} />
+            <Route path="transport" element={<Transport />} />
+            <Route path="rte" element={<Rte />} />
+            <Route path="books" element={<Books />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="login" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </SchoolProvider>
+    </ConfigProvider>
   )
 }
 
