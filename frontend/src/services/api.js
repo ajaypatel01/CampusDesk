@@ -17,7 +17,9 @@ async function request(path, options = {}) {
   })
   if (res.status === 401) {
     clearToken()
-    window.location.replace('/login')
+    if (window.location.pathname !== '/login') {
+      window.location.replace('/login')
+    }
     throw new Error('Session expired. Please log in again.')
   }
   if (res.status === 204) return null
