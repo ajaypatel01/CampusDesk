@@ -26,7 +26,7 @@ const staffSelect = `
 		sp.id, sp.user_id, sp.guardian_name, sp.aadhar_number, sp.education_qualification,
 		sp.professional_qualification, sp.designation, sp.salary,
 		sp.bank_name, sp.bank_ifsc, sp.bank_branch, sp.bank_account_number, sp.bank_account_holder,
-		sp.phone, sp.created_at, sp.updated_at
+		sp.phone, sp.staff_type, sp.created_at, sp.updated_at
 	FROM users u
 	LEFT JOIN staff_profiles sp ON sp.user_id = u.id`
 
@@ -84,17 +84,17 @@ func (r *Repository) UpsertProfile(ctx context.Context, p *domain.StaffProfile) 
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO staff_profiles (user_id, guardian_name, aadhar_number, education_qualification,
 			professional_qualification, designation, salary, bank_name, bank_ifsc, bank_branch,
-			bank_account_number, bank_account_holder, phone)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			bank_account_number, bank_account_holder, phone, staff_type)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		ON CONFLICT (user_id) DO UPDATE SET
 			guardian_name=$2, aadhar_number=$3, education_qualification=$4,
 			professional_qualification=$5, designation=$6, salary=$7, bank_name=$8,
 			bank_ifsc=$9, bank_branch=$10, bank_account_number=$11,
-			bank_account_holder=$12, phone=$13, updated_at=NOW()
+			bank_account_holder=$12, phone=$13, staff_type=$14, updated_at=NOW()
 		RETURNING id, created_at, updated_at`,
 		p.UserID, p.GuardianName, p.AadharNumber, p.EducationQualification,
 		p.ProfessionalQualification, p.Designation, p.Salary, p.BankName,
-		p.BankIFSC, p.BankBranch, p.BankAccountNumber, p.BankAccountHolder, p.Phone,
+		p.BankIFSC, p.BankBranch, p.BankAccountNumber, p.BankAccountHolder, p.Phone, p.StaffType,
 	)
 	return row.Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 }
@@ -114,7 +114,7 @@ func scanMember(row scannable) (*domain.StaffMember, error) {
 		&profileID, &profileUserID, &p.GuardianName, &p.AadharNumber, &p.EducationQualification,
 		&p.ProfessionalQualification, &p.Designation, &p.Salary,
 		&p.BankName, &p.BankIFSC, &p.BankBranch, &p.BankAccountNumber, &p.BankAccountHolder,
-		&p.Phone, &p.CreatedAt, &p.UpdatedAt,
+		&p.Phone, &p.StaffType, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

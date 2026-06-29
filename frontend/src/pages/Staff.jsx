@@ -20,12 +20,15 @@ const roleBadge = {
   registrar: 'success',
 }
 
+const staffTypeLabel = { teaching: 'Teaching', non_teaching: 'Non-Teaching' }
+const staffTypeBadge = { teaching: 'staff-type--teaching', non_teaching: 'staff-type--non-teaching' }
+
 function Staff() {
   const { currentSchool } = useSchool()
   const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [designFilter, setDesignFilter] = useState('')
 
   useEffect(() => {
@@ -39,9 +42,11 @@ function Staff() {
 
   const designations = useMemo(() => {
     const set = new Set()
-    staff.forEach(m => { if (m.profile?.designation) set.add(m.profile.designation) })
+    staff
+      .filter(m => !typeFilter || m.profile?.staff_type === typeFilter)
+      .forEach(m => { if (m.profile?.designation) set.add(m.profile.designation) })
     return [...set].sort()
-  }, [staff])
+  }, [staff, typeFilter])
 
   const filtered = useMemo(() => {
     let result = staff
@@ -54,22 +59,28 @@ function Staff() {
         return name.includes(q) || desig.includes(q) || phone.includes(q)
       })
     }
-    if (roleFilter) result = result.filter(m => m.role === roleFilter)
+    if (typeFilter) result = result.filter(m => m.profile?.staff_type === typeFilter)
     if (designFilter) result = result.filter(m => m.profile?.designation === designFilter)
     return result
-  }, [staff, search, roleFilter, designFilter])
+  }, [staff, search, typeFilter, designFilter])
 
   const stats = useMemo(() => {
     const s = { total: staff.length, teaching: 0, nonTeaching: 0, totalSalary: 0 }
     staff.forEach(m => {
-      if (m.role === 'teacher') s.teaching++
-      else s.nonTeaching++
+      if (m.profile?.staff_type === 'non_teaching') s.nonTeaching++
+      else s.teaching++
       s.totalSalary += m.profile?.salary || 0
     })
     return s
   }, [staff])
 
-  const activeFilterCount = [roleFilter, designFilter].filter(Boolean).length
+  const activeFilterCount = [typeFilter, designFilter].filter(Boolean).length
+
+  function clearFilters() {
+    setTypeFilter('')
+    setDesignFilter('')
+    setSearch('')
+  }
 
   if (!currentSchool) return <p className="empty-text">Select a school first.</p>
 
@@ -83,21 +94,21 @@ function Staff() {
       </div>
 
       <div className="staff-stats">
-        <div className="sstat-card">
+        <div className="sstat-card sstat-card--clickable" onClick={() => setTypeFilter('')}>
           <div className="sstat-card__icon sstat-card__icon--primary"><Users size={18} /></div>
           <div className="sstat-card__body">
             <span className="sstat-card__value">{stats.total}</span>
             <span className="sstat-card__label">Total Staff</span>
           </div>
         </div>
-        <div className="sstat-card">
+        <div className={`sstat-card sstat-card--clickable ${typeFilter === 'teaching' ? 'sstat-card--active' : ''}`} onClick={() => setTypeFilter(t => t === 'teaching' ? '' : 'teaching')}>
           <div className="sstat-card__icon sstat-card__icon--info"><GraduationCap size={18} /></div>
           <div className="sstat-card__body">
             <span className="sstat-card__value">{stats.teaching}</span>
             <span className="sstat-card__label">Teaching</span>
           </div>
         </div>
-        <div className="sstat-card">
+        <div className={`sstat-card sstat-card--clickable ${typeFilter === 'non_teaching' ? 'sstat-card--active' : ''}`} onClick={() => setTypeFilter(t => t === 'non_teaching' ? '' : 'non_teaching')}>
           <div className="sstat-card__icon sstat-card__icon--warning"><Briefcase size={18} /></div>
           <div className="sstat-card__body">
             <span className="sstat-card__value">{stats.nonTeaching}</span>
@@ -125,11 +136,10 @@ function Staff() {
         </div>
         <div className="filter-select">
           <Filter size={16} />
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-            <option value="">All Roles</option>
-            <option value="teacher">Teacher</option>
-            <option value="school_admin">School Admin</option>
-            <option value="registrar">Registrar</option>
+          <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setDesignFilter('') }}>
+            <option value="">All Types</option>
+            <option value="teaching">Teaching</option>
+            <option value="non_teaching">Non-Teaching</option>
           </select>
         </div>
         <div className="filter-select">
@@ -139,7 +149,7 @@ function Staff() {
           </select>
         </div>
         {activeFilterCount > 0 && (
-          <button className="filter-clear" onClick={() => { setRoleFilter(''); setDesignFilter('') }}>
+          <button className="filter-clear" onClick={clearFilters}>
             <X size={14} /> Clear ({activeFilterCount})
           </button>
         )}
@@ -157,6 +167,7 @@ function Staff() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Type</th>
                 <th>Designation</th>
                 <th>Role</th>
                 <th>Phone</th>
@@ -170,7 +181,7 @@ function Staff() {
                 <tr key={m.id}>
                   <td>
                     <Link to={`/staff/${m.id}`} className="staff-table__user">
-                      <div className="staff-table__avatar">
+                      <div className={`staff-table__avatar ${m.profile?.staff_type === 'non_teaching' ? 'staff-table__avatar--non-teaching' : ''}`}>
                         {m.first_name[0]}{m.last_name[0]}
                       </div>
                       <div>
@@ -178,6 +189,13 @@ function Staff() {
                         <div className="data-table__muted staff-email">{m.email}</div>
                       </div>
                     </Link>
+                  </td>
+                  <td>
+                    {m.profile?.staff_type ? (
+                      <span className={`staff-type-badge ${staffTypeBadge[m.profile.staff_type] || ''}`}>
+                        {staffTypeLabel[m.profile.staff_type] || m.profile.staff_type}
+                      </span>
+                    ) : <span className="data-table__muted">—</span>}
                   </td>
                   <td>{m.profile?.designation || <span className="data-table__muted">—</span>}</td>
                   <td>

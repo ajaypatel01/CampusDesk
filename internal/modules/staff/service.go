@@ -38,6 +38,7 @@ func (s *Service) UpsertProfile(ctx context.Context, userID uuid.UUID, in Update
 		BankAccountNumber:         in.BankAccountNumber,
 		BankAccountHolder:         in.BankAccountHolder,
 		Phone:                     in.Phone,
+		StaffType:                 in.StaffType,
 	}
 	if err := s.repo.UpsertProfile(ctx, p); err != nil {
 		return nil, err
@@ -58,4 +59,5 @@ type UpdateProfileInput struct {
 	BankAccountNumber         *string `json:"bank_account_number"`
 	BankAccountHolder         *string `json:"bank_account_holder"`
 	Phone                     *string `json:"phone"`
+	StaffType                 *string `json:"staff_type"`
 }
