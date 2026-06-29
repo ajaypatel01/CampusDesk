@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Filter, X, Download } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
 import './Fees.css'
@@ -59,8 +59,57 @@ function Fees() {
     setOffset(0)
   }
 
+  const [exporting, setExporting] = useState(false)
+
   function fmt(amt) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amt)
+  }
+
+  async function exportCSV() {
+    setExporting(true)
+    try {
+      const res = await feesApi.listAccounts({
+        school_id: currentSchool.id,
+        academic_year_id: currentYear.id,
+        limit: 5000,
+        offset: 0,
+      })
+      const rows = res.items || []
+      const headers = [
+        'Student Name', 'Student Code', 'Grade',
+        'Tuition Fee', 'Discount', 'Van Fee', 'Previous Dues',
+        'Total Due', 'Total Paid', 'Balance', 'RTE', 'Status',
+      ]
+      const csvRows = rows.map(a => {
+        const status = a.balance_remaining <= 0 ? 'Paid' : a.total_paid > 0 ? 'Partial' : 'Unpaid'
+        return [
+          `"${a.student_name}"`,
+          a.student_code,
+          `"${a.grade_level_name || ''}"`,
+          a.tuition_fee,
+          a.discount_amount,
+          a.van_fee,
+          a.previous_year_dues,
+          a.total_due,
+          a.total_paid,
+          a.balance_remaining,
+          a.is_rte ? 'Yes' : 'No',
+          status,
+        ].join(',')
+      })
+      const csv = [headers.join(','), ...csvRows].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fee-sheet-${currentYear.name.replace(/\s+/g, '-')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Export failed: ' + err.message)
+    } finally {
+      setExporting(false)
+    }
   }
 
   if (!currentSchool || !currentYear) {
@@ -74,6 +123,9 @@ function Fees() {
           <h1>Fee Management</h1>
           <p className="page-subtitle">{currentYear.name} - Fee accounts and payments</p>
         </div>
+        <button className="btn btn--outline" onClick={exportCSV} disabled={exporting}>
+          <Download size={16} /> {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {summary && (
