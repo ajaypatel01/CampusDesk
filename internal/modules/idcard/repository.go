@@ -108,13 +108,16 @@ func (r *Repository) GetTeacherCardData(ctx context.Context, userID uuid.UUID) (
 		SELECT
 			COALESCE(sch.name,''), COALESCE(sch.address,''), COALESCE(sch.phone,''),
 			u.first_name || ' ' || u.last_name,
-			u.role, COALESCE(u.phone,''), u.email
+			u.role, COALESCE(sp.phone,''), u.email,
+			COALESCE(sp.designation, u.role)
 		FROM users u
 		LEFT JOIN schools sch ON sch.id = u.school_id
+		LEFT JOIN staff_profiles sp ON sp.user_id = u.id
 		WHERE u.id = $1`, userID,
 	).Scan(
 		&d.SchoolName, &d.SchoolAddress, &d.SchoolPhone,
-		&d.TeacherName, &d.Designation, &d.Phone, &d.Email,
+		&d.TeacherName, &d.Department, &d.Phone, &d.Email,
+		&d.Designation,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound

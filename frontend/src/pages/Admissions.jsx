@@ -77,11 +77,14 @@ export default function Admissions() {
       }))
 
       setRows(joined)
+      const boys = joined.filter(r => r.gender?.toLowerCase() === 'male' || r.gender?.toLowerCase() === 'boy').length
+      const girls = joined.filter(r => r.gender?.toLowerCase() === 'female' || r.gender?.toLowerCase() === 'girl').length
       setStats({
         total: joined.length,
         active: joined.filter(r => r.status === 'active').length,
-        girls: joined.filter(r => r.gender?.toLowerCase() === 'female' || r.gender?.toLowerCase() === 'girl').length,
-        boys: joined.filter(r => r.gender?.toLowerCase() === 'male' || r.gender?.toLowerCase() === 'boy').length,
+        boys,
+        girls,
+        unknown: joined.length - boys - girls,
       })
     }).catch(() => {}).finally(() => setLoading(false))
   }, [currentSchool, selectedYearId])
@@ -172,6 +175,7 @@ export default function Admissions() {
         <div className="admission-stat"><span className="admission-stat__val">{stats.active}</span><span className="admission-stat__lbl">Active</span></div>
         <div className="admission-stat"><span className="admission-stat__val">{stats.boys}</span><span className="admission-stat__lbl">Boys</span></div>
         <div className="admission-stat"><span className="admission-stat__val">{stats.girls}</span><span className="admission-stat__lbl">Girls</span></div>
+        {stats.unknown > 0 && <div className="admission-stat admission-stat--muted"><span className="admission-stat__val">{stats.unknown}</span><span className="admission-stat__lbl">Not Specified</span></div>}
       </div>
 
       {/* Filters */}

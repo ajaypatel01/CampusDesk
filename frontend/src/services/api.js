@@ -241,6 +241,17 @@ export const configApi = {
   get: () => request('/config'),
 }
 
+export const tcRecordsApi = {
+  list: (params = {}) => request(`/tc-records${qs(params)}`),
+  get: (id) => request(`/tc-records/${id}`),
+  create: (body) => request('/tc-records', { method: 'POST', body: JSON.stringify(body) }),
+}
+
+export const vouchersApi = {
+  list: (params = {}) => request(`/vouchers${qs(params)}`),
+  create: (body) => request('/vouchers', { method: 'POST', body: JSON.stringify(body) }),
+}
+
 export const staffApi = {
   list: (params = {}) => request(`/staff${qs(params)}`),
   get: (id) => request(`/staff/${id}`),

@@ -1,0 +1,71 @@
+.vouchers-page { padding: var(--space-6); max-width: 1200px; }
+
+.vouchers-header-actions { display: flex; gap: var(--space-2); }
+
+.vouchers-summary {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.vsumm-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.vsumm-card--red { border-color: #fca5a5; background: #fef2f2; }
+.vsumm-card--red .vsumm-value { color: #dc2626; }
+
+.vsumm-label { font-size: 0.75rem; color: var(--text-muted); }
+.vsumm-value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+
+.voucher-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.voucher-date-filter input[type="date"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.voucher-account {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.voucher-desc {
+  max-width: 220px;
+  white-space: normal;
+  font-size: 0.82rem;
+}
+
+.voucher-mode-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.voucher-mode--cash { background: #d1fae5; color: #065f46; }
+.voucher-mode--online, .voucher-mode--upi { background: #dbeafe; color: #1d4ed8; }
+.voucher-mode--cheque { background: #fef3c7; color: #92400e; }
+
+.voucher-amount { font-weight: 600; color: var(--text-primary); }
+.voucher-amount--total { font-size: 1rem; color: #dc2626; }
+
+.vouchers-total-row td { background: var(--surface-alt, #f9fafb); border-top: 2px solid var(--border); }

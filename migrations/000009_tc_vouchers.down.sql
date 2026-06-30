@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS vouchers;
+DROP TABLE IF EXISTS tc_records;

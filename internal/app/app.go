@@ -23,6 +23,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/rte"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/school"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/staff"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/tcvoucher"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/student"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/user"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/van"
@@ -137,6 +138,7 @@ func mountProtectedModules(r chi.Router, pool *pgxpool.Pool, emailClient *email.
 		homework.New(pool),
 		communications.New(pool, waClient),
 		staff.New(pool),
+		tcvoucher.New(pool),
 	}
 	for _, m := range mods {
 		log.Printf("mount module: %s", m.Name())
