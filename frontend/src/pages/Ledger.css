@@ -1,0 +1,110 @@
+.ledger-page { padding: var(--space-6); max-width: 1200px; }
+
+/* Controls */
+.ledger-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.ledger-year-select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.ledger-mode-tabs {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ledger-tab {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ledger-tab:hover { background: var(--gray-50); }
+.ledger-tab--active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.ledger-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ledger-date-inputs input[type="date"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.ledger-date-sep { font-size: 0.85rem; color: var(--text-muted); }
+
+/* Summary */
+.ledger-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.lsumm {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+}
+.lsumm--green { border-color: #86efac; background: #f0fdf4; }
+.lsumm--green .lsumm__val { color: #16a34a; }
+
+.lsumm__val { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
+.lsumm__lbl { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Table */
+.ledger-date { white-space: nowrap; }
+.ledger-student { font-weight: 500; }
+.ledger-code { font-size: 0.75rem; margin-top: 1px; }
+
+.ledger-mode {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.ledger-mode--cash { background: #d1fae5; color: #065f46; }
+.ledger-mode--online { background: #dbeafe; color: #1d4ed8; }
+.ledger-mode--cheque { background: #fef3c7; color: #92400e; }
+
+.ledger-amount { font-weight: 600; }
+.ledger-amount--total { font-size: 1rem; color: #16a34a; }
+
+.ledger-total-row td {
+  background: var(--surface-alt, #f9fafb);
+  border-top: 2px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .ledger-controls { flex-direction: column; align-items: flex-start; }
+  .lsumm { min-width: 100px; }
+}

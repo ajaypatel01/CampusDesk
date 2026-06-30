@@ -21,6 +21,7 @@ import Admissions from './pages/Admissions'
 import Staff from './pages/Staff'
 import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
+import Ledger from './pages/Ledger'
 import Login from './pages/Login'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
@@ -68,6 +69,7 @@ function App() {
             <Route path="staff" element={<Staff />} />
             <Route path="tc-records" element={<TCRecords />} />
             <Route path="vouchers" element={<Vouchers />} />
+            <Route path="ledger" element={<Ledger />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />
             <Route path="results" element={<Results />} />
