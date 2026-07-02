@@ -19,6 +19,7 @@ import Rte from './pages/Rte'
 import Books from './pages/Books'
 import Admissions from './pages/Admissions'
 import Staff from './pages/Staff'
+import StaffDetail from './pages/StaffDetail'
 import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
@@ -67,6 +68,7 @@ function App() {
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/:id" element={<TeacherDetail />} />
             <Route path="staff" element={<Staff />} />
+            <Route path="staff/:id" element={<StaffDetail />} />
             <Route path="tc-records" element={<TCRecords />} />
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="ledger" element={<Ledger />} />
