@@ -136,6 +136,11 @@ function StaffDetail() {
             </span>
           </div>
           {p?.designation && <p className="sd-hero__designation">{p.designation}</p>}
+          {p?.salary != null && (
+            <p className="sd-hero__salary">
+              ₹{Number(p.salary).toLocaleString('en-IN')} <span>/ month</span>
+            </p>
+          )}
         </div>
         <button className="btn btn--outline sd-edit-btn" onClick={() => setEditing(true)}>
           <Edit3 size={15} /> Edit Profile
@@ -163,7 +168,7 @@ function StaffDetail() {
           </div>
           <Field label="Designation" value={p?.designation} />
           <Field label="Staff Type" value={p?.staff_type ? staffTypeLabels[p.staff_type] : null} />
-          <Field label="Salary" value={p?.salary != null && p.salary > 0 ? `₹${Number(p.salary).toLocaleString('en-IN')}` : null} />
+          <Field label="Salary" value={p?.salary != null ? `₹${Number(p.salary).toLocaleString('en-IN')} / month` : null} />
           <Field label="Education" value={p?.education_qualification} />
           <Field label="Professional Qual." value={p?.professional_qualification} />
         </div>

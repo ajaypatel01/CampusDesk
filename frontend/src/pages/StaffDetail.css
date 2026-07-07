@@ -65,6 +65,14 @@
 
 .sd-hero__designation { font-size: 0.875rem; color: var(--text-muted); margin: 0; }
 
+.sd-hero__salary {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #16a34a;
+  margin: 4px 0 0;
+}
+.sd-hero__salary span { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); }
+
 .sd-edit-btn { align-self: flex-start; white-space: nowrap; }
 
 /* Grid */
