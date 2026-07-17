@@ -40,6 +40,11 @@ function StudentDetail() {
       .finally(() => setLoading(false))
   }, [id, currentYear])
 
+  function toISODate(val) {
+    if (!val) return undefined
+    return new Date(val).toISOString()
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -47,9 +52,9 @@ function StudentDetail() {
         student_code: form.student_code,
         first_name: form.first_name,
         last_name: form.last_name,
-        gender: form.gender, date_of_birth: form.date_of_birth,
+        gender: form.gender, date_of_birth: toISODate(form.date_of_birth),
         phone: form.phone, email: form.email, address: form.address,
-        admission_date: form.admission_date, caste: form.caste, category: form.category,
+        admission_date: toISODate(form.admission_date), caste: form.caste, category: form.category,
         aadhar_number: form.aadhar_number, samagra_id: form.samagra_id,
         pen_number: form.pen_number, apar_id: form.apar_id,
         previous_school: form.previous_school,

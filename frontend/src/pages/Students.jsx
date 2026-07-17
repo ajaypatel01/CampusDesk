@@ -82,11 +82,22 @@ function Students() {
     setOffset(0)
   }
 
+  function toISODate(val) {
+    if (!val) return undefined
+    return new Date(val).toISOString()
+  }
+
   async function handleCreate(e) {
     e.preventDefault()
     setSaving(true)
     try {
-      await studentsApi.create({ ...form, school_id: currentSchool.id })
+      const body = {
+        ...form,
+        school_id: currentSchool.id,
+        date_of_birth: toISODate(form.date_of_birth),
+        admission_date: toISODate(form.admission_date),
+      }
+      await studentsApi.create(body)
       setShowModal(false)
       setForm({ student_code: '', first_name: '', last_name: '', gender: '', date_of_birth: '', phone: '', email: '', address: '', admission_date: '', caste: '', category: '', aadhar_number: '', status: 'active' })
       setOffset(0)
