@@ -8,6 +8,25 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+// SchoolScopeMiddleware ensures school_admin users can only access their own school's data.
+// It checks the school_id query param against the school_id in the JWT claims.
+func SchoolScopeMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims := ClaimsFromContext(r.Context())
+		if claims == nil || claims.Role == "super_admin" || claims.SchoolID == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// For school_admin/teacher/registrar/parent: validate school_id param if present
+		paramSchoolID := r.URL.Query().Get("school_id")
+		if paramSchoolID != "" && paramSchoolID != claims.SchoolID {
+			Error(w, http.StatusForbidden, "access denied: school mismatch")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func CommonMiddleware() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.RequestID,

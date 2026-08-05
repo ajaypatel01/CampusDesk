@@ -4,7 +4,7 @@ import { useTheme } from '../services/ThemeContext'
 import './Header.css'
 
 function Header({ onToggleSidebar }) {
-  const { schools, currentSchool, setCurrentSchool, academicYears, currentYear, setCurrentYear } = useSchool()
+  const { schools, currentSchool, setCurrentSchool, academicYears, currentYear, setCurrentYear, isSuperAdmin } = useSchool()
   const { theme, toggleTheme } = useTheme()
 
   return (
@@ -14,7 +14,7 @@ function Header({ onToggleSidebar }) {
           <Menu size={20} />
         </button>
         <div className="header__selectors">
-          {schools.length > 0 && (
+          {isSuperAdmin && schools.length > 1 ? (
             <select
               className="header__select"
               value={currentSchool?.id || ''}
@@ -27,7 +27,9 @@ function Header({ onToggleSidebar }) {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-          )}
+          ) : currentSchool ? (
+            <span className="header__school-name">{currentSchool.name}</span>
+          ) : null}
           {academicYears.length > 0 && (
             <select
               className="header__select"

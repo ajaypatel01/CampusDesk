@@ -49,16 +49,26 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.School,
 	return s, nil
 }
 
-func (r *Repository) List(ctx context.Context, limit, offset int) ([]domain.School, int, error) {
+func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offset int) ([]domain.School, int, error) {
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM schools`).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+	var rows pgx.Rows
+	var err error
 
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, code, address, phone, email, created_at, updated_at
-		FROM schools ORDER BY name LIMIT $1 OFFSET $2`, limit, offset,
-	)
+	if schoolID != nil {
+		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM schools WHERE id=$1`, *schoolID).Scan(&total); err != nil {
+			return nil, 0, err
+		}
+		rows, err = r.pool.Query(ctx, `
+			SELECT id, name, code, address, phone, email, created_at, updated_at
+			FROM schools WHERE id=$1 ORDER BY name LIMIT $2 OFFSET $3`, *schoolID, limit, offset)
+	} else {
+		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM schools`).Scan(&total); err != nil {
+			return nil, 0, err
+		}
+		rows, err = r.pool.Query(ctx, `
+			SELECT id, name, code, address, phone, email, created_at, updated_at
+			FROM schools ORDER BY name LIMIT $1 OFFSET $2`, limit, offset)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

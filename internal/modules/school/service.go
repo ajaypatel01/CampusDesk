@@ -54,8 +54,8 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*domain.School, error)
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context, limit, offset int) ([]domain.School, int, error) {
-	return s.repo.List(ctx, limit, offset)
+func (s *Service) List(ctx context.Context, schoolID *uuid.UUID, limit, offset int) ([]domain.School, int, error) {
+	return s.repo.List(ctx, schoolID, limit, offset)
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*domain.School, error) {

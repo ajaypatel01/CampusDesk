@@ -98,6 +98,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Protected routes — JWT required
 	api.Group(func(r chi.Router) {
 		r.Use(httpx.JWTMiddleware(cfg.Auth.JWTSecret))
+		r.Use(httpx.SchoolScopeMiddleware)
 		// expose feature flags so frontend can adapt UI
 		r.Get("/config", func(w http.ResponseWriter, r *http.Request) {
 			httpx.JSON(w, http.StatusOK, map[string]bool{

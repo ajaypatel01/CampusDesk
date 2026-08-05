@@ -3,12 +3,14 @@ import { schoolsApi, academicApi, getToken } from './api'
 
 const SchoolContext = createContext(null)
 
-export function SchoolProvider({ children }) {
+export function SchoolProvider({ user, children }) {
   const [schools, setSchools] = useState([])
   const [currentSchool, setCurrentSchool] = useState(null)
   const [academicYears, setAcademicYears] = useState([])
   const [currentYear, setCurrentYear] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  const isSuperAdmin = user?.role === 'super_admin'
 
   useEffect(() => {
     if (!getToken()) { setLoading(false); return }
@@ -36,9 +38,15 @@ export function SchoolProvider({ children }) {
 
   return (
     <SchoolContext.Provider value={{
-      schools, currentSchool, setCurrentSchool,
-      academicYears, currentYear, setCurrentYear,
+      schools,
+      currentSchool,
+      // school_admin cannot switch schools — their school is locked from the API response
+      setCurrentSchool: isSuperAdmin ? setCurrentSchool : () => {},
+      academicYears,
+      currentYear,
+      setCurrentYear,
       loading,
+      isSuperAdmin,
     }}>
       {children}
     </SchoolContext.Provider>

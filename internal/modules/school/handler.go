@@ -48,7 +48,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	p := pagination.FromRequest(r)
-	items, total, err := h.svc.List(r.Context(), p.Limit, p.Offset)
+	var schoolID *uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil && claims.Role != "super_admin" && claims.SchoolID != "" {
+		id, err := uuid.Parse(claims.SchoolID)
+		if err == nil {
+			schoolID = &id
+		}
+	}
+	items, total, err := h.svc.List(r.Context(), schoolID, p.Limit, p.Offset)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return

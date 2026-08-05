@@ -44,6 +44,14 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
+const roleLabel = {
+  super_admin: 'Owner',
+  school_admin: 'School Admin',
+  teacher: 'Teacher',
+  registrar: 'Registrar',
+  parent: 'Parent',
+}
+
 function Sidebar({ open, user, onLogout }) {
   const initials = user?.role ? user.role[0].toUpperCase() : 'A'
 
@@ -77,7 +85,7 @@ function Sidebar({ open, user, onLogout }) {
           <div className="sidebar__avatar">{initials}</div>
           {open && (
             <div className="sidebar__user-info">
-              <span className="sidebar__user-name">{user?.role || 'User'}</span>
+              <span className="sidebar__user-name">{roleLabel[user?.role] || user?.role || 'User'}</span>
               <button className="sidebar__logout" onClick={onLogout} title="Sign out">
                 <LogOut size={14} />
                 <span>Sign out</span>

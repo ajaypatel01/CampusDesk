@@ -86,3 +86,4 @@
   background: var(--gray-100);
   color: var(--gray-700);
 }
+.header__school-name { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }

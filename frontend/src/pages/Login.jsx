@@ -20,7 +20,7 @@ function Login({ onLogin }) {
     try {
       const res = await usersApi.login({ email, password })
       setToken(res.token)
-      onLogin(res.user)
+      onLogin()
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.message || 'Invalid email or password')

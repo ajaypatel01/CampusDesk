@@ -28,17 +28,18 @@ import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
 
-function App() {
-  const [user, setUser] = useState(() => {
-    const t = getToken()
-    if (!t) return null
-    try {
-      const payload = JSON.parse(atob(t.split('.')[1]))
-      return { id: payload.sub, role: payload.role }
-    } catch (_) { return null }
-  })
+function decodeUser(token) {
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return { id: payload.sub, role: payload.role, schoolId: payload.school_id || null }
+  } catch (_) { return null }
+}
 
-  function handleLogin(u) { setUser(u) }
+function App() {
+  const [user, setUser] = useState(() => decodeUser(getToken()))
+
+  function handleLogin() { setUser(decodeUser(getToken())) }
 
   function handleLogout() {
     clearToken()
@@ -56,7 +57,7 @@ function App() {
 
   return (
     <ConfigProvider>
-      <SchoolProvider>
+      <SchoolProvider user={user}>
         <Routes>
           <Route element={<Layout onLogout={handleLogout} user={user} />}>
             <Route index element={<Dashboard />} />

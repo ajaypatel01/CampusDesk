@@ -99,7 +99,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 		return nil, apperr.ErrUnauthorized
 	}
 	u.PasswordHash = ""
-	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), s.jwtSecret)
+	schoolID := ""
+	if u.SchoolID != nil {
+		schoolID = u.SchoolID.String()
+	}
+	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), schoolID, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
