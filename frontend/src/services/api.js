@@ -61,6 +61,8 @@ export const schoolsApi = {
   create: (body) => request('/schools', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => request(`/schools/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id) => request(`/schools/${id}`, { method: 'DELETE' }),
+  // Unauthenticated directory (id/name/code only) for the registration form's school picker.
+  publicList: () => request(`/schools/public`),
 }
 
 export const studentsApi = {
@@ -83,6 +85,11 @@ export const usersApi = {
   get: (id) => request(`/users/${id}`),
   create: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  // Public self-registration; account is created pending until an admin approves it.
+  register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  listPending: (params = {}) => request(`/users${qs({ ...params, status: 'pending' })}`),
+  approve: (id) => request(`/users/${id}/approve`, { method: 'POST' }),
+  reject: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
 }
 
 export const academicApi = {

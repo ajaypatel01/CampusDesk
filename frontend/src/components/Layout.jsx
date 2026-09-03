@@ -13,7 +13,7 @@ function Layout({ onLogout, user }) {
       <div className="layout__main">
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
         <main className="layout__content">
-          <Outlet />
+          <Outlet context={{ user }} />
         </main>
       </div>
     </div>

@@ -1,15 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee } from 'lucide-react'
+import { useOutletContext } from 'react-router-dom'
+import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, Check, X } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
-import { schoolsApi, academicApi, feesApi } from '../services/api'
+import { schoolsApi, academicApi, feesApi, usersApi } from '../services/api'
 import './Settings.css'
+
+const roleLabel = {
+  super_admin: 'Owner',
+  school_admin: 'School Admin',
+  teacher: 'Teacher',
+  registrar: 'Registrar',
+  parent: 'Parent',
+}
 
 function Settings() {
   const { currentSchool, setCurrentSchool, schools, academicYears, currentYear, setCurrentYear } = useSchool()
+  const { user } = useOutletContext() || {}
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'school_admin'
   const [activeTab, setActiveTab] = useState('school')
   const [grades, setGrades] = useState([])
   const [sections, setSections] = useState([])
   const [feeStructures, setFeeStructures] = useState([])
+  const [pendingUsers, setPendingUsers] = useState([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [approvalBusyId, setApprovalBusyId] = useState(null)
 
   const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
   const [feeForm, setFeeForm] = useState({ grade_level_id: '', tuition_fee_annual: '', van_fee_annual: '0', num_installments: '4' })
@@ -44,6 +58,34 @@ function Settings() {
       .then(res => setFeeStructures(res.items || []))
       .catch(() => setFeeStructures([]))
   }, [currentSchool, currentYear])
+
+  useEffect(() => {
+    if (!isAdmin || activeTab !== 'approvals') return
+    setPendingLoading(true)
+    usersApi.listPending(currentSchool ? { school_id: currentSchool.id } : {})
+      .then(res => setPendingUsers(res.items || []))
+      .catch(() => setPendingUsers([]))
+      .finally(() => setPendingLoading(false))
+  }, [isAdmin, activeTab, currentSchool])
+
+  async function handleApprove(id) {
+    setApprovalBusyId(id)
+    try {
+      await usersApi.approve(id)
+      setPendingUsers(list => list.filter(u => u.id !== id))
+    } catch (err) { alert(err.message) }
+    finally { setApprovalBusyId(null) }
+  }
+
+  async function handleReject(id) {
+    if (!confirm('Reject this registration request?')) return
+    setApprovalBusyId(id)
+    try {
+      await usersApi.reject(id)
+      setPendingUsers(list => list.filter(u => u.id !== id))
+    } catch (err) { alert(err.message) }
+    finally { setApprovalBusyId(null) }
+  }
 
   async function handleCreateSchool(e) {
     e.preventDefault()
@@ -134,6 +176,7 @@ function Settings() {
     { id: 'academic', label: 'Academic Years', icon: CalendarDays },
     { id: 'grades', label: 'Grades & Sections', icon: Layers },
     { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
+    ...(isAdmin ? [{ id: 'approvals', label: 'User Approvals', icon: UserCheck }] : []),
   ]
 
   return (
@@ -313,6 +356,52 @@ function Settings() {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'approvals' && isAdmin && (
+            <div className="settings-section">
+              <div className="settings-section__header">
+                <div>
+                  <h2>User Approvals</h2>
+                  <p className="settings-section__desc">Review and approve accounts requested through self-registration</p>
+                </div>
+              </div>
+              {pendingLoading ? (
+                <p className="empty-text">Loading...</p>
+              ) : pendingUsers.length === 0 ? (
+                <p className="empty-text">No pending registration requests.</p>
+              ) : (
+                <div className="settings-list">
+                  {pendingUsers.map(u => (
+                    <div key={u.id} className="settings-list__item">
+                      <div>
+                        <strong>{u.first_name} {u.last_name}</strong>
+                        <span className="badge badge--info">{roleLabel[u.role] || u.role}</span>
+                      </div>
+                      <div className="settings-list__details">
+                        <span>{u.email}</span>
+                      </div>
+                      <div className="settings-section__actions">
+                        <button
+                          className="btn btn--outline btn--sm"
+                          disabled={approvalBusyId === u.id}
+                          onClick={() => handleReject(u.id)}
+                        >
+                          <X size={14} /> Reject
+                        </button>
+                        <button
+                          className="btn btn--primary btn--sm"
+                          disabled={approvalBusyId === u.id}
+                          onClick={() => handleApprove(u.id)}
+                        >
+                          <Check size={14} /> Approve
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

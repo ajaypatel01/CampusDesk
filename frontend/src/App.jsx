@@ -24,6 +24,7 @@ import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
@@ -50,6 +51,7 @@ function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/register" element={<Register />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
@@ -83,6 +85,7 @@ function App() {
             <Route path="books" element={<Books />} />
             <Route path="settings" element={<Settings />} />
             <Route path="login" element={<Navigate to="/" replace />} />
+            <Route path="register" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </SchoolProvider>

@@ -27,6 +27,25 @@ func SchoolScopeMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// RequireRole restricts a route group to the given JWT roles (e.g. super_admin, school_admin).
+// Must run after JWTMiddleware so claims are already in the request context.
+func RequireRole(roles ...string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims := ClaimsFromContext(r.Context())
+			if claims == nil || !allowed[claims.Role] {
+				Error(w, http.StatusForbidden, "access denied: insufficient role")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func CommonMiddleware() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.RequestID,

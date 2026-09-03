@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -17,9 +18,10 @@ func New(pool *pgxpool.Pool, jwtSecret string) *Module {
 
 func (m *Module) Name() string { return "user" }
 
-// MountPublic registers only the login endpoint (no auth required).
+// MountPublic registers the login and self-registration endpoints (no auth required).
 func (m *Module) MountPublic(r chi.Router) {
 	r.Post("/auth/login", m.handler.Login)
+	r.Post("/auth/register", m.handler.Register)
 }
 
 // Mount registers all user management endpoints (auth required).
@@ -29,6 +31,12 @@ func (m *Module) Mount(r chi.Router) {
 		r.Post("/", m.handler.Create)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", m.handler.Get)
+			// Approving/rejecting a registration is an admin-only action.
+			r.Group(func(r chi.Router) {
+				r.Use(httpx.RequireRole("super_admin", "school_admin"))
+				r.Post("/approve", m.handler.Approve)
+				r.Post("/reject", m.handler.Reject)
+			})
 		})
 	})
 }

@@ -79,7 +79,8 @@
   color: var(--gray-600);
 }
 
-.login-field input {
+.login-field input,
+.login-field select {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid var(--gray-200);
@@ -91,9 +92,32 @@
   transition: all var(--transition);
 }
 
-.login-field input:focus {
+.login-field input:focus,
+.login-field select:focus {
   border-color: var(--primary-light);
   box-shadow: 0 0 0 3px var(--primary-50);
+}
+
+.login-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.login-field-row .login-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.login-switch {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.login-switch a {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .login-field__password {

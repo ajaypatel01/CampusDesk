@@ -58,6 +58,10 @@ func (s *Service) List(ctx context.Context, schoolID *uuid.UUID, limit, offset i
 	return s.repo.List(ctx, schoolID, limit, offset)
 }
 
+func (s *Service) ListPublic(ctx context.Context) ([]PublicSchool, error) {
+	return s.repo.ListPublic(ctx)
+}
+
 func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*domain.School, error) {
 	if err := validateInput(in.Name, in.Code); err != nil {
 		return nil, err

@@ -21,6 +21,16 @@ const (
 	RoleParent      UserRole = "parent"
 )
 
+// UserStatus tracks the approval state of a user account. Self-registered
+// accounts start as pending and cannot log in until an admin approves them.
+type UserStatus string
+
+const (
+	UserStatusPending  UserStatus = "pending"
+	UserStatusApproved UserStatus = "approved"
+	UserStatusRejected UserStatus = "rejected"
+)
+
 type EnrollmentStatus string
 
 const (

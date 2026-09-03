@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { GraduationCap, Eye, EyeOff } from 'lucide-react'
 import { usersApi } from '../services/api'
 import { setToken } from '../services/api'
@@ -72,6 +72,10 @@ function Login({ onLogin }) {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <p className="login-switch">
+          New here? <Link to="/register">Create an account</Link>
+        </p>
       </div>
     </div>
   )

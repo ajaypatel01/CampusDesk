@@ -17,6 +17,12 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "school" }
 
+// MountPublic registers the minimal, unauthenticated school directory used by the
+// self-registration form (no sensitive fields exposed).
+func (m *Module) MountPublic(r chi.Router) {
+	r.Get("/schools/public", m.handler.ListPublic)
+}
+
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/schools", func(r chi.Router) {
 		r.Get("/", m.handler.List)

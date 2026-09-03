@@ -85,6 +85,32 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offse
 	return schools, total, rows.Err()
 }
 
+// PublicSchool is the minimal, unauthenticated-safe shape of a school used to
+// populate the self-registration form's school picker.
+type PublicSchool struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Code string    `json:"code"`
+}
+
+func (r *Repository) ListPublic(ctx context.Context) ([]PublicSchool, error) {
+	rows, err := r.pool.Query(ctx, `SELECT id, name, code FROM schools ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var schools []PublicSchool
+	for rows.Next() {
+		var s PublicSchool
+		if err := rows.Scan(&s.ID, &s.Name, &s.Code); err != nil {
+			return nil, err
+		}
+		schools = append(schools, s)
+	}
+	return schools, rows.Err()
+}
+
 func (r *Repository) Update(ctx context.Context, s *domain.School) error {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE schools SET name=$2, code=$3, address=$4, phone=$5, email=$6, updated_at=NOW()

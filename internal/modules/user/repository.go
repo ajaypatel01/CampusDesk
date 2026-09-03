@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
@@ -23,10 +24,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, u *domain.User) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO users (school_id, email, password_hash, first_name, last_name, role, is_active)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO users (school_id, email, password_hash, first_name, last_name, role, status, is_active)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		RETURNING id, created_at, updated_at`,
-		u.SchoolID, u.Email, u.PasswordHash, u.FirstName, u.LastName, u.Role, u.IsActive,
+		u.SchoolID, u.Email, u.PasswordHash, u.FirstName, u.LastName, u.Role, u.Status, u.IsActive,
 	)
 	if err := row.Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -35,36 +36,56 @@ func (r *Repository) Create(ctx context.Context, u *domain.User) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at FROM users WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE id=$1`, id)
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at FROM users WHERE email=$1`, email)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE email=$1`, email)
 }
 
-func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offset int) ([]domain.User, int, error) {
+// UpdateStatus transitions a user's approval status (e.g. pending -> approved/rejected)
+// and syncs is_active accordingly (only approved users may log in).
+func (r *Repository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.UserStatus, isActive bool) (*domain.User, error) {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET status=$2, is_active=$3, updated_at=NOW() WHERE id=$1`, id, status, isActive)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, apperr.ErrNotFound
+	}
+	return r.GetByID(ctx, id)
+}
+
+func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domain.UserStatus, limit, offset int) ([]domain.User, int, error) {
 	var total int
 	var rows pgx.Rows
 	var err error
 
+	where := make([]string, 0, 2)
+	args := make([]interface{}, 0, 4)
 	if schoolID != nil {
-		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE school_id=$1`, *schoolID).Scan(&total); err != nil {
-			return nil, 0, err
-		}
-		rows, err = r.pool.Query(ctx, `
-			SELECT id, school_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at
-			FROM users WHERE school_id=$1 ORDER BY last_name, first_name LIMIT $2 OFFSET $3`,
-			*schoolID, limit, offset,
-		)
-	} else {
-		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {
-			return nil, 0, err
-		}
-		rows, err = r.pool.Query(ctx, `
-			SELECT id, school_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at
-			FROM users ORDER BY last_name, first_name LIMIT $1 OFFSET $2`, limit, offset,
-		)
+		args = append(args, *schoolID)
+		where = append(where, fmt.Sprintf("school_id=$%d", len(args)))
 	}
+	if status != "" {
+		args = append(args, status)
+		where = append(where, fmt.Sprintf("status=$%d", len(args)))
+	}
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = "WHERE " + strings.Join(where, " AND ")
+	}
+
+	if err = r.pool.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause), args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	limitArgs := append(append([]interface{}{}, args...), limit, offset)
+	rows, err = r.pool.Query(ctx, fmt.Sprintf(`
+		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at
+		FROM users %s ORDER BY last_name, first_name LIMIT $%d OFFSET $%d`,
+		whereClause, len(args)+1, len(args)+2), limitArgs...,
+	)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -103,6 +124,6 @@ type scannable interface {
 
 func scanRow(row scannable) (*domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	return &u, err
 }

@@ -63,6 +63,16 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, pagination.NewListResponse(items, total, p.Limit, p.Offset))
 }
 
+// ListPublic serves the unauthenticated school directory used by the registration form.
+func (h *Handler) ListPublic(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.ListPublic(r.Context())
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
