@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2 } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
@@ -12,10 +13,15 @@ function downloadBlob(blob, filename) {
 }
 
 function Results() {
+  const { user } = useOutletContext() || {}
+  const isTeacher = user?.role === 'teacher'
   const { currentSchool, currentYear } = useSchool()
   const [tab, setTab] = useState('subjects')
   const [grades, setGrades] = useState([])
   const [selectedGrade, setSelectedGrade] = useState('')
+  // Grade level ids of the class section(s) this teacher is homeroom teacher of —
+  // a class teacher only sees results for their own class, not the whole school.
+  const [myGradeIds, setMyGradeIds] = useState(null)
 
   // Subjects
   const [subjects, setSubjects] = useState([])
@@ -44,10 +50,32 @@ function Results() {
 
   useEffect(() => {
     if (!currentSchool) return
+    if (isTeacher) {
+      // A class teacher only sees results for the grade(s) of their own homeroom section(s).
+      if (!currentYear) return
+      Promise.all([
+        academicApi.listGrades(currentSchool.id),
+        academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id }),
+      ]).then(([gradeRes, sectionRes]) => {
+        const allGrades = gradeRes.items || []
+        const myGrades = new Set(
+          (sectionRes.items || [])
+            .filter(s => s.homeroom_teacher_id === user.id)
+            .map(s => s.grade_level_id)
+        )
+        // No homeroom class assigned yet anywhere — nothing to restrict to, so show everything
+        // (mirrors the backend's fallback so we don't lock teachers out before setup is done).
+        const g = myGrades.size === 0 ? allGrades : allGrades.filter(gr => myGrades.has(gr.id))
+        setMyGradeIds(myGrades)
+        setGrades(g)
+        setSelectedGrade(prev => (prev && g.some(gr => gr.id === prev)) ? prev : (g[0]?.id || ''))
+      }).catch(() => { setGrades([]); setMyGradeIds(new Set()) })
+      return
+    }
     academicApi.listGrades(currentSchool.id)
       .then(r => { const g = r.items || []; setGrades(g); if (g.length) setSelectedGrade(g[0].id) })
       .catch(() => {})
-  }, [currentSchool])
+  }, [currentSchool, currentYear, isTeacher, user?.id])
 
   useEffect(() => {
     if (!currentSchool || !currentYear || !selectedGrade) return
@@ -55,9 +83,17 @@ function Results() {
       .then(r => setSubjects(r.items || [])).catch(() => {})
     resultsApi.listExams({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
       .then(r => setExams(r.items || [])).catch(() => {})
-    studentsApi.list({ school_id: currentSchool.id, limit: 500 })
+    const gradeName = grades.find(g => g.id === selectedGrade)?.name
+    const studentParams = { school_id: currentSchool.id, limit: 500 }
+    // Scope the student picker to this class teacher's own grade — the backend still
+    // enforces this independently, but there's no reason to show other classes' students.
+    if (isTeacher && gradeName) {
+      studentParams.academic_year_id = currentYear.id
+      studentParams.grade_level = gradeName
+    }
+    studentsApi.list(studentParams)
       .then(r => setStudents(r.items || [])).catch(() => {})
-  }, [currentSchool, currentYear, selectedGrade])
+  }, [currentSchool, currentYear, selectedGrade, grades, isTeacher])
 
   useEffect(() => {
     if (!selectedGrade) return
@@ -169,11 +205,13 @@ function Results() {
         <div className="results-section">
           <div className="results-section__header">
             <h2>Subjects for {grades.find(g => g.id === selectedGrade)?.name || '—'}</h2>
-            <button className="btn btn--primary" onClick={() => setShowSubjectForm(!showSubjectForm)}>
-              <Plus size={16} /> Add Subject
-            </button>
+            {!isTeacher && (
+              <button className="btn btn--primary" onClick={() => setShowSubjectForm(!showSubjectForm)}>
+                <Plus size={16} /> Add Subject
+              </button>
+            )}
           </div>
-          {showSubjectForm && (
+          {!isTeacher && showSubjectForm && (
             <form className="results-inline-form" onSubmit={handleAddSubject}>
               <div className="form-row">
                 <label className="form-field"><span>Name *</span><input required value={subjectForm.name} onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })} placeholder="e.g. Mathematics" /></label>
@@ -202,7 +240,11 @@ function Results() {
                     <td className="data-table__muted">{s.code || '-'}</td>
                     <td>{s.max_marks}</td>
                     <td>{s.passing_marks}</td>
-                    <td><button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)}><Trash2 size={14} /></button></td>
+                    <td>
+                      {!isTeacher && (
+                        <button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)}><Trash2 size={14} /></button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -216,11 +258,13 @@ function Results() {
         <div className="results-section">
           <div className="results-section__header">
             <h2>Exams</h2>
-            <button className="btn btn--primary" onClick={() => setShowExamForm(!showExamForm)}>
-              <Plus size={16} /> Add Exam
-            </button>
+            {!isTeacher && (
+              <button className="btn btn--primary" onClick={() => setShowExamForm(!showExamForm)}>
+                <Plus size={16} /> Add Exam
+              </button>
+            )}
           </div>
-          {showExamForm && (
+          {!isTeacher && showExamForm && (
             <form className="results-inline-form" onSubmit={handleAddExam}>
               <div className="form-row">
                 <label className="form-field"><span>Exam Name *</span><input required value={examForm.name} onChange={e => setExamForm({ ...examForm, name: e.target.value })} placeholder="e.g. Unit Test 1" /></label>

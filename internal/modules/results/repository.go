@@ -274,6 +274,63 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 	return &ms, nil
 }
 
+// ---- Class-teacher scoping ----
+
+// TeacherHasAnyHomeroom reports whether teacherID is homeroom teacher of any
+// section at all, in any year. Schools that haven't set up class sections yet
+// use this to fall back to unrestricted access instead of locking every teacher out.
+func (r *Repository) TeacherHasAnyHomeroom(ctx context.Context, teacherID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE homeroom_teacher_id=$1)`,
+		teacherID,
+	).Scan(&exists)
+	return exists, err
+}
+
+// TeacherOwnsGrade reports whether teacherID is the homeroom teacher of any
+// section in gradeLevelID, in any academic year.
+func (r *Repository) TeacherOwnsGrade(ctx context.Context, teacherID, gradeLevelID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE grade_level_id=$1 AND homeroom_teacher_id=$2)`,
+		gradeLevelID, teacherID,
+	).Scan(&exists)
+	return exists, err
+}
+
+// TeacherOwnsGradeInYear is like TeacherOwnsGrade but scoped to one academic year.
+func (r *Repository) TeacherOwnsGradeInYear(ctx context.Context, teacherID, academicYearID, gradeLevelID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE grade_level_id=$1 AND academic_year_id=$2 AND homeroom_teacher_id=$3)`,
+		gradeLevelID, academicYearID, teacherID,
+	).Scan(&exists)
+	return exists, err
+}
+
+// TeacherOwnsStudent reports whether studentID is enrolled, in academicYearID,
+// in a section homeroomed by teacherID.
+func (r *Repository) TeacherOwnsStudent(ctx context.Context, teacherID, academicYearID, studentID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM enrollments e
+			JOIN class_sections cs ON cs.id = e.class_section_id
+			WHERE e.student_id=$1 AND e.academic_year_id=$2 AND cs.homeroom_teacher_id=$3
+		)`,
+		studentID, academicYearID, teacherID,
+	).Scan(&exists)
+	return exists, err
+}
+
+// ExamAcademicYear returns the academic year an exam belongs to.
+func (r *Repository) ExamAcademicYear(ctx context.Context, examID uuid.UUID) (uuid.UUID, error) {
+	var yearID uuid.UUID
+	err := r.pool.QueryRow(ctx, `SELECT academic_year_id FROM exams WHERE id=$1`, examID).Scan(&yearID)
+	return yearID, err
+}
+
 func gradeFromPercent(pct float64) (grade string, gp float64) {
 	switch {
 	case pct >= 91:

@@ -27,14 +27,15 @@ func (m *Module) Name() string { return "results" }
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/subjects", func(r chi.Router) {
 		r.Get("/", m.ListSubjects)
-		r.Post("/", m.CreateSubject)
-		r.Put("/{id}", m.UpdateSubject)
-		r.Delete("/{id}", m.DeleteSubject)
+		// Subject/exam setup is admin work; class teachers only view and enter marks.
+		r.With(httpx.BlockRoles("teacher")).Post("/", m.CreateSubject)
+		r.With(httpx.BlockRoles("teacher")).Put("/{id}", m.UpdateSubject)
+		r.With(httpx.BlockRoles("teacher")).Delete("/{id}", m.DeleteSubject)
 	})
 	r.Route("/exams", func(r chi.Router) {
 		r.Get("/", m.ListExams)
-		r.Post("/", m.CreateExam)
-		r.Post("/{id}/publish", m.PublishExam)
+		r.With(httpx.BlockRoles("teacher")).Post("/", m.CreateExam)
+		r.With(httpx.BlockRoles("teacher")).Post("/{id}/publish", m.PublishExam)
 	})
 	r.Route("/exam-marks", func(r chi.Router) {
 		r.Post("/", m.UpsertMark)
@@ -90,6 +91,13 @@ func (m *Module) ListSubjects(w http.ResponseWriter, r *http.Request) {
 	gradeID, _ := uuid.Parse(r.URL.Query().Get("grade_level_id"))
 	if schoolID == uuid.Nil || gradeID == uuid.Nil {
 		httpx.Error(w, http.StatusBadRequest, "school_id and grade_level_id required")
+		return
+	}
+	if ok, err := m.teacherCanAccessGrade(r.Context(), httpx.ClaimsFromContext(r.Context()), gradeID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 		return
 	}
 	items, err := m.repo.ListSubjects(r.Context(), schoolID, gradeID)
@@ -158,6 +166,13 @@ func (m *Module) ListExams(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "school_id, academic_year_id, grade_level_id required")
 		return
 	}
+	if ok, err := m.teacherCanAccessGradeInYear(r.Context(), httpx.ClaimsFromContext(r.Context()), yearID, gradeID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
 	items, err := m.repo.ListExams(r.Context(), schoolID, yearID, gradeID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -192,6 +207,13 @@ func (m *Module) UpsertMark(w http.ResponseWriter, r *http.Request) {
 	if mark.MaxMarks <= 0 {
 		mark.MaxMarks = 100
 	}
+	if ok, err := m.teacherCanAccessMarks(r.Context(), httpx.ClaimsFromContext(r.Context()), []domain.ExamMark{mark}); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
 	if err := m.repo.UpsertMark(r.Context(), &mark); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -205,6 +227,13 @@ func (m *Module) BulkUpsertMarks(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if ok, err := m.teacherCanAccessMarks(r.Context(), httpx.ClaimsFromContext(r.Context()), body.Marks); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 		return
 	}
 	saved, err := m.bulkUpsert(r.Context(), body.Marks)
@@ -242,6 +271,13 @@ func (m *Module) GetMarksheet(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "student_id required")
 		return
 	}
+	if ok, err := m.teacherCanAccessExamStudent(r.Context(), httpx.ClaimsFromContext(r.Context()), examID, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
 	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -259,6 +295,13 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "student_id required")
+		return
+	}
+	if ok, err := m.teacherCanAccessExamStudent(r.Context(), httpx.ClaimsFromContext(r.Context()), examID, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 		return
 	}
 	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
@@ -281,5 +324,85 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(pdfBytes)
+}
+
+// ---- Class-teacher scoping helpers ----
+//
+// A teacher only sees/enters results for the grade(s)/student(s) of the class
+// section(s) where they are the homeroom teacher. Every other role is unaffected.
+
+// teacherIDIfRestricted returns the requester's user id and restricted=true only when
+// the requester is a teacher who is homeroom teacher of at least one class section
+// somewhere. A teacher with no homeroom class assigned yet (nothing set up) falls back
+// to unrestricted access instead of being locked out of Results entirely.
+func (m *Module) teacherIDIfRestricted(ctx context.Context, claims *httpx.Claims) (teacherID uuid.UUID, restricted bool, err error) {
+	if claims == nil || claims.Role != "teacher" {
+		return uuid.Nil, false, nil
+	}
+	teacherID, err = uuid.Parse(claims.Sub)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	hasHomeroom, err := m.repo.TeacherHasAnyHomeroom(ctx, teacherID)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	return teacherID, hasHomeroom, nil
+}
+
+func (m *Module) teacherCanAccessGrade(ctx context.Context, claims *httpx.Claims, gradeID uuid.UUID) (bool, error) {
+	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
+	if err != nil || !restricted {
+		return err == nil, err
+	}
+	return m.repo.TeacherOwnsGrade(ctx, teacherID, gradeID)
+}
+
+func (m *Module) teacherCanAccessGradeInYear(ctx context.Context, claims *httpx.Claims, yearID, gradeID uuid.UUID) (bool, error) {
+	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
+	if err != nil || !restricted {
+		return err == nil, err
+	}
+	return m.repo.TeacherOwnsGradeInYear(ctx, teacherID, yearID, gradeID)
+}
+
+func (m *Module) teacherCanAccessExamStudent(ctx context.Context, claims *httpx.Claims, examID, studentID uuid.UUID) (bool, error) {
+	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
+	if err != nil || !restricted {
+		return err == nil, err
+	}
+	yearID, err := m.repo.ExamAcademicYear(ctx, examID)
+	if err != nil {
+		return false, err
+	}
+	return m.repo.TeacherOwnsStudent(ctx, teacherID, yearID, studentID)
+}
+
+// teacherCanAccessMarks checks every mark's (exam, student) pair against the teacher's
+// homeroom class, caching each exam's academic year to avoid repeat lookups in a bulk save.
+func (m *Module) teacherCanAccessMarks(ctx context.Context, claims *httpx.Claims, marks []domain.ExamMark) (bool, error) {
+	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
+	if err != nil || !restricted {
+		return err == nil, err
+	}
+	examYears := map[uuid.UUID]uuid.UUID{}
+	for _, mk := range marks {
+		yearID, ok := examYears[mk.ExamID]
+		if !ok {
+			yearID, err = m.repo.ExamAcademicYear(ctx, mk.ExamID)
+			if err != nil {
+				return false, err
+			}
+			examYears[mk.ExamID] = yearID
+		}
+		owns, err := m.repo.TeacherOwnsStudent(ctx, teacherID, yearID, mk.StudentID)
+		if err != nil {
+			return false, err
+		}
+		if !owns {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
