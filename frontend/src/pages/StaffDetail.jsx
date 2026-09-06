@@ -23,6 +23,12 @@ const roleBadge = {
 
 const staffTypeLabels = { teaching: 'Teaching', non_teaching: 'Non-Teaching' }
 
+const DESIGNATION_OPTIONS = [
+  'Principal', 'Pre Primary Teacher', 'Primary Teacher', 'Upper Primary Teacher',
+  'Secondary Teacher', 'Receptionist', 'Registrar', 'Driver', 'Cleaning Staff',
+  'Housekeeping Staff', 'Peon',
+]
+
 function Field({ label, value }) {
   return (
     <div className="sd-field">
@@ -228,7 +234,16 @@ function StaffDetail() {
 
               <p className="sd-modal__section-title">HR</p>
               <div className="sd-form-row">
-                <label>Designation<input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Head Teacher" /></label>
+                <label>Job Profile
+                  <select
+                    value={DESIGNATION_OPTIONS.includes(form.designation) ? form.designation : (form.designation ? 'Other' : '')}
+                    onChange={e => set('designation', e.target.value === 'Other' ? '' : e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {DESIGNATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                    <option value="Other">Other (custom)</option>
+                  </select>
+                </label>
                 <label>Staff Type
                   <select value={form.staff_type} onChange={e => set('staff_type', e.target.value)}>
                     <option value="teaching">Teaching</option>
@@ -236,6 +251,11 @@ function StaffDetail() {
                   </select>
                 </label>
               </div>
+              {!DESIGNATION_OPTIONS.includes(form.designation) && (
+                <div className="sd-form-row">
+                  <label>Custom Job Profile<input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Lab Assistant" /></label>
+                </div>
+              )}
               <div className="sd-form-row">
                 <label>Salary (₹)<input type="number" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="Monthly salary" /></label>
               </div>
