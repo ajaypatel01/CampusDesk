@@ -37,7 +37,7 @@ func (r *Repository) Create(ctx context.Context, s *domain.School) error {
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.School, error) {
 	s := &domain.School{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, name, code, address, phone, email, created_at, updated_at
+		SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
 		FROM schools WHERE id = $1`, id,
 	).Scan(&s.ID, &s.Name, &s.Code, &s.Address, &s.Phone, &s.Email, &s.CreatedAt, &s.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -59,14 +59,14 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offse
 			return nil, 0, err
 		}
 		rows, err = r.pool.Query(ctx, `
-			SELECT id, name, code, address, phone, email, created_at, updated_at
+			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
 			FROM schools WHERE id=$1 ORDER BY name LIMIT $2 OFFSET $3`, *schoolID, limit, offset)
 	} else {
 		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM schools`).Scan(&total); err != nil {
 			return nil, 0, err
 		}
 		rows, err = r.pool.Query(ctx, `
-			SELECT id, name, code, address, phone, email, created_at, updated_at
+			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
 			FROM schools ORDER BY name LIMIT $1 OFFSET $2`, limit, offset)
 	}
 	if err != nil {

@@ -24,9 +24,10 @@ const staffSelect = `
 	SELECT
 		u.id, u.school_id, u.email, u.first_name, u.last_name, u.role, u.is_active, u.created_at, u.updated_at,
 		sp.id, sp.user_id, sp.guardian_name, sp.aadhar_number, sp.education_qualification,
-		sp.professional_qualification, sp.designation, sp.salary,
+		sp.professional_qualification, sp.designation, COALESCE(sp.salary, 0) AS salary,
 		sp.bank_name, sp.bank_ifsc, sp.bank_branch, sp.bank_account_number, sp.bank_account_holder,
-		sp.phone, sp.staff_type, sp.created_at, sp.updated_at
+		sp.phone, sp.staff_type,
+		COALESCE(sp.created_at, u.created_at), COALESCE(sp.updated_at, u.updated_at)
 	FROM users u
 	LEFT JOIN staff_profiles sp ON sp.user_id = u.id`
 
