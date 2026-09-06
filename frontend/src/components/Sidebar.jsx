@@ -45,7 +45,7 @@ const navItems = [
   { to: '/books', icon: Library, label: 'Books', deny: ['registrar'] },
   { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar'] },
   { to: '/payroll', icon: Wallet, label: 'Payroll', only: ['super_admin'] },
-  { to: '/settings', icon: Settings, label: 'Settings', deny: ['registrar'] },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 const roleLabel = {

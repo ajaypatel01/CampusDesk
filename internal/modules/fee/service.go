@@ -58,6 +58,7 @@ type CreateFeeAccountInput struct {
 }
 
 type UpdateFeeAccountInput struct {
+	TuitionFee       *int    `json:"tuition_fee"`
 	DiscountAmount   *int    `json:"discount_amount"`
 	DiscountReason   *string `json:"discount_reason"`
 	PreviousYearDues *int    `json:"previous_year_dues"`
@@ -146,6 +147,7 @@ type GradeFeeSummary struct {
 }
 
 type StudentFeeSummaryResponse struct {
+	AccountID        uuid.UUID           `json:"account_id"`
 	StudentID        uuid.UUID           `json:"student_id"`
 	StudentName      string              `json:"student_name"`
 	StudentCode      string              `json:"student_code"`
@@ -384,6 +386,9 @@ func (s *Service) UpdateFeeAccount(ctx context.Context, id uuid.UUID, in UpdateF
 	if err != nil {
 		return nil, err
 	}
+	if in.TuitionFee != nil {
+		fa.TuitionFee = *in.TuitionFee
+	}
 	if in.DiscountAmount != nil {
 		fa.DiscountAmount = *in.DiscountAmount
 	}
@@ -509,6 +514,7 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 	}
 
 	return &StudentFeeSummaryResponse{
+		AccountID:        fa.ID,
 		StudentID:        studentID,
 		StudentName:      name,
 		StudentCode:      code,

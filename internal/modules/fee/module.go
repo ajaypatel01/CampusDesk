@@ -22,21 +22,24 @@ func (m *Module) Name() string { return "fee" }
 func (m *Module) Mount(r chi.Router) {
 	h := m.handler
 
+	// Editing fee amounts is limited to admins and registrars; everyone else stays read-only.
+	canEditFees := httpx.RequireRole("super_admin", "school_admin", "registrar")
+
 	r.Route("/fee-structures", func(r chi.Router) {
 		r.Get("/", h.ListFeeStructures)
-		r.Post("/", h.CreateFeeStructure)
+		r.With(canEditFees).Post("/", h.CreateFeeStructure)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", h.GetFeeStructure)
-			r.Put("/", h.UpdateFeeStructure)
+			r.With(canEditFees).Put("/", h.UpdateFeeStructure)
 		})
 	})
 
 	r.Route("/fee-accounts", func(r chi.Router) {
 		r.Get("/", h.ListFeeAccounts)
-		r.Post("/", h.CreateFeeAccount)
+		r.With(canEditFees).Post("/", h.CreateFeeAccount)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", h.GetFeeAccount)
-			r.Put("/", h.UpdateFeeAccount)
+			r.With(canEditFees).Put("/", h.UpdateFeeAccount)
 		})
 	})
 

@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useOutletContext } from 'react-router-dom'
 import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee } from 'lucide-react'
 import { studentsApi, guardiansApi, feesApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import './StudentDetail.css'
 
+const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
+
 function StudentDetail() {
   const { id } = useParams()
   const { currentYear } = useSchool()
+  const { user } = useOutletContext() || {}
+  const canEditFees = FEE_EDITOR_ROLES.includes(user?.role)
   const [student, setStudent] = useState(null)
   const [guardians, setGuardians] = useState([])
   const [feeSummary, setFeeSummary] = useState(null)
@@ -17,6 +21,9 @@ function StudentDetail() {
   const [saving, setSaving] = useState(false)
   const [showGuardianModal, setShowGuardianModal] = useState(false)
   const [guardianForm, setGuardianForm] = useState({ first_name: '', last_name: '', phone: '', email: '', relation: '', aadhar_number: '' })
+  const [feeEditing, setFeeEditing] = useState(false)
+  const [feeForm, setFeeForm] = useState({})
+  const [feeSaving, setFeeSaving] = useState(false)
 
   function fmt(amt) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amt || 0)
@@ -36,9 +43,37 @@ function StudentDetail() {
       setForm(s)
       setGuardians(g.items || [])
       setFeeSummary(fee || null)
+      if (fee) {
+        setFeeForm({
+          tuition_fee: fee.tuition_fee, discount_amount: fee.discount_amount,
+          discount_reason: fee.discount_reason || '', van_fee: fee.van_fee,
+          previous_year_dues: fee.previous_year_dues,
+        })
+      }
     }).catch(() => {})
       .finally(() => setLoading(false))
   }, [id, currentYear])
+
+  async function handleSaveFee() {
+    if (!feeSummary?.account_id) return
+    setFeeSaving(true)
+    try {
+      await feesApi.updateAccount(feeSummary.account_id, {
+        tuition_fee: parseInt(feeForm.tuition_fee, 10) || 0,
+        discount_amount: parseInt(feeForm.discount_amount, 10) || 0,
+        discount_reason: feeForm.discount_reason,
+        van_fee: parseInt(feeForm.van_fee, 10) || 0,
+        previous_year_dues: parseInt(feeForm.previous_year_dues, 10) || 0,
+      })
+      const updated = await feesApi.studentSummary(id, currentYear.id)
+      setFeeSummary(updated)
+      setFeeEditing(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setFeeSaving(false)
+    }
+  }
 
   function toISODate(val) {
     if (!val) return undefined
@@ -190,15 +225,28 @@ function StudentDetail() {
           <div className="detail-card">
             <div className="detail-card__header">
               <h3><IndianRupee size={16} /> Fee Summary ({feeSummary.academic_year_id ? currentYear?.name : ''})</h3>
-              <Link to={`/fees`} className="btn btn--outline btn--sm">View All Fees</Link>
+              <div className="student-detail__actions">
+                {canEditFees && (feeEditing ? (
+                  <>
+                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues }) }}><X size={14} /> Cancel</button>
+                    <button className="btn btn--primary btn--sm" onClick={handleSaveFee} disabled={feeSaving}><Save size={14} /> {feeSaving ? 'Saving...' : 'Save'}</button>
+                  </>
+                ) : (
+                  <button className="btn btn--outline btn--sm" onClick={() => setFeeEditing(true)}><Edit2 size={14} /> Edit Fees</button>
+                ))}
+                <Link to={`/fees`} className="btn btn--outline btn--sm">View All Fees</Link>
+              </div>
             </div>
             <div className="detail-fields">
               <Field label="Class" value={feeSummary.grade_level_name} editing={false} />
-              <Field label="Tuition Fee" value={fmt(feeSummary.tuition_fee)} editing={false} />
-              <Field label="Discount" value={feeSummary.discount_amount ? `${fmt(feeSummary.discount_amount)}${feeSummary.discount_reason ? ` (${feeSummary.discount_reason})` : ''}` : '-'} editing={false} />
+              <Field label="Tuition Fee" value={feeEditing ? feeForm.tuition_fee : fmt(feeSummary.tuition_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, tuition_fee: v })} />
+              <Field label="Discount" value={feeEditing ? feeForm.discount_amount : (feeSummary.discount_amount ? `${fmt(feeSummary.discount_amount)}${feeSummary.discount_reason ? ` (${feeSummary.discount_reason})` : ''}` : '-')} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, discount_amount: v })} />
+              {feeEditing && (
+                <Field label="Discount Reason" value={feeForm.discount_reason} editing={true} onChange={v => setFeeForm({ ...feeForm, discount_reason: v })} />
+              )}
               <Field label="Net Tuition" value={fmt(feeSummary.net_tuition_fee)} editing={false} />
-              <Field label="Van Fee" value={fmt(feeSummary.van_fee)} editing={false} />
-              <Field label="Previous Dues" value={fmt(feeSummary.previous_year_dues)} editing={false} />
+              <Field label="Van Fee" value={feeEditing ? feeForm.van_fee : fmt(feeSummary.van_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, van_fee: v })} />
+              <Field label="Previous Dues" value={feeEditing ? feeForm.previous_year_dues : fmt(feeSummary.previous_year_dues)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, previous_year_dues: v })} />
               <Field label="Total Due" value={fmt(feeSummary.total_due)} editing={false} />
               <Field label="Total Paid" value={fmt(feeSummary.total_paid)} editing={false} />
               <Field label="Balance" value={fmt(feeSummary.balance_remaining)} editing={false} />

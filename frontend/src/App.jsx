@@ -33,7 +33,7 @@ import { ConfigProvider } from './services/ConfigContext'
 
 // Pages a registrar isn't allowed to open, even by typing the URL directly —
 // mirrors the backend's BlockRoles("registrar") checks on the same modules.
-const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/settings', '/fee-report']
+const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/fee-report']
 // Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
 const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
 

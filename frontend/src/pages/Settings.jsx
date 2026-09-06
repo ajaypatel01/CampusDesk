@@ -17,7 +17,8 @@ function Settings() {
   const { currentSchool, setCurrentSchool, schools, academicYears, currentYear, setCurrentYear } = useSchool()
   const { user } = useOutletContext() || {}
   const isAdmin = user?.role === 'super_admin' || user?.role === 'school_admin'
-  const [activeTab, setActiveTab] = useState('school')
+  const isRegistrar = user?.role === 'registrar'
+  const [activeTab, setActiveTab] = useState(isRegistrar ? 'fees' : 'school')
   const [grades, setGrades] = useState([])
   const [sections, setSections] = useState([])
   const [feeStructures, setFeeStructures] = useState([])
@@ -26,6 +27,7 @@ function Settings() {
   const [approvalBusyId, setApprovalBusyId] = useState(null)
 
   const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
+  const [editingFeeStructureId, setEditingFeeStructureId] = useState(null)
   const [feeForm, setFeeForm] = useState({ grade_level_id: '', tuition_fee_annual: '', van_fee_annual: '0', num_installments: '4' })
 
   const [showSchoolModal, setShowSchoolModal] = useState(false)
@@ -142,24 +144,44 @@ function Settings() {
     finally { setSaving(false) }
   }
 
-  async function handleCreateFeeStructure(e) {
+  async function handleSaveFeeStructure(e) {
     e.preventDefault()
     setSaving(true)
     try {
-      await feesApi.createStructure({
-        school_id: currentSchool.id,
-        academic_year_id: currentYear.id,
-        grade_level_id: feeForm.grade_level_id,
-        tuition_fee_annual: parseInt(feeForm.tuition_fee_annual, 10),
-        num_installments: parseInt(feeForm.num_installments, 10) || 4,
-        van_fee_annual: parseInt(feeForm.van_fee_annual, 10) || 0,
-      })
+      if (editingFeeStructureId) {
+        await feesApi.updateStructure(editingFeeStructureId, {
+          tuition_fee_annual: parseInt(feeForm.tuition_fee_annual, 10),
+          num_installments: parseInt(feeForm.num_installments, 10) || 4,
+          van_fee_annual: parseInt(feeForm.van_fee_annual, 10) || 0,
+        })
+      } else {
+        await feesApi.createStructure({
+          school_id: currentSchool.id,
+          academic_year_id: currentYear.id,
+          grade_level_id: feeForm.grade_level_id,
+          tuition_fee_annual: parseInt(feeForm.tuition_fee_annual, 10),
+          num_installments: parseInt(feeForm.num_installments, 10) || 4,
+          van_fee_annual: parseInt(feeForm.van_fee_annual, 10) || 0,
+        })
+      }
       setShowFeeStructureModal(false)
+      setEditingFeeStructureId(null)
       setFeeForm({ grade_level_id: '', tuition_fee_annual: '', van_fee_annual: '0', num_installments: '4' })
       const res = await feesApi.listStructures({ school_id: currentSchool.id, academic_year_id: currentYear.id })
       setFeeStructures(res.items || [])
     } catch (err) { alert(err.message) }
     finally { setSaving(false) }
+  }
+
+  function openEditFeeStructure(fs) {
+    setEditingFeeStructureId(fs.id)
+    setFeeForm({
+      grade_level_id: fs.grade_level_id,
+      tuition_fee_annual: String(fs.tuition_fee_annual),
+      van_fee_annual: String(fs.van_fee_annual || 0),
+      num_installments: String(fs.num_installments),
+    })
+    setShowFeeStructureModal(true)
   }
 
   function fmt(amt) {
@@ -171,7 +193,9 @@ function Settings() {
     return g ? g.name : glId
   }
 
-  const tabs = [
+  const tabs = isRegistrar ? [
+    { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
+  ] : [
     { id: 'school', label: 'School', icon: Building },
     { id: 'academic', label: 'Academic Years', icon: CalendarDays },
     { id: 'grades', label: 'Grades & Sections', icon: Layers },
@@ -320,7 +344,7 @@ function Settings() {
                   <p className="settings-section__desc">Annual fee per grade for {currentYear?.name || 'current year'}</p>
                 </div>
                 {currentSchool && currentYear && (
-                  <button className="btn btn--primary btn--sm" onClick={() => setShowFeeStructureModal(true)}>
+                  <button className="btn btn--primary btn--sm" onClick={() => { setEditingFeeStructureId(null); setFeeForm({ grade_level_id: '', tuition_fee_annual: '', van_fee_annual: '0', num_installments: '4' }); setShowFeeStructureModal(true) }}>
                     <Plus size={16} /> Add Fee Structure
                   </button>
                 )}
@@ -338,6 +362,7 @@ function Settings() {
                       <th>Installments</th>
                       <th>Per Installment</th>
                       <th>Van Fee (Annual)</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -352,6 +377,9 @@ function Settings() {
                         <td>{fs.num_installments}</td>
                         <td>{fmt(Math.round(fs.tuition_fee_annual / fs.num_installments))}</td>
                         <td>{fs.van_fee_annual > 0 ? fmt(fs.van_fee_annual) : '-'}</td>
+                        <td>
+                          <button className="btn btn--outline btn--sm" onClick={() => openEditFeeStructure(fs)}>Edit</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -497,13 +525,13 @@ function Settings() {
         </div>
       )}
       {showFeeStructureModal && (
-        <div className="modal-overlay" onClick={() => setShowFeeStructureModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowFeeStructureModal(false); setEditingFeeStructureId(null) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Fee Structure</h2>
-            <form className="modal__form" onSubmit={handleCreateFeeStructure}>
+            <h2>{editingFeeStructureId ? 'Edit Fee Structure' : 'Add Fee Structure'}</h2>
+            <form className="modal__form" onSubmit={handleSaveFeeStructure}>
               <label className="form-field">
                 <span>Grade Level *</span>
-                <select required value={feeForm.grade_level_id} onChange={e => setFeeForm({ ...feeForm, grade_level_id: e.target.value })}>
+                <select required disabled={!!editingFeeStructureId} value={feeForm.grade_level_id} onChange={e => setFeeForm({ ...feeForm, grade_level_id: e.target.value })}>
                   <option value="">Select grade</option>
                   {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
@@ -514,8 +542,8 @@ function Settings() {
               </div>
               <label className="form-field"><span>Annual Van Fee (₹)</span><input type="number" min="0" value={feeForm.van_fee_annual} onChange={e => setFeeForm({ ...feeForm, van_fee_annual: e.target.value })} placeholder="0" /></label>
               <div className="modal__actions">
-                <button type="button" className="btn btn--outline" onClick={() => setShowFeeStructureModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Creating...' : 'Add Fee Structure'}</button>
+                <button type="button" className="btn btn--outline" onClick={() => { setShowFeeStructureModal(false); setEditingFeeStructureId(null) }}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving...' : (editingFeeStructureId ? 'Save Changes' : 'Add Fee Structure')}</button>
               </div>
             </form>
           </div>
