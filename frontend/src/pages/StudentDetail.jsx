@@ -124,7 +124,7 @@ function StudentDetail() {
           <div className="detail-fields">
             <Field label="First Name" value={f.first_name} editing={editing} onChange={v => setForm({ ...form, first_name: v })} />
             <Field label="Last Name" value={f.last_name} editing={editing} onChange={v => setForm({ ...form, last_name: v })} />
-            <Field label="Gender" value={f.gender} editing={editing} onChange={v => setForm({ ...form, gender: v })} type="select" options={['', 'male', 'female', 'other']} />
+            <Field label="Gender" value={f.gender} editing={editing} onChange={v => setForm({ ...form, gender: v })} type="select" options={['', 'male', 'female']} />
             <Field label="Date of Birth" value={f.date_of_birth?.split('T')[0] || ''} editing={editing} onChange={v => setForm({ ...form, date_of_birth: v })} type="date" />
             <Field label="Phone" value={f.phone} editing={editing} onChange={v => setForm({ ...form, phone: v })} />
             <Field label="Email" value={f.email} editing={editing} onChange={v => setForm({ ...form, email: v })} />

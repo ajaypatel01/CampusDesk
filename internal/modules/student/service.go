@@ -2,6 +2,7 @@ package student
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -80,6 +81,16 @@ type UpdateInput struct {
 
 var validSorts = map[string]bool{"name": true, "student_code": true, "admission_date": true, "class": true}
 var validPaymentStatus = map[string]bool{"paid": true, "due": true, "partial": true, "unpaid": true}
+var validGender = map[string]bool{"": true, "male": true, "female": true}
+
+// normalizeGender lowercases and trims gender input, rejecting anything but male/female/blank.
+func normalizeGender(g string) (string, error) {
+	g = strings.ToLower(strings.TrimSpace(g))
+	if !validGender[g] {
+		return "", fmt.Errorf("%w: gender must be male or female", apperr.ErrInvalidInput)
+	}
+	return g, nil
+}
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, error) {
 	if in.SchoolID == uuid.Nil || strings.TrimSpace(in.StudentCode) == "" ||
@@ -90,13 +101,17 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, 
 	if status == "" {
 		status = domain.StudentStatusActive
 	}
+	gender, err := normalizeGender(in.Gender)
+	if err != nil {
+		return nil, err
+	}
 	st := &domain.Student{
 		SchoolID:          in.SchoolID,
 		StudentCode:       strings.TrimSpace(in.StudentCode),
 		FirstName:         strings.TrimSpace(in.FirstName),
 		LastName:          strings.TrimSpace(in.LastName),
 		DateOfBirth:       in.DateOfBirth,
-		Gender:            strings.TrimSpace(in.Gender),
+		Gender:            gender,
 		Email:             strings.TrimSpace(in.Email),
 		Phone:             strings.TrimSpace(in.Phone),
 		Address:           strings.TrimSpace(in.Address),
@@ -149,11 +164,15 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	if strings.TrimSpace(in.StudentCode) == "" || strings.TrimSpace(in.FirstName) == "" {
 		return nil, apperr.ErrInvalidInput
 	}
+	gender, err := normalizeGender(in.Gender)
+	if err != nil {
+		return nil, err
+	}
 	st.StudentCode = strings.TrimSpace(in.StudentCode)
 	st.FirstName = strings.TrimSpace(in.FirstName)
 	st.LastName = strings.TrimSpace(in.LastName)
 	st.DateOfBirth = in.DateOfBirth
-	st.Gender = strings.TrimSpace(in.Gender)
+	st.Gender = gender
 	st.Email = strings.TrimSpace(in.Email)
 	st.Phone = strings.TrimSpace(in.Phone)
 	st.Address = strings.TrimSpace(in.Address)
