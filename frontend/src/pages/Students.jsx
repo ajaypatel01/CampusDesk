@@ -247,8 +247,8 @@ function Students() {
               </div>
               <div className="form-row">
                 <label className="form-field">
-                  <span>Gender</span>
-                  <select value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
+                  <span>Gender *</span>
+                  <select required value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
                     <option value="">Select</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
@@ -256,8 +256,8 @@ function Students() {
                   </select>
                 </label>
                 <label className="form-field">
-                  <span>Date of Birth</span>
-                  <input type="date" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} />
+                  <span>Date of Birth *</span>
+                  <input required type="date" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} />
                 </label>
                 <label className="form-field">
                   <span>Admission Date</span>
@@ -266,22 +266,22 @@ function Students() {
               </div>
               <div className="form-row">
                 <label className="form-field">
-                  <span>Phone</span>
-                  <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  <span>Phone *</span>
+                  <input required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                 </label>
                 <label className="form-field">
-                  <span>Email</span>
-                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  <span>Email *</span>
+                  <input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                 </label>
               </div>
               <div className="form-row">
                 <label className="form-field">
-                  <span>Caste</span>
-                  <input value={form.caste} onChange={e => setForm({ ...form, caste: e.target.value })} />
+                  <span>Caste *</span>
+                  <input required value={form.caste} onChange={e => setForm({ ...form, caste: e.target.value })} />
                 </label>
                 <label className="form-field">
-                  <span>Category</span>
-                  <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="e.g. General, OBC, SC, ST" />
+                  <span>Category *</span>
+                  <input required value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="e.g. General, OBC, SC, ST" />
                 </label>
                 <label className="form-field">
                   <span>Aadhar Number</span>
@@ -289,8 +289,8 @@ function Students() {
                 </label>
               </div>
               <label className="form-field">
-                <span>Address</span>
-                <textarea rows={2} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+                <span>Address *</span>
+                <textarea required rows={2} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
               </label>
               <div className="modal__actions">
                 <button type="button" className="btn btn--outline" onClick={() => setShowModal(false)}>Cancel</button>
