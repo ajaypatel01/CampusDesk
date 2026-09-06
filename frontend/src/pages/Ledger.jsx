@@ -39,18 +39,20 @@ function Ledger() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
-  // Load academic years
+  // Load academic years for this school's dropdown
   useEffect(() => {
     if (!currentSchool) return
     academicApi.listYears(currentSchool.id)
-      .then(res => {
-        const ys = res.items || []
-        setYears(ys)
-        const cur = ys.find(y => y.is_current) || ys[0]
-        if (cur) setSelectedYearId(cur.id)
-      })
-      .catch(() => {})
+      .then(res => setYears(res.items || []))
+      .catch(() => setYears([]))
   }, [currentSchool])
+
+  // Keep the ledger's year selection in sync with the school/year picker in the header —
+  // it previously always defaulted to whichever year was flagged current in the database,
+  // ignoring what was actually selected up top.
+  useEffect(() => {
+    if (currentYear) setSelectedYearId(currentYear.id)
+  }, [currentYear])
 
   // Load all fee accounts for the selected year (to join with payments)
   useEffect(() => {
