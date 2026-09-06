@@ -1,6 +1,7 @@
 package fee
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -51,7 +52,8 @@ func (m *Module) Mount(r chi.Router) {
 	})
 
 	r.Route("/fee-summary", func(r chi.Router) {
-		r.Get("/", h.SchoolFeeSummary)
+		// School-wide aggregate totals are hidden from registrars; per-student summaries stay visible.
+		r.With(httpx.BlockRoles("registrar")).Get("/", h.SchoolFeeSummary)
 		r.Get("/student/{student_id}", h.StudentFeeSummary)
 	})
 }

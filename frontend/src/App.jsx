@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -28,6 +28,18 @@ import Register from './pages/Register'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
+
+// Pages a registrar isn't allowed to open, even by typing the URL directly —
+// mirrors the backend's BlockRoles("registrar") checks on the same modules.
+const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/settings']
+
+function RegistrarGuard({ user, children }) {
+  const location = useLocation()
+  const isBlocked = user?.role === 'registrar' &&
+    REGISTRAR_BLOCKED_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
+  if (isBlocked) return <Navigate to="/" replace />
+  return children
+}
 
 function decodeUser(token) {
   if (!token) return null
@@ -61,7 +73,7 @@ function App() {
     <ConfigProvider>
       <SchoolProvider user={user}>
         <Routes>
-          <Route element={<Layout onLogout={handleLogout} user={user} />}>
+          <Route element={<RegistrarGuard user={user}><Layout onLogout={handleLogout} user={user} /></RegistrarGuard>}>
             <Route index element={<Dashboard />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />

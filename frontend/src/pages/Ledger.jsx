@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Search, Download, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
@@ -21,6 +22,8 @@ function fmtAmt(n) {
 }
 
 function Ledger() {
+  const { user } = useOutletContext() || {}
+  const isRegistrar = user?.role === 'registrar'
   const { currentSchool, currentYear } = useSchool()
   const [years, setYears] = useState([])
   const [selectedYearId, setSelectedYearId] = useState('')
@@ -200,14 +203,16 @@ function Ledger() {
         )}
       </div>
 
-      {/* Summary bar */}
-      <div className="ledger-summary">
-        <div className="lsumm"><span className="lsumm__val">{summary.count}</span><span className="lsumm__lbl">Payments</span></div>
-        <div className="lsumm lsumm--green"><span className="lsumm__val">{fmtAmt(summary.total)}</span><span className="lsumm__lbl">Total Collected</span></div>
-        <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.cash)}</span><span className="lsumm__lbl">Cash</span></div>
-        <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.online)}</span><span className="lsumm__lbl">Online / UPI</span></div>
-        {summary.other > 0 && <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.other)}</span><span className="lsumm__lbl">Other</span></div>}
-      </div>
+      {/* Summary bar — registrars only see per-payment rows below, not the summed totals */}
+      {!isRegistrar && (
+        <div className="ledger-summary">
+          <div className="lsumm"><span className="lsumm__val">{summary.count}</span><span className="lsumm__lbl">Payments</span></div>
+          <div className="lsumm lsumm--green"><span className="lsumm__val">{fmtAmt(summary.total)}</span><span className="lsumm__lbl">Total Collected</span></div>
+          <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.cash)}</span><span className="lsumm__lbl">Cash</span></div>
+          <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.online)}</span><span className="lsumm__lbl">Online / UPI</span></div>
+          {summary.other > 0 && <div className="lsumm"><span className="lsumm__val">{fmtAmt(summary.other)}</span><span className="lsumm__lbl">Other</span></div>}
+        </div>
+      )}
 
       <div className="page-filters">
         <div className="filter-search">

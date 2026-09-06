@@ -28,20 +28,20 @@ const navItems = [
   { to: '/admissions', icon: ClipboardList, label: 'Admissions' },
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/fees', icon: IndianRupee, label: 'Fees' },
-  { to: '/teachers', icon: UserCog, label: 'Teachers' },
-  { to: '/staff', icon: Briefcase, label: 'Staff' },
+  { to: '/teachers', icon: UserCog, label: 'Teachers', deny: ['registrar'] },
+  { to: '/staff', icon: Briefcase, label: 'Staff', deny: ['registrar'] },
   { to: '/ledger', icon: LedgerIcon, label: 'Fee Ledger' },
   { to: '/tc-records', icon: FileMinus, label: 'TC Records' },
   { to: '/vouchers', icon: Receipt, label: 'Vouchers' },
-  { to: '/documents', icon: FileText, label: 'Documents' },
-  { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts' },
+  { to: '/documents', icon: FileText, label: 'Documents', deny: ['registrar'] },
+  { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts', deny: ['registrar'] },
   { to: '/results', icon: BarChart2, label: 'Results' },
   { to: '/homework', icon: BookOpen, label: 'Homework' },
   { to: '/transport', icon: Bus, label: 'Transport' },
   { to: '/rte', icon: ShieldCheck, label: 'RTE' },
-  { to: '/books', icon: Library, label: 'Books' },
-  { to: '/id-cards', icon: CreditCard, label: 'ID Cards' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/books', icon: Library, label: 'Books', deny: ['registrar'] },
+  { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar'] },
+  { to: '/settings', icon: Settings, label: 'Settings', deny: ['registrar'] },
 ]
 
 const roleLabel = {
@@ -65,7 +65,7 @@ function Sidebar({ open, user, onLogout }) {
       </div>
 
       <nav className="sidebar__nav">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {navItems.filter(item => !item.deny?.includes(user?.role)).map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

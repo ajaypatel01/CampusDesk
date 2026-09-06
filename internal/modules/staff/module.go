@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -19,6 +20,7 @@ func (m *Module) Name() string { return "staff" }
 
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/staff", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("registrar"))
 		r.Get("/", m.handler.List)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", m.handler.Get)

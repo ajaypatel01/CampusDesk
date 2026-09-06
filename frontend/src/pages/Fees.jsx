@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, Filter, X, Download } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
 import './Fees.css'
 
 function Fees() {
+  const { user } = useOutletContext() || {}
+  const isRegistrar = user?.role === 'registrar'
   const { currentSchool, currentYear } = useSchool()
   const [accounts, setAccounts] = useState([])
   const [total, setTotal] = useState(0)
@@ -29,7 +31,7 @@ function Fees() {
   useEffect(() => {
     if (!currentSchool || !currentYear) { setLoading(false); return }
     setLoading(true)
-    Promise.all([
+    const requests = [
       feesApi.listAccounts({
         school_id: currentSchool.id,
         academic_year_id: currentYear.id,
@@ -39,16 +41,20 @@ function Fees() {
         limit,
         offset,
       }),
-      feesApi.schoolSummary({ school_id: currentSchool.id, academic_year_id: currentYear.id }),
-    ])
+    ]
+    // Registrars can't see school-wide fee totals — skip the call entirely.
+    if (!isRegistrar) {
+      requests.push(feesApi.schoolSummary({ school_id: currentSchool.id, academic_year_id: currentYear.id }))
+    }
+    Promise.all(requests)
       .then(([accRes, sumRes]) => {
         setAccounts(accRes.items || [])
         setTotal(accRes.total || 0)
-        setSummary(sumRes)
+        setSummary(sumRes || null)
       })
       .catch(() => { setAccounts([]); setTotal(0) })
       .finally(() => setLoading(false))
-  }, [currentSchool, currentYear, search, gradeFilter, paymentStatus, offset])
+  }, [currentSchool, currentYear, search, gradeFilter, paymentStatus, offset, isRegistrar])
 
   const activeFilterCount = [gradeFilter, paymentStatus].filter(Boolean).length
 

@@ -27,7 +27,7 @@ func (m *Module) Name() string { return "media" }
 
 func (m *Module) Mount(r chi.Router) {
 	r.Post("/media/students/{id}/photo", m.UploadStudentPhoto)
-	r.Post("/media/users/{id}/photo", m.UploadUserPhoto)
+	r.With(httpx.BlockRoles("registrar")).Post("/media/users/{id}/photo", m.UploadUserPhoto)
 }
 
 const maxPhotoSize = 5 << 20 // 5 MB

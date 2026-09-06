@@ -26,6 +26,7 @@ func (m *Module) Name() string { return "communications" }
 
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/broadcasts", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("registrar"))
 		r.Get("/", m.ListBroadcasts)
 		r.Post("/", m.SendBroadcast)
 		r.Get("/{id}/recipients", m.ListRecipients)

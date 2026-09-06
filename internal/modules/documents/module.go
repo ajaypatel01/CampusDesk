@@ -2,6 +2,7 @@ package documents
 
 import (
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -22,6 +23,7 @@ func (m *Module) Name() string { return "documents" }
 func (m *Module) Mount(r chi.Router) {
 	h := m.handler
 	r.Route("/documents", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("registrar"))
 		r.Get("/bonafide", h.DownloadBonafide)
 		r.Post("/bonafide/email", h.EmailBonafide)
 		r.Post("/bonafide/whatsapp", h.WhatsAppBonafide)

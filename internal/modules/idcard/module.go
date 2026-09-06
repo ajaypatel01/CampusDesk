@@ -26,8 +26,11 @@ func New(pool *pgxpool.Pool, s *storage.Client) *Module {
 func (m *Module) Name() string { return "idcard" }
 
 func (m *Module) Mount(r chi.Router) {
-	r.Post("/id-cards/students", m.StudentCards)
-	r.Post("/id-cards/teachers", m.TeacherCards)
+	r.Route("/id-cards", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("registrar"))
+		r.Post("/students", m.StudentCards)
+		r.Post("/teachers", m.TeacherCards)
+	})
 }
 
 func (m *Module) StudentCards(w http.ResponseWriter, r *http.Request) {

@@ -46,6 +46,26 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 	}
 }
 
+// BlockRoles rejects requests from any of the given JWT roles, leaving every other role unaffected.
+// Use this to carve out exceptions (e.g. registrar) from a module that's otherwise open to all
+// authenticated roles, without having to enumerate every allowed role.
+func BlockRoles(roles ...string) func(http.Handler) http.Handler {
+	blocked := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		blocked[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims := ClaimsFromContext(r.Context())
+			if claims != nil && blocked[claims.Role] {
+				Error(w, http.StatusForbidden, "access denied: insufficient role")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func CommonMiddleware() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		middleware.RequestID,

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { Users, IndianRupee, UserCog, GraduationCap, TrendingUp, AlertCircle } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, usersApi, feesApi } from '../services/api'
 import './Dashboard.css'
 
 function Dashboard() {
+  const { user } = useOutletContext() || {}
+  const isRegistrar = user?.role === 'registrar'
   const { currentSchool, currentYear } = useSchool()
   const [stats, setStats] = useState({ students: 0, teachers: 0, collected: 0, outstanding: 0, byGrade: [] })
   const [recentStudents, setRecentStudents] = useState([])
@@ -16,18 +18,21 @@ function Dashboard() {
     setLoading(true)
 
     const promises = [
-      studentsApi.list({ school_id: currentSchool.id, limit: 5 }).catch(() => ({ items: [], total: 0 })),
-      usersApi.list({ school_id: currentSchool.id, limit: 100 }).catch(() => ({ items: [], total: 0 })),
+      studentsApi.list({ school_id: currentSchool.id, academic_year_id: currentYear?.id || undefined, limit: 5 }).catch(() => ({ items: [], total: 0 })),
     ]
 
-    if (currentYear) {
-      promises.push(
-        feesApi.schoolSummary({ school_id: currentSchool.id, academic_year_id: currentYear.id }).catch(() => null)
-      )
+    // Registrars can't see staff records or aggregate fee totals — skip those calls entirely.
+    if (!isRegistrar) {
+      promises.push(usersApi.list({ school_id: currentSchool.id, limit: 100 }).catch(() => ({ items: [], total: 0 })))
+      if (currentYear) {
+        promises.push(
+          feesApi.schoolSummary({ school_id: currentSchool.id, academic_year_id: currentYear.id }).catch(() => null)
+        )
+      }
     }
 
     Promise.all(promises).then(([studentRes, userRes, feeRes]) => {
-      const teachers = (userRes.items || []).filter(u => u.role === 'teacher')
+      const teachers = (userRes?.items || []).filter(u => u.role === 'teacher')
       setRecentStudents(studentRes.items || [])
       setStats({
         students: studentRes.total || 0,
@@ -38,7 +43,7 @@ function Dashboard() {
       })
       setLoading(false)
     })
-  }, [currentSchool, currentYear])
+  }, [currentSchool, currentYear, isRegistrar])
 
   function formatCurrency(amt) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amt)
@@ -74,27 +79,31 @@ function Dashboard() {
           <div className="stat-card__value">{loading ? '...' : stats.students}</div>
           <div className="stat-card__label">Total Students</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-card__header">
-            <div className="stat-card__icon stat-card__icon--success"><UserCog size={20} /></div>
-          </div>
-          <div className="stat-card__value">{loading ? '...' : stats.teachers}</div>
-          <div className="stat-card__label">Teachers</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__header">
-            <div className="stat-card__icon stat-card__icon--info"><IndianRupee size={20} /></div>
-          </div>
-          <div className="stat-card__value">{loading ? '...' : formatCurrency(stats.collected)}</div>
-          <div className="stat-card__label">Fee Collected</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card__header">
-            <div className="stat-card__icon stat-card__icon--danger"><AlertCircle size={20} /></div>
-          </div>
-          <div className="stat-card__value">{loading ? '...' : formatCurrency(stats.outstanding)}</div>
-          <div className="stat-card__label">Outstanding</div>
-        </div>
+        {!isRegistrar && (
+          <>
+            <div className="stat-card">
+              <div className="stat-card__header">
+                <div className="stat-card__icon stat-card__icon--success"><UserCog size={20} /></div>
+              </div>
+              <div className="stat-card__value">{loading ? '...' : stats.teachers}</div>
+              <div className="stat-card__label">Teachers</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__header">
+                <div className="stat-card__icon stat-card__icon--info"><IndianRupee size={20} /></div>
+              </div>
+              <div className="stat-card__value">{loading ? '...' : formatCurrency(stats.collected)}</div>
+              <div className="stat-card__label">Fee Collected</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__header">
+                <div className="stat-card__icon stat-card__icon--danger"><AlertCircle size={20} /></div>
+              </div>
+              <div className="stat-card__value">{loading ? '...' : formatCurrency(stats.outstanding)}</div>
+              <div className="stat-card__label">Outstanding</div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="dashboard__grid">
@@ -135,35 +144,37 @@ function Dashboard() {
           )}
         </div>
 
-        <div className="dashboard__sidebar-section">
-          <div className="section-header">
-            <h2>Fee by Grade</h2>
-          </div>
-          {stats.byGrade.length === 0 ? (
-            <p className="empty-text">No fee data available</p>
-          ) : (
-            <div className="grade-fee-list">
-              {stats.byGrade.map(g => (
-                <div key={g.grade_level_id} className="grade-fee-item">
-                  <div className="grade-fee-item__header">
-                    <span className="grade-fee-item__name">{g.grade_level_name}</span>
-                    <span className="grade-fee-item__count">{g.student_count} students</span>
-                  </div>
-                  <div className="grade-fee-item__bar">
-                    <div
-                      className="grade-fee-item__fill"
-                      style={{ width: `${g.total_due ? (g.total_collected / g.total_due * 100) : 0}%` }}
-                    />
-                  </div>
-                  <div className="grade-fee-item__amounts">
-                    <span>{formatCurrency(g.total_collected)}</span>
-                    <span className="grade-fee-item__due">of {formatCurrency(g.total_due)}</span>
-                  </div>
-                </div>
-              ))}
+        {!isRegistrar && (
+          <div className="dashboard__sidebar-section">
+            <div className="section-header">
+              <h2>Fee by Grade</h2>
             </div>
-          )}
-        </div>
+            {stats.byGrade.length === 0 ? (
+              <p className="empty-text">No fee data available</p>
+            ) : (
+              <div className="grade-fee-list">
+                {stats.byGrade.map(g => (
+                  <div key={g.grade_level_id} className="grade-fee-item">
+                    <div className="grade-fee-item__header">
+                      <span className="grade-fee-item__name">{g.grade_level_name}</span>
+                      <span className="grade-fee-item__count">{g.student_count} students</span>
+                    </div>
+                    <div className="grade-fee-item__bar">
+                      <div
+                        className="grade-fee-item__fill"
+                        style={{ width: `${g.total_due ? (g.total_collected / g.total_due * 100) : 0}%` }}
+                      />
+                    </div>
+                    <div className="grade-fee-item__amounts">
+                      <span>{formatCurrency(g.total_collected)}</span>
+                      <span className="grade-fee-item__due">of {formatCurrency(g.total_due)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
