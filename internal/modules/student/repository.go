@@ -192,7 +192,9 @@ func buildOrderClause(sortBy, sortOrder string) string {
 	for i := range args {
 		args[i] = sortOrder
 	}
-	return fmt.Sprintf(pattern, args...)
+	// Transferred students sink to the bottom regardless of the chosen sort, same as
+	// inactive teachers do in the Teachers list.
+	return "(s.status = 'transferred'), " + fmt.Sprintf(pattern, args...)
 }
 
 func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
