@@ -20,7 +20,11 @@ func (m *Module) Mount(r chi.Router) {
 	r.Route("/tc-records", func(r chi.Router) {
 		r.Get("/", m.handler.ListTCRecords)
 		r.Post("/", m.handler.CreateTCRecord)
-		r.Get("/{id}", m.handler.GetTCRecord)
+		r.Route("/{id}", func(r chi.Router) {
+			r.Get("/", m.handler.GetTCRecord)
+			r.Put("/", m.handler.UpdateTCRecord)
+			r.Delete("/", m.handler.DeleteTCRecord)
+		})
 	})
 	r.Route("/vouchers", func(r chi.Router) {
 		r.Get("/", m.handler.ListVouchers)

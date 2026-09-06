@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Mail, ShieldCheck, Clock, BookOpen, Users } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Mail, ShieldCheck, Clock, BookOpen, Users, Edit2, Save, X, Trash2 } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { usersApi, academicApi } from '../services/api'
 import './TeacherDetail.css'
@@ -23,19 +23,54 @@ const roleBadge = {
 
 function TeacherDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { currentSchool, currentYear } = useSchool()
   const [user, setUser] = useState(null)
   const [sections, setSections] = useState([])
   const [grades, setGrades] = useState([])
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setLoading(true)
     usersApi.get(id)
-      .then(u => setUser(u))
+      .then(u => { setUser(u); setForm(u) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [id])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const updated = await usersApi.update(id, {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        is_active: form.is_active,
+      })
+      setUser(updated)
+      setEditing(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete ${user.first_name} ${user.last_name}'s account? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      await usersApi.remove(id)
+      navigate('/teachers')
+    } catch (err) {
+      alert(err.message)
+      setDeleting(false)
+    }
+  }
 
   useEffect(() => {
     if (!currentSchool || !currentYear) return
@@ -53,6 +88,7 @@ function TeacherDetail() {
 
   const assignedSections = sections.filter(s => s.homeroom_teacher_id === user.id)
   const gradeMap = Object.fromEntries(grades.map(g => [g.id, g.name]))
+  const f = editing ? form : user
 
   return (
     <div className="teacher-detail">
@@ -60,19 +96,50 @@ function TeacherDetail() {
 
       <div className="teacher-detail__hero">
         <div className="teacher-detail__avatar">
-          {user.first_name[0]}{user.last_name[0]}
+          {f.first_name?.[0]}{f.last_name?.[0]}
         </div>
         <div className="teacher-detail__hero-info">
-          <h1>{user.first_name} {user.last_name}</h1>
+          {editing ? (
+            <div className="teacher-detail__name-edit">
+              <input className="detail-field__input" value={form.first_name || ''} placeholder="First name" onChange={e => setForm({ ...form, first_name: e.target.value })} />
+              <input className="detail-field__input" value={form.last_name || ''} placeholder="Last name" onChange={e => setForm({ ...form, last_name: e.target.value })} />
+            </div>
+          ) : (
+            <h1>{user.first_name} {user.last_name}</h1>
+          )}
           <div className="teacher-detail__hero-meta">
             <span className={`badge badge--${roleBadge[user.role] || 'muted'}`}>
               {roleLabels[user.role] || user.role}
             </span>
-            <span className={`teacher-status-pill ${user.is_active ? 'teacher-status-pill--active' : ''}`}>
-              <span className={`teacher-status-dot ${user.is_active ? 'teacher-status-dot--active' : ''}`} />
-              {user.is_active ? 'Active' : 'Inactive'}
-            </span>
+            {editing ? (
+              <select className="detail-field__input" value={form.is_active ? 'active' : 'inactive'} onChange={e => setForm({ ...form, is_active: e.target.value === 'active' })}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            ) : (
+              <span className={`teacher-status-pill ${user.is_active ? 'teacher-status-pill--active' : ''}`}>
+                <span className={`teacher-status-dot ${user.is_active ? 'teacher-status-dot--active' : ''}`} />
+                {user.is_active ? 'Active' : 'Inactive'}
+              </span>
+            )}
           </div>
+        </div>
+        <div className="teacher-detail__hero-actions">
+          {editing ? (
+            <>
+              <button className="btn btn--outline btn--sm" onClick={() => { setEditing(false); setForm(user) }}><X size={16} /> Cancel</button>
+              <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving}>
+                <Save size={16} /> {saving ? 'Saving...' : 'Save'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn--outline btn--sm" onClick={() => setEditing(true)}><Edit2 size={16} /> Edit</button>
+              <button className="btn btn--danger btn--sm" onClick={handleDelete} disabled={deleting}>
+                <Trash2 size={16} /> {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -84,7 +151,11 @@ function TeacherDetail() {
               <Mail size={16} className="td-field__icon" />
               <div>
                 <span className="td-field__label">Email</span>
-                <span className="td-field__value">{user.email}</span>
+                {editing ? (
+                  <input className="detail-field__input" type="email" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
+                ) : (
+                  <span className="td-field__value">{user.email}</span>
+                )}
               </div>
             </div>
             <div className="td-field">

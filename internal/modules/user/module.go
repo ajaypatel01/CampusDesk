@@ -27,15 +27,18 @@ func (m *Module) MountPublic(r chi.Router) {
 // Mount registers all user management endpoints (auth required).
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/users", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("registrar"))
 		r.Get("/", m.handler.List)
 		r.Post("/", m.handler.Create)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", m.handler.Get)
-			// Approving/rejecting a registration is an admin-only action.
+			r.Put("/", m.handler.Update)
+			// Approving/rejecting a registration, and deleting an account, are admin-only actions.
 			r.Group(func(r chi.Router) {
 				r.Use(httpx.RequireRole("super_admin", "school_admin"))
 				r.Post("/approve", m.handler.Approve)
 				r.Post("/reject", m.handler.Reject)
+				r.Delete("/", m.handler.Delete)
 			})
 		})
 	})

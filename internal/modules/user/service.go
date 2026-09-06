@@ -153,6 +153,33 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return u, nil
 }
 
+// UpdateInput edits a user's core profile fields and active status.
+type UpdateInput struct {
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
+	IsActive  bool   `json:"is_active"`
+}
+
+func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*domain.User, error) {
+	if strings.TrimSpace(in.FirstName) == "" || strings.TrimSpace(in.Email) == "" {
+		return nil, apperr.ErrInvalidInput
+	}
+	u, err := s.repo.Update(ctx, id,
+		strings.TrimSpace(in.FirstName), strings.TrimSpace(in.LastName),
+		strings.TrimSpace(strings.ToLower(in.Email)), in.IsActive,
+	)
+	if err != nil {
+		return nil, err
+	}
+	u.PasswordHash = ""
+	return u, nil
+}
+
+func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.repo.Delete(ctx, id)
+}
+
 func (s *Service) List(ctx context.Context, schoolID *uuid.UUID, status domain.UserStatus, limit, offset int) ([]domain.User, int, error) {
 	users, total, err := s.repo.List(ctx, schoolID, status, limit, offset)
 	if err != nil {

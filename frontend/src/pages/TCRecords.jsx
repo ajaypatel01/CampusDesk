@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Search, Download, Plus, X, FileText } from 'lucide-react'
+import { Search, Download, Plus, X, FileText, Pencil, Trash2 } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { tcRecordsApi } from '../services/api'
 import './TCRecords.css'
+
+const emptyForm = {
+  scholar_number: '', student_name: '', father_name: '', mother_name: '',
+  dob: '', caste: '', category: '', date_of_admission: '', application_date: '',
+  issue_date: '', class_passed: '', pen_number: '', apar_id: '', samagra_id: '',
+  new_school: '', dice_code: '', remark: '',
+}
+
+function toDateInput(d) {
+  return d ? d.split('T')[0] : ''
+}
 
 function fmt(d) {
   if (!d) return '—'
@@ -16,13 +27,10 @@ function TCRecords() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({
-    scholar_number: '', student_name: '', father_name: '', mother_name: '',
-    dob: '', caste: '', category: '', date_of_admission: '', application_date: '',
-    issue_date: '', class_passed: '', pen_number: '', apar_id: '', samagra_id: '',
-    new_school: '', dice_code: '', remark: '',
-  })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   function load() {
     if (!currentSchool) return
@@ -73,12 +81,47 @@ function TCRecords() {
       const payload = { ...form, school_id: currentSchool.id }
       Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null })
       payload.student_name = form.student_name
-      await tcRecordsApi.create(payload)
+      if (editingId) {
+        await tcRecordsApi.update(editingId, payload)
+      } else {
+        await tcRecordsApi.create(payload)
+      }
       setShowModal(false)
-      setForm({ scholar_number:'',student_name:'',father_name:'',mother_name:'',dob:'',caste:'',category:'',date_of_admission:'',application_date:'',issue_date:'',class_passed:'',pen_number:'',apar_id:'',samagra_id:'',new_school:'',dice_code:'',remark:'' })
+      setEditingId(null)
+      setForm(emptyForm)
       load()
     } catch (err) { alert(err.message) }
     finally { setSaving(false) }
+  }
+
+  function openAdd() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setShowModal(true)
+  }
+
+  function openEdit(r) {
+    setEditingId(r.id)
+    setForm({
+      scholar_number: r.scholar_number || '', student_name: r.student_name || '',
+      father_name: r.father_name || '', mother_name: r.mother_name || '',
+      dob: toDateInput(r.dob), caste: r.caste || '', category: r.category || '',
+      date_of_admission: toDateInput(r.date_of_admission), application_date: toDateInput(r.application_date),
+      issue_date: toDateInput(r.issue_date), class_passed: r.class_passed || '',
+      pen_number: r.pen_number || '', apar_id: r.apar_id || '', samagra_id: r.samagra_id || '',
+      new_school: r.new_school || '', dice_code: r.dice_code || '', remark: r.remark || '',
+    })
+    setShowModal(true)
+  }
+
+  async function handleDelete(r) {
+    if (!window.confirm(`Delete TC record for ${r.student_name}? This cannot be undone.`)) return
+    setDeletingId(r.id)
+    try {
+      await tcRecordsApi.remove(r.id)
+      load()
+    } catch (err) { alert(err.message) }
+    finally { setDeletingId(null) }
   }
 
   if (!currentSchool) return <p className="empty-text">Select a school first.</p>
@@ -92,7 +135,7 @@ function TCRecords() {
         </div>
         <div className="tc-header-actions">
           <button className="btn btn--outline" onClick={exportCSV}><Download size={16} /> Export CSV</button>
-          <button className="btn btn--primary" onClick={() => setShowModal(true)}><Plus size={16} /> Add TC</button>
+          <button className="btn btn--primary" onClick={openAdd}><Plus size={16} /> Add TC</button>
         </div>
       </div>
 
@@ -125,6 +168,7 @@ function TCRecords() {
                 <th>Issue Date</th>
                 <th>New School</th>
                 <th>Remark</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -148,6 +192,12 @@ function TCRecords() {
                   <td>{fmt(r.issue_date)}</td>
                   <td className="tc-school">{r.new_school || <span className="data-table__muted">—</span>}</td>
                   <td className="data-table__muted">{r.remark || '—'}</td>
+                  <td>
+                    <div className="tc-row-actions">
+                      <button className="btn-icon" title="Edit" onClick={() => openEdit(r)}><Pencil size={14} /></button>
+                      <button className="btn-icon btn-icon--danger" title="Delete" disabled={deletingId === r.id} onClick={() => handleDelete(r)}><Trash2 size={14} /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -156,9 +206,9 @@ function TCRecords() {
       )}
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowModal(false); setEditingId(null) }}>
           <div className="modal modal--wide" onClick={e => e.stopPropagation()}>
-            <h2>Add TC Record</h2>
+            <h2>{editingId ? 'Edit TC Record' : 'Add TC Record'}</h2>
             <form className="modal__form" onSubmit={handleCreate}>
               <div className="form-row">
                 <label className="form-field"><span>Scholar Number</span><input value={form.scholar_number} onChange={e => setForm({...form, scholar_number: e.target.value})} /></label>
@@ -192,8 +242,8 @@ function TCRecords() {
                 <label className="form-field"><span>Remark</span><input value={form.remark} onChange={e => setForm({...form, remark: e.target.value})} /></label>
               </div>
               <div className="modal__actions">
-                <button type="button" className="btn btn--outline" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving...' : 'Save TC'}</button>
+                <button type="button" className="btn btn--outline" onClick={() => { setShowModal(false); setEditingId(null) }}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving...' : editingId ? 'Update TC' : 'Save TC'}</button>
               </div>
             </form>
           </div>

@@ -47,6 +47,38 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, u)
 }
 
+func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in UpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	u, err := h.svc.Update(r.Context(), id, in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, u)
+}
+
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.Delete(r.Context(), id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	p := pagination.FromRequest(r)
 	var schoolID *uuid.UUID

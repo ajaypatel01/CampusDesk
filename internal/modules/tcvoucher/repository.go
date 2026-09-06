@@ -87,6 +87,38 @@ func (r *Repository) CreateTCRecord(ctx context.Context, t *TCRecord) error {
 	return row.Scan(&t.ID, &t.CreatedAt)
 }
 
+func (r *Repository) UpdateTCRecord(ctx context.Context, t *TCRecord) error {
+	cmd, err := r.pool.Exec(ctx, `
+		UPDATE tc_records SET
+			scholar_number=$2, student_name=$3, father_name=$4, mother_name=$5, dob=$6,
+			caste=$7, category=$8, date_of_admission=$9, application_date=$10, issue_date=$11,
+			class_passed=$12, pen_number=$13, apar_id=$14, samagra_id=$15, new_school=$16,
+			dice_code=$17, remark=$18, updated_at=now()
+		WHERE id=$1`,
+		t.ID, t.ScholarNumber, t.StudentName, t.FatherName, t.MotherName, t.DOB,
+		t.Caste, t.Category, t.DateOfAdmission, t.ApplicationDate, t.IssueDate, t.ClassPassed,
+		t.PENNumber, t.APARID, t.SamagraID, t.NewSchool, t.DICECode, t.Remark,
+	)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteTCRecord(ctx context.Context, id uuid.UUID) error {
+	cmd, err := r.pool.Exec(ctx, `DELETE FROM tc_records WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) GetTCRecord(ctx context.Context, id uuid.UUID) (*TCRecord, error) {
 	var t TCRecord
 	err := r.pool.QueryRow(ctx, `

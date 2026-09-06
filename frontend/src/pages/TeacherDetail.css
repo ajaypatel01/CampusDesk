@@ -23,6 +23,11 @@
   flex-shrink: 0;
 }
 
+.teacher-detail__hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .teacher-detail__hero-info h1 {
   font-size: 1.4rem;
   margin-bottom: 8px;
@@ -32,6 +37,35 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.teacher-detail__hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.teacher-detail__name-edit {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.detail-field__input {
+  padding: 7px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  color: var(--gray-800);
+  background: var(--surface);
+  transition: all var(--transition);
+}
+
+.detail-field__input:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 2px var(--primary-50);
 }
 
 .teacher-status-pill {

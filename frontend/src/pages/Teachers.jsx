@@ -84,6 +84,8 @@ function Teachers() {
         return 0
       })
     }
+    // Inactive users always sink to the bottom, regardless of the chosen sort.
+    result = [...result].sort((a, b) => (b.is_active ? 1 : 0) - (a.is_active ? 1 : 0))
     return result
   }, [users, search, roleFilter, activeFilter, sortBy])
 

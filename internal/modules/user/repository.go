@@ -56,6 +56,34 @@ func (r *Repository) UpdateStatus(ctx context.Context, id uuid.UUID, status doma
 	return r.GetByID(ctx, id)
 }
 
+// Update edits a user's core profile fields and active status.
+func (r *Repository) Update(ctx context.Context, id uuid.UUID, firstName, lastName, email string, isActive bool) (*domain.User, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET first_name=$2, last_name=$3, email=$4, is_active=$5, updated_at=NOW()
+		WHERE id=$1`, id, firstName, lastName, email, isActive)
+	if err != nil {
+		return nil, database.MapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, apperr.ErrNotFound
+	}
+	return r.GetByID(ctx, id)
+}
+
+// Delete permanently removes a user account. Their homeroom assignments are
+// cleared (ON DELETE SET NULL) and any staff profile is removed along with it
+// (ON DELETE CASCADE) — see the FKs on class_sections and staff_profiles.
+func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domain.UserStatus, limit, offset int) ([]domain.User, int, error) {
 	var total int
 	var rows pgx.Rows
@@ -83,7 +111,7 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domai
 	limitArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err = r.pool.Query(ctx, fmt.Sprintf(`
 		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at
-		FROM users %s ORDER BY last_name, first_name LIMIT $%d OFFSET $%d`,
+		FROM users %s ORDER BY is_active DESC, last_name, first_name LIMIT $%d OFFSET $%d`,
 		whereClause, len(args)+1, len(args)+2), limitArgs...,
 	)
 	if err != nil {

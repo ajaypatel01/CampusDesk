@@ -67,6 +67,47 @@ func (h *Handler) GetTCRecord(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, t)
 }
 
+func (h *Handler) UpdateTCRecord(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var t TCRecord
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if t.StudentName == "" {
+		httpx.Error(w, http.StatusBadRequest, "student_name required")
+		return
+	}
+	t.ID = id
+	if err := h.repo.UpdateTCRecord(r.Context(), &t); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	updated, err := h.repo.GetTCRecord(r.Context(), id)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, updated)
+}
+
+func (h *Handler) DeleteTCRecord(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.repo.DeleteTCRecord(r.Context(), id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ---- Vouchers ----
 
 func (h *Handler) ListVouchers(w http.ResponseWriter, r *http.Request) {
