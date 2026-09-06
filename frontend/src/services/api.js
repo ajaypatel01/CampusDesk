@@ -12,8 +12,8 @@ function authHeader() {
 async function request(path, options = {}) {
   const url = `${BASE}${path}`
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeader(), ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...authHeader(), ...options.headers },
   })
   if (res.status === 401) {
     clearToken()
@@ -31,8 +31,8 @@ async function request(path, options = {}) {
 async function requestBlob(path, options = {}) {
   const url = `${BASE}${path}`
   const res = await fetch(url, {
-    headers: { ...authHeader(), ...options.headers },
     ...options,
+    headers: { ...authHeader(), ...options.headers },
   })
   if (res.status === 401) {
     clearToken()
@@ -84,6 +84,8 @@ export const usersApi = {
   list: (params = {}) => request(`/users${qs(params)}`),
   get: (id) => request(`/users/${id}`),
   create: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id) => request(`/users/${id}`, { method: 'DELETE' }),
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   // Public self-registration; account is created pending until an admin approves it.
   register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
@@ -252,6 +254,8 @@ export const tcRecordsApi = {
   list: (params = {}) => request(`/tc-records${qs(params)}`),
   get: (id) => request(`/tc-records/${id}`),
   create: (body) => request('/tc-records', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/tc-records/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id) => request(`/tc-records/${id}`, { method: 'DELETE' }),
 }
 
 export const vouchersApi = {
