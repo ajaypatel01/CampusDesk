@@ -37,11 +37,13 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offse
 	var err error
 
 	if schoolID != nil {
-		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE school_id=$1 AND role IN ('teacher','school_admin','registrar','super_admin')`, *schoolID).Scan(&total); err != nil {
+		// super_admin accounts have no school_id (they oversee every school), so surface
+		// them alongside each school's own staff rather than only under school_id IS NULL.
+		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE (school_id=$1 OR (school_id IS NULL AND role='super_admin')) AND role IN ('teacher','school_admin','registrar','super_admin')`, *schoolID).Scan(&total); err != nil {
 			return nil, 0, err
 		}
 		rows, err = r.pool.Query(ctx,
-			staffSelect+` WHERE u.school_id=$1 AND u.role IN ('teacher','school_admin','registrar','super_admin') ORDER BY sp.designation NULLS LAST, u.last_name, u.first_name LIMIT $2 OFFSET $3`,
+			staffSelect+` WHERE (u.school_id=$1 OR (u.school_id IS NULL AND u.role='super_admin')) AND u.role IN ('teacher','school_admin','registrar','super_admin') ORDER BY sp.designation NULLS LAST, u.last_name, u.first_name LIMIT $2 OFFSET $3`,
 			*schoolID, limit, offset,
 		)
 	} else {
