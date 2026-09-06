@@ -60,6 +60,39 @@ function FeeReport() {
       .finally(() => setLoadingSheet(false))
   }, [currentSchool, currentYear, gradeFilter])
 
+  // Quarterly fee schedule: each installment's planned amount is bucketed by the
+  // quarter its due date falls in (Apr-Jun, Jul-Sep, Oct-Dec, Jan-Mar), split into
+  // what's already been collected against it vs. still pending.
+  const QUARTER_LABELS = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)']
+  function quarterOf(dueDate) {
+    const month = new Date(dueDate).getMonth() // 0=Jan
+    if (month >= 3 && month <= 5) return 0
+    if (month >= 6 && month <= 8) return 1
+    if (month >= 9 && month <= 11) return 2
+    return 3
+  }
+  const quarterData = useMemo(() => {
+    const buckets = QUARTER_LABELS.map(label => ({ label, collected: 0, pending: 0 }))
+    let unscheduled = 0
+    for (const row of sheet?.items || []) {
+      const datedCells = row.installments.filter(c => c.due_date && c.planned_amount > 0)
+      if (datedCells.length === 0) {
+        // No installment plan/due-dates configured for this student's fee structure —
+        // there's nothing to bucket by quarter, so fall back to their real balance
+        // rather than silently reporting zero.
+        unscheduled += Math.max(row.balance, 0)
+        continue
+      }
+      for (const cell of datedCells) {
+        const q = quarterOf(cell.due_date)
+        buckets[q].collected += Math.min(cell.paid_amount, cell.planned_amount)
+        buckets[q].pending += Math.max(cell.planned_amount - cell.paid_amount, 0)
+      }
+    }
+    return { buckets, unscheduled }
+  }, [sheet])
+  const quarterMax = Math.max(1, quarterData.unscheduled, ...quarterData.buckets.map(b => b.collected + b.pending))
+
   const gradeComparison = useMemo(() => {
     if (!currentSummary) return []
     const prevByGrade = Object.fromEntries((previousSummary?.by_grade || []).map(g => [g.grade_level_name, g]))
@@ -129,6 +162,44 @@ function FeeReport() {
           )}
         </table>
       </div>
+
+      {/* Quarterly chart */}
+      <h2 className="fee-report-section-title">Fee to Be Collected by Quarter — {currentYear.name}</h2>
+      {loadingSheet ? (
+        <p className="empty-text">Loading...</p>
+      ) : (
+        <div className="fee-quarter-chart">
+          {quarterData.buckets.map(b => {
+            const total = b.collected + b.pending
+            return (
+              <div key={b.label} className="fee-quarter-bar-col">
+                <div className="fee-quarter-bar-track">
+                  <div className="fee-quarter-bar fee-quarter-bar--collected" style={{ height: `${(b.collected / quarterMax) * 100}%` }} title={`Collected: ${fmt(b.collected)}`} />
+                  <div className="fee-quarter-bar fee-quarter-bar--pending" style={{ height: `${(b.pending / quarterMax) * 100}%` }} title={`Pending: ${fmt(b.pending)}`} />
+                </div>
+                <div className="fee-quarter-total">{fmt(total)}</div>
+                <div className="fee-quarter-label">{b.label}</div>
+              </div>
+            )
+          })}
+          {quarterData.unscheduled > 0 && (
+            <div className="fee-quarter-bar-col">
+              <div className="fee-quarter-bar-track">
+                <div className="fee-quarter-bar fee-quarter-bar--unscheduled" style={{ height: `${(quarterData.unscheduled / quarterMax) * 100}%` }} title={`No due date on file: ${fmt(quarterData.unscheduled)}`} />
+              </div>
+              <div className="fee-quarter-total">{fmt(quarterData.unscheduled)}</div>
+              <div className="fee-quarter-label">Not Scheduled</div>
+            </div>
+          )}
+          <div className="fee-quarter-legend">
+            <span><i className="fee-quarter-dot fee-quarter-dot--collected" /> Collected</span>
+            <span><i className="fee-quarter-dot fee-quarter-dot--pending" /> Pending</span>
+            {quarterData.unscheduled > 0 && (
+              <span><i className="fee-quarter-dot fee-quarter-dot--unscheduled" /> No installment due-dates set for {currentYear.name} — set them up under fee structures to see this split by quarter</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Installment sheet */}
       <div className="fee-report-sheet-header">
