@@ -83,7 +83,7 @@ var validPaymentStatus = map[string]bool{"paid": true, "due": true, "partial": t
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, error) {
 	if in.SchoolID == uuid.Nil || strings.TrimSpace(in.StudentCode) == "" ||
-		strings.TrimSpace(in.FirstName) == "" || strings.TrimSpace(in.LastName) == "" {
+		strings.TrimSpace(in.FirstName) == "" {
 		return nil, apperr.ErrInvalidInput
 	}
 	status := domain.StudentStatus(in.Status)
@@ -146,7 +146,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(in.StudentCode) == "" || strings.TrimSpace(in.FirstName) == "" || strings.TrimSpace(in.LastName) == "" {
+	if strings.TrimSpace(in.StudentCode) == "" || strings.TrimSpace(in.FirstName) == "" {
 		return nil, apperr.ErrInvalidInput
 	}
 	st.StudentCode = strings.TrimSpace(in.StudentCode)
