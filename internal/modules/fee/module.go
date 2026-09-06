@@ -56,4 +56,7 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("registrar")).Get("/", h.SchoolFeeSummary)
 		r.Get("/student/{student_id}", h.StudentFeeSummary)
 	})
+
+	// Installment sheet is a school-wide aggregate view, hidden from registrars like fee-summary.
+	r.With(httpx.BlockRoles("registrar")).Get("/fee-installment-sheet", h.InstallmentSheet)
 }

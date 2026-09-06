@@ -24,6 +24,7 @@ import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
 import Payroll from './pages/Payroll'
+import FeeReport from './pages/FeeReport'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import { getToken, clearToken } from './services/api'
@@ -32,7 +33,7 @@ import { ConfigProvider } from './services/ConfigContext'
 
 // Pages a registrar isn't allowed to open, even by typing the URL directly —
 // mirrors the backend's BlockRoles("registrar") checks on the same modules.
-const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/settings']
+const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/settings', '/fee-report']
 // Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
 const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
 
@@ -93,6 +94,7 @@ function App() {
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="ledger" element={<Ledger />} />
             <Route path="payroll" element={<Payroll />} />
+            <Route path="fee-report" element={<FeeReport />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />
             <Route path="results" element={<Results />} />

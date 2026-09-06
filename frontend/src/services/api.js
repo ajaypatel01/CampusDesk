@@ -132,6 +132,7 @@ export const feesApi = {
 
   schoolSummary: (params) => request(`/fee-summary${qs(params)}`),
   studentSummary: (studentId, yearId) => request(`/fee-summary/student/${studentId}${qs({ academic_year_id: yearId })}`),
+  installmentSheet: (params) => request(`/fee-installment-sheet${qs(params)}`),
   downloadReceipt: (paymentId) => requestBlob(`/fee-receipts/${paymentId}`),
   sendReceiptWhatsApp: (paymentId, phone) => request(`/fee-receipts/${paymentId}/whatsapp`, { method: 'POST', body: JSON.stringify({ phone }) }),
 }

@@ -21,6 +21,7 @@ import {
   Library,
   LogOut,
   Wallet,
+  PieChart,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -32,6 +33,7 @@ const navItems = [
   { to: '/teachers', icon: UserCog, label: 'Teachers', deny: ['registrar'] },
   { to: '/staff', icon: Briefcase, label: 'Staff', deny: ['registrar'] },
   { to: '/ledger', icon: LedgerIcon, label: 'Fee Ledger' },
+  { to: '/fee-report', icon: PieChart, label: 'Fee Report', deny: ['registrar'] },
   { to: '/tc-records', icon: FileMinus, label: 'TC Records' },
   { to: '/vouchers', icon: Receipt, label: 'Vouchers' },
   { to: '/documents', icon: FileText, label: 'Documents', deny: ['registrar'] },
