@@ -26,7 +26,7 @@ const staffSelect = `
 		sp.id, sp.user_id, sp.guardian_name, sp.aadhar_number, sp.education_qualification,
 		sp.professional_qualification, sp.designation, COALESCE(sp.salary, 0) AS salary,
 		sp.bank_name, sp.bank_ifsc, sp.bank_branch, sp.bank_account_number, sp.bank_account_holder,
-		sp.phone, sp.staff_type,
+		sp.phone, sp.staff_type, COALESCE(sp.cl_quota_per_year, 12) AS cl_quota_per_year,
 		COALESCE(sp.created_at, u.created_at), COALESCE(sp.updated_at, u.updated_at)
 	FROM users u
 	LEFT JOIN staff_profiles sp ON sp.user_id = u.id`
@@ -84,20 +84,24 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StaffMe
 }
 
 func (r *Repository) UpsertProfile(ctx context.Context, p *domain.StaffProfile) error {
+	if p.CLQuotaPerYear <= 0 {
+		p.CLQuotaPerYear = 12
+	}
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO staff_profiles (user_id, guardian_name, aadhar_number, education_qualification,
 			professional_qualification, designation, salary, bank_name, bank_ifsc, bank_branch,
-			bank_account_number, bank_account_holder, phone, staff_type)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+			bank_account_number, bank_account_holder, phone, staff_type, cl_quota_per_year)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 		ON CONFLICT (user_id) DO UPDATE SET
 			guardian_name=$2, aadhar_number=$3, education_qualification=$4,
 			professional_qualification=$5, designation=$6, salary=$7, bank_name=$8,
 			bank_ifsc=$9, bank_branch=$10, bank_account_number=$11,
-			bank_account_holder=$12, phone=$13, staff_type=$14, updated_at=NOW()
+			bank_account_holder=$12, phone=$13, staff_type=$14, cl_quota_per_year=$15, updated_at=NOW()
 		RETURNING id, created_at, updated_at`,
 		p.UserID, p.GuardianName, p.AadharNumber, p.EducationQualification,
 		p.ProfessionalQualification, p.Designation, p.Salary, p.BankName,
 		p.BankIFSC, p.BankBranch, p.BankAccountNumber, p.BankAccountHolder, p.Phone, p.StaffType,
+		p.CLQuotaPerYear,
 	)
 	return row.Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 }
@@ -117,7 +121,7 @@ func scanMember(row scannable) (*domain.StaffMember, error) {
 		&profileID, &profileUserID, &p.GuardianName, &p.AadharNumber, &p.EducationQualification,
 		&p.ProfessionalQualification, &p.Designation, &p.Salary,
 		&p.BankName, &p.BankIFSC, &p.BankBranch, &p.BankAccountNumber, &p.BankAccountHolder,
-		&p.Phone, &p.StaffType, &p.CreatedAt, &p.UpdatedAt,
+		&p.Phone, &p.StaffType, &p.CLQuotaPerYear, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

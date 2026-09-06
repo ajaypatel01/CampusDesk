@@ -60,6 +60,7 @@ function StaffDetail() {
     bank_account_holder: '',
     phone: '',
     staff_type: 'teaching',
+    cl_quota_per_year: 12,
   })
 
   useEffect(() => {
@@ -82,6 +83,7 @@ function StaffDetail() {
             bank_account_holder: m.profile.bank_account_holder || '',
             phone: m.profile.phone || '',
             staff_type: m.profile.staff_type || 'teaching',
+            cl_quota_per_year: m.profile.cl_quota_per_year || 12,
           })
         }
       })
@@ -175,6 +177,7 @@ function StaffDetail() {
           <Field label="Designation" value={p?.designation} />
           <Field label="Staff Type" value={p?.staff_type ? staffTypeLabels[p.staff_type] : null} />
           <Field label="Salary" value={p?.salary != null ? `₹${Number(p.salary).toLocaleString('en-IN')} / month` : null} />
+          <Field label="CL Quota" value={p?.cl_quota_per_year != null ? `${p.cl_quota_per_year} / year` : null} />
           <Field label="Education" value={p?.education_qualification} />
           <Field label="Professional Qual." value={p?.professional_qualification} />
         </div>
@@ -258,6 +261,7 @@ function StaffDetail() {
               )}
               <div className="sd-form-row">
                 <label>Salary (₹)<input type="number" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="Monthly salary" /></label>
+                <label>CL Quota (per year)<input type="number" min="0" value={form.cl_quota_per_year} onChange={e => set('cl_quota_per_year', parseInt(e.target.value, 10) || 0)} /></label>
               </div>
               <div className="sd-form-row">
                 <label>Education Qualification<input value={form.education_qualification} onChange={e => set('education_qualification', e.target.value)} placeholder="e.g. B.Ed" /></label>

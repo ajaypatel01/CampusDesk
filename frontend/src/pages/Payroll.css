@@ -1,0 +1,38 @@
+.payroll-page { padding: var(--space-6); max-width: 1200px; }
+
+.payroll-controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.payroll-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.payroll-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  background: var(--gray-50, #f9fafb);
+}
+.payroll-stat span { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.payroll-stat label { font-size: 0.72rem; color: var(--text-muted); }
+.payroll-stat--danger { border-color: #fecaca; background: #fef2f2; }
+.payroll-stat--danger span { color: #dc2626; }
+.payroll-stat--green { border-color: #86efac; background: #f0fdf4; }
+.payroll-stat--green span { color: #16a34a; }
+
+.payroll-negative { color: #dc2626; font-weight: 500; }
+.payroll-net { font-weight: 700; color: #16a34a; }
+
+.payroll-section-title {
+  margin: 28px 0 12px;
+  font-size: 1.05rem;
+}

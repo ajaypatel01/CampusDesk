@@ -37,9 +37,9 @@ func (r *Repository) Create(ctx context.Context, s *domain.School) error {
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.School, error) {
 	s := &domain.School{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
+		SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), working_days_per_month, created_at, updated_at
 		FROM schools WHERE id = $1`, id,
-	).Scan(&s.ID, &s.Name, &s.Code, &s.Address, &s.Phone, &s.Email, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(&s.ID, &s.Name, &s.Code, &s.Address, &s.Phone, &s.Email, &s.WorkingDaysPerMonth, &s.CreatedAt, &s.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -59,14 +59,14 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offse
 			return nil, 0, err
 		}
 		rows, err = r.pool.Query(ctx, `
-			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
+			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), working_days_per_month, created_at, updated_at
 			FROM schools WHERE id=$1 ORDER BY name LIMIT $2 OFFSET $3`, *schoolID, limit, offset)
 	} else {
 		if err = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM schools`).Scan(&total); err != nil {
 			return nil, 0, err
 		}
 		rows, err = r.pool.Query(ctx, `
-			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), created_at, updated_at
+			SELECT id, name, code, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''), working_days_per_month, created_at, updated_at
 			FROM schools ORDER BY name LIMIT $1 OFFSET $2`, limit, offset)
 	}
 	if err != nil {
@@ -77,7 +77,7 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, limit, offse
 	var schools []domain.School
 	for rows.Next() {
 		var s domain.School
-		if err := rows.Scan(&s.ID, &s.Name, &s.Code, &s.Address, &s.Phone, &s.Email, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.Name, &s.Code, &s.Address, &s.Phone, &s.Email, &s.WorkingDaysPerMonth, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		schools = append(schools, s)
@@ -113,9 +113,9 @@ func (r *Repository) ListPublic(ctx context.Context) ([]PublicSchool, error) {
 
 func (r *Repository) Update(ctx context.Context, s *domain.School) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE schools SET name=$2, code=$3, address=$4, phone=$5, email=$6, updated_at=NOW()
+		UPDATE schools SET name=$2, code=$3, address=$4, phone=$5, email=$6, working_days_per_month=$7, updated_at=NOW()
 		WHERE id=$1`,
-		s.ID, s.Name, s.Code, s.Address, s.Phone, s.Email,
+		s.ID, s.Name, s.Code, s.Address, s.Phone, s.Email, s.WorkingDaysPerMonth,
 	)
 	if err != nil {
 		return err

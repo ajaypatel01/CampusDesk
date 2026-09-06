@@ -188,6 +188,14 @@ export const idCardsApi = {
     requestBlob(`/id-cards/teachers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
 }
 
+export const payrollApi = {
+  computeMonth: (params) => request(`/payroll${qs(params)}`),
+  listLeaves: (params) => request(`/staff-leaves${qs(params)}`),
+  createLeave: (body) => request('/staff-leaves', { method: 'POST', body: JSON.stringify(body) }),
+  updateLeave: (id, body) => request(`/staff-leaves/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLeave: (id) => request(`/staff-leaves/${id}`, { method: 'DELETE' }),
+}
+
 export const broadcastsApi = {
   list: (schoolId) => request(`/broadcasts${qs({ school_id: schoolId })}`),
   send: (body) => request('/broadcasts', { method: 'POST', body: JSON.stringify(body) }),

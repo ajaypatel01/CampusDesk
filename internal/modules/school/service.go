@@ -26,11 +26,12 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
-	Name    string `json:"name"`
-	Code    string `json:"code"`
-	Address string `json:"address"`
-	Phone   string `json:"phone"`
-	Email   string `json:"email"`
+	Name                string `json:"name"`
+	Code                string `json:"code"`
+	Address             string `json:"address"`
+	Phone               string `json:"phone"`
+	Email               string `json:"email"`
+	WorkingDaysPerMonth int    `json:"working_days_per_month"`
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.School, error) {
@@ -75,6 +76,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	school.Address = strings.TrimSpace(in.Address)
 	school.Phone = strings.TrimSpace(in.Phone)
 	school.Email = strings.TrimSpace(in.Email)
+	if in.WorkingDaysPerMonth > 0 {
+		school.WorkingDaysPerMonth = in.WorkingDaysPerMonth
+	}
 	if err := s.repo.Update(ctx, school); err != nil {
 		return nil, err
 	}

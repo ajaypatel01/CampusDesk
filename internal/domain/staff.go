@@ -18,6 +18,7 @@ type StaffProfile struct {
 	BankAccountHolder        *string    `json:"bank_account_holder,omitempty"`
 	Phone                    *string    `json:"phone,omitempty"`
 	StaffType                *string    `json:"staff_type,omitempty"`
+	CLQuotaPerYear           int        `json:"cl_quota_per_year"`
 	Timestamps
 }
 

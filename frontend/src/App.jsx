@@ -23,6 +23,7 @@ import StaffDetail from './pages/StaffDetail'
 import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
+import Payroll from './pages/Payroll'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import { getToken, clearToken } from './services/api'
@@ -32,12 +33,16 @@ import { ConfigProvider } from './services/ConfigContext'
 // Pages a registrar isn't allowed to open, even by typing the URL directly —
 // mirrors the backend's BlockRoles("registrar") checks on the same modules.
 const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/settings']
+// Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
+const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
 
 function RegistrarGuard({ user, children }) {
   const location = useLocation()
-  const isBlocked = user?.role === 'registrar' &&
+  const isRegistrarBlocked = user?.role === 'registrar' &&
     REGISTRAR_BLOCKED_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
-  if (isBlocked) return <Navigate to="/" replace />
+  const isSuperAdminOnly = user?.role !== 'super_admin' &&
+    SUPER_ADMIN_ONLY_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
+  if (isRegistrarBlocked || isSuperAdminOnly) return <Navigate to="/" replace />
   return children
 }
 
@@ -87,6 +92,7 @@ function App() {
             <Route path="tc-records" element={<TCRecords />} />
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="ledger" element={<Ledger />} />
+            <Route path="payroll" element={<Payroll />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />
             <Route path="results" element={<Results />} />

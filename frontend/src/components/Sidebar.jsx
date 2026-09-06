@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Library,
   LogOut,
+  Wallet,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -41,6 +42,7 @@ const navItems = [
   { to: '/rte', icon: ShieldCheck, label: 'RTE' },
   { to: '/books', icon: Library, label: 'Books', deny: ['registrar'] },
   { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar'] },
+  { to: '/payroll', icon: Wallet, label: 'Payroll', only: ['super_admin'] },
   { to: '/settings', icon: Settings, label: 'Settings', deny: ['registrar'] },
 ]
 
@@ -65,7 +67,9 @@ function Sidebar({ open, user, onLogout }) {
       </div>
 
       <nav className="sidebar__nav">
-        {navItems.filter(item => !item.deny?.includes(user?.role)).map(({ to, icon: Icon, label }) => (
+        {navItems
+          .filter(item => !item.deny?.includes(user?.role) && (!item.only || item.only.includes(user?.role)))
+          .map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

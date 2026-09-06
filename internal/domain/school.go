@@ -9,5 +9,6 @@ type School struct {
 	Address string    `json:"address,omitempty"`
 	Phone   string    `json:"phone,omitempty"`
 	Email   string    `json:"email,omitempty"`
+	WorkingDaysPerMonth int `json:"working_days_per_month"`
 	Timestamps
 }
