@@ -37,5 +37,6 @@ func (m *Module) Mount(r chi.Router) {
 		})
 
 		r.Get("/payroll", m.handler.ComputeMonth)
+		r.Get("/payroll/slip", m.handler.DownloadSlip)
 	})
 }

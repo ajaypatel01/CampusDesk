@@ -191,6 +191,7 @@ export const idCardsApi = {
 
 export const payrollApi = {
   computeMonth: (params) => request(`/payroll${qs(params)}`),
+  downloadSlip: (params) => requestBlob(`/payroll/slip${qs(params)}`),
   listLeaves: (params) => request(`/staff-leaves${qs(params)}`),
   createLeave: (body) => request('/staff-leaves', { method: 'POST', body: JSON.stringify(body) }),
   updateLeave: (id, body) => request(`/staff-leaves/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

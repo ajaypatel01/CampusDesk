@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useOutletContext } from 'react-router-dom'
 import {
   ArrowLeft, Mail, Phone, ShieldCheck, Briefcase, User,
-  Building2, CreditCard, GraduationCap, Edit3, X, Save, Loader
+  Building2, CreditCard, GraduationCap, Edit3, X, Save, Loader,
+  Wallet, Download, Plus, Trash2,
 } from 'lucide-react'
-import { staffApi } from '../services/api'
+import { staffApi, payrollApi } from '../services/api'
+import { useSchool } from '../services/SchoolContext'
 import './StaffDetail.css'
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function fmtCurrency(amt) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amt || 0)
+}
 
 const roleLabels = {
   super_admin: 'Super Admin',
@@ -40,11 +51,26 @@ function Field({ label, value }) {
 
 function StaffDetail() {
   const { id } = useParams()
+  const { user } = useOutletContext() || {}
+  const { currentSchool, currentYear } = useSchool()
+  const isSuperAdmin = user?.role === 'super_admin'
   const [member, setMember] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState('')
+
+  const now = new Date()
+  const [payMonth, setPayMonth] = useState(now.getMonth() + 1)
+  const [payYear, setPayYear] = useState(now.getFullYear())
+  const [payrollRow, setPayrollRow] = useState(null)
+  const [payrollLoading, setPayrollLoading] = useState(false)
+  const [leaves, setLeaves] = useState([])
+  const [slipDownloading, setSlipDownloading] = useState(false)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [leaveForm, setLeaveForm] = useState({ leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+  const [leaveSaving, setLeaveSaving] = useState(false)
+  const [leaveErr, setLeaveErr] = useState('')
 
   const [form, setForm] = useState({
     guardian_name: '',
@@ -93,6 +119,70 @@ function StaffDetail() {
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }))
+  }
+
+  function loadLeaves() {
+    if (!isSuperAdmin || !currentYear) return
+    payrollApi.listLeaves({ user_id: id, academic_year_id: currentYear.id })
+      .then(r => setLeaves(r.items || []))
+      .catch(() => setLeaves([]))
+  }
+
+  function loadPayrollRow() {
+    if (!isSuperAdmin || !currentSchool || !currentYear) return
+    setPayrollLoading(true)
+    payrollApi.computeMonth({ school_id: currentSchool.id, academic_year_id: currentYear.id, year: payYear, month: payMonth })
+      .then(r => setPayrollRow((r.items || []).find(row => row.user_id === id) || null))
+      .catch(() => setPayrollRow(null))
+      .finally(() => setPayrollLoading(false))
+  }
+
+  useEffect(loadPayrollRow, [isSuperAdmin, currentSchool, currentYear, payYear, payMonth, id])
+  useEffect(loadLeaves, [isSuperAdmin, currentYear, id])
+
+  async function handleAddLeave(e) {
+    e.preventDefault()
+    setLeaveSaving(true); setLeaveErr('')
+    try {
+      await payrollApi.createLeave({ ...leaveForm, user_id: id, academic_year_id: currentYear.id })
+      setShowLeaveModal(false)
+      setLeaveForm({ leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+      loadLeaves()
+      loadPayrollRow()
+    } catch (err) {
+      setLeaveErr(err.message || 'Failed to save leave')
+    } finally {
+      setLeaveSaving(false)
+    }
+  }
+
+  async function handleDeleteLeave(leaveId) {
+    if (!confirm('Delete this leave record?')) return
+    try {
+      await payrollApi.deleteLeave(leaveId)
+      loadLeaves()
+      loadPayrollRow()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function handleDownloadSlip() {
+    if (!currentSchool || !currentYear) return
+    setSlipDownloading(true)
+    try {
+      const blob = await payrollApi.downloadSlip({ school_id: currentSchool.id, academic_year_id: currentYear.id, user_id: id, year: payYear, month: payMonth })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `salary_slip_${id.substring(0, 8)}_${payYear}_${String(payMonth).padStart(2, '0')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSlipDownloading(false)
+    }
   }
 
   async function handleSave() {
@@ -215,6 +305,117 @@ function StaffDetail() {
           </div>
         </div>
       </div>
+
+      {isSuperAdmin && (
+        <div className="sd-card" style={{ marginTop: '20px' }}>
+          <div className="sd-card__header">
+            <Wallet size={16} />
+            <h3>Payroll &amp; Leave</h3>
+          </div>
+
+          {!currentSchool || !currentYear ? (
+            <p className="empty-text">Select a school and academic year first.</p>
+          ) : (
+            <>
+              <div className="payroll-controls">
+                <label className="form-field">
+                  <span>Month</span>
+                  <select value={payMonth} onChange={e => setPayMonth(parseInt(e.target.value, 10))}>
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Year</span>
+                  <input type="number" value={payYear} onChange={e => setPayYear(parseInt(e.target.value, 10) || now.getFullYear())} />
+                </label>
+                <button className="btn btn--outline btn--sm" onClick={handleDownloadSlip} disabled={slipDownloading || !payrollRow}>
+                  <Download size={14} /> {slipDownloading ? 'Downloading...' : 'Download Salary Slip'}
+                </button>
+              </div>
+
+              {payrollLoading ? (
+                <p className="empty-text">Loading...</p>
+              ) : !payrollRow ? (
+                <p className="empty-text">No salary on file, or no data for {MONTHS[payMonth - 1]} {payYear}.</p>
+              ) : (
+                <div className="sd-payroll-summary">
+                  <Field label="Working Days" value={payrollRow.working_days_per_month} />
+                  <Field label="Present Days" value={payrollRow.working_days_per_month - payrollRow.deducted_days} />
+                  <Field label="CL Availed (Paid)" value={payrollRow.cl_paid_days} />
+                  <Field label="CL Beyond Quota" value={payrollRow.cl_excess_days} />
+                  <Field label="Unpaid Days" value={payrollRow.unpaid_days} />
+                  <Field label="Deduction" value={fmtCurrency(payrollRow.deduction)} />
+                  <Field label="Net Salary" value={fmtCurrency(payrollRow.net_salary)} />
+                  <Field label="CL Balance (YTD)" value={`${payrollRow.cl_balance} / ${payrollRow.cl_quota_per_year}`} />
+                </div>
+              )}
+
+              <div className="sd-card__header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
+                <h3>Leave Records — {currentYear.name}</h3>
+                <button className="btn btn--outline btn--sm" onClick={() => setShowLeaveModal(true)}>
+                  <Plus size={14} /> Log Leave
+                </button>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Type</th><th>From</th><th>To</th><th>Reason</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {leaves.length === 0 ? (
+                    <tr><td colSpan={5} className="data-table__empty">No leave records yet</td></tr>
+                  ) : leaves.map(l => (
+                    <tr key={l.id}>
+                      <td><span className={`badge badge--${l.leave_type === 'cl' ? 'info' : 'danger'}`}>{l.leave_type === 'cl' ? 'CL' : 'Unpaid'}</span></td>
+                      <td className="data-table__muted">{l.start_date}</td>
+                      <td className="data-table__muted">{l.end_date}</td>
+                      <td className="data-table__muted">{l.reason || '-'}</td>
+                      <td><button className="btn btn--outline btn--sm" onClick={() => handleDeleteLeave(l.id)}><Trash2 size={14} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {showLeaveModal && (
+        <div className="modal-overlay" onClick={() => setShowLeaveModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Log Leave for {member.first_name} {member.last_name}</h2>
+            <form className="modal__form" onSubmit={handleAddLeave}>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Leave Type *</span>
+                  <select value={leaveForm.leave_type} onChange={e => setLeaveForm({ ...leaveForm, leave_type: e.target.value })}>
+                    <option value="cl">Casual Leave (CL)</option>
+                    <option value="unpaid">Unpaid</option>
+                  </select>
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>From *</span>
+                  <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>To *</span>
+                  <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })} />
+                </label>
+              </div>
+              <label className="form-field">
+                <span>Reason</span>
+                <input value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Optional" />
+              </label>
+              {leaveErr && <p className="doc-msg doc-msg--error">{leaveErr}</p>}
+              <div className="modal__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setShowLeaveModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={leaveSaving}>{leaveSaving ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editing && (

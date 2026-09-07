@@ -237,9 +237,24 @@
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.payroll-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 12px 0 16px;
+}
+
+.sd-payroll-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4) var(--space-6);
+  margin-bottom: 8px;
+}
+
 @media (max-width: 700px) {
   .sd-grid { grid-template-columns: 1fr; }
   .sd-hero { flex-wrap: wrap; }
   .sd-form-row { grid-template-columns: 1fr; }
   .sd-form-row label:only-child { grid-column: auto; }
+  .sd-payroll-summary { grid-template-columns: repeat(2, 1fr); }
 }

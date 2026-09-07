@@ -2,6 +2,7 @@ package payroll
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -125,4 +126,42 @@ func (h *Handler) ComputeMonth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": rows})
+}
+
+func (h *Handler) DownloadSlip(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	userID, err := uuid.Parse(r.URL.Query().Get("user_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "user_id required")
+		return
+	}
+	year, err := strconv.Atoi(r.URL.Query().Get("year"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "year required")
+		return
+	}
+	monthNum, err := strconv.Atoi(r.URL.Query().Get("month"))
+	if err != nil || monthNum < 1 || monthNum > 12 {
+		httpx.Error(w, http.StatusBadRequest, "month (1-12) required")
+		return
+	}
+	pdfBytes, filename, err := h.svc.GenerateSlip(r.Context(), schoolID, yearID, userID, year, time.Month(monthNum))
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(pdfBytes)
 }

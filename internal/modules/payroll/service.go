@@ -231,6 +231,63 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 	return rows, nil
 }
 
+// GenerateSlip computes one staff member's salary for the given month and renders
+// it as a downloadable PDF, using the same present-day/CL logic as ComputeMonth.
+func (s *Service) GenerateSlip(ctx context.Context, schoolID, academicYearID, userID uuid.UUID, year int, month time.Month) ([]byte, string, error) {
+	rows, err := s.ComputeMonth(ctx, schoolID, academicYearID, year, month)
+	if err != nil {
+		return nil, "", err
+	}
+	var row *MonthRow
+	for i := range rows {
+		if rows[i].UserID == userID {
+			row = &rows[i]
+			break
+		}
+	}
+	if row == nil {
+		return nil, "", fmt.Errorf("%w: no salary on file for this staff member", apperr.ErrNotFound)
+	}
+
+	member, err := s.staffRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, "", err
+	}
+	sch, err := s.schoolRepo.GetByID(ctx, schoolID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	data := SlipData{
+		SchoolName:    sch.Name,
+		SchoolAddress: sch.Address,
+		SchoolPhone:   sch.Phone,
+		SchoolEmail:   sch.Email,
+		Month:         month,
+		Year:          year,
+		Row:           *row,
+	}
+	if member.Profile != nil {
+		data.BankName = derefStr(member.Profile.BankName)
+		data.BankAccountNumber = derefStr(member.Profile.BankAccountNumber)
+		data.BankIFSC = derefStr(member.Profile.BankIFSC)
+	}
+
+	pdfBytes, err := generateSalarySlipPDF(data)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate salary slip: %w", err)
+	}
+	filename := fmt.Sprintf("salary_slip_%s_%d_%02d.pdf", userID.String()[:8], year, int(month))
+	return pdfBytes, filename, nil
+}
+
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func daysBetween(start, end time.Time) int {
 	return int(end.Sub(start).Hours()/24) + 1
 }
