@@ -55,6 +55,30 @@
   color: var(--danger);
 }
 
+.filter-amount-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  color: var(--gray-400);
+}
+
+.filter-amount-range input {
+  border: none;
+  outline: none;
+  background: none;
+  width: 100px;
+  font-size: 0.875rem;
+  color: var(--gray-800);
+}
+
+.filter-amount-range input::placeholder {
+  color: var(--gray-400);
+}
+
 @media (max-width: 1024px) {
   .fees-page__summary {
     grid-template-columns: repeat(3, 1fr);

@@ -138,6 +138,18 @@ func (h *Handler) ListFeeAccounts(w http.ResponseWriter, r *http.Request) {
 		Search:         r.URL.Query().Get("search"),
 		GradeLevel:     r.URL.Query().Get("grade_level"),
 		PaymentStatus:  r.URL.Query().Get("payment_status"),
+		SortBy:         r.URL.Query().Get("sort_by"),
+		SortOrder:      r.URL.Query().Get("sort_order"),
+	}
+	if v := r.URL.Query().Get("min_balance"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			f.MinBalance = &n
+		}
+	}
+	if v := r.URL.Query().Get("max_balance"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			f.MaxBalance = &n
+		}
 	}
 	items, total, err := h.svc.ListFeeAccounts(r.Context(), f, p.Limit, p.Offset)
 	if err != nil {

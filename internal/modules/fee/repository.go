@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
@@ -180,6 +181,22 @@ func (r *Repository) GetFeeAccountByID(ctx context.Context, id uuid.UUID) (*doma
 	return &fa, nil
 }
 
+func buildFeeAccountOrder(sortBy, sortOrder string) string {
+	if sortOrder != "desc" {
+		sortOrder = "asc"
+	}
+	pattern, ok := feeAccountSortColumns[sortBy]
+	if !ok {
+		pattern = feeAccountSortColumns["name"]
+	}
+	n := strings.Count(pattern, "%s")
+	args := make([]interface{}, n)
+	for i := range args {
+		args[i] = sortOrder
+	}
+	return fmt.Sprintf(pattern, args...)
+}
+
 func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, limit, offset int) ([]FeeAccountSummary, int, error) {
 	args := []interface{}{f.SchoolID, f.AcademicYearID}
 	where := "WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2"
@@ -196,14 +213,29 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 		argN++
 	}
 
-	having := ""
+	balanceExpr := "(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0)"
+	var havingParts []string
 	switch f.PaymentStatus {
 	case "paid":
-		having = " HAVING (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) <= 0"
+		havingParts = append(havingParts, balanceExpr+" <= 0")
 	case "due":
-		having = " HAVING (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0"
+		havingParts = append(havingParts, balanceExpr+" > 0")
 	case "partial":
-		having = " HAVING COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0"
+		havingParts = append(havingParts, "COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) > 0 AND "+balanceExpr+" > 0")
+	}
+	if f.MinBalance != nil {
+		havingParts = append(havingParts, fmt.Sprintf(balanceExpr+" >= $%d", argN))
+		args = append(args, *f.MinBalance)
+		argN++
+	}
+	if f.MaxBalance != nil {
+		havingParts = append(havingParts, fmt.Sprintf(balanceExpr+" <= $%d", argN))
+		args = append(args, *f.MaxBalance)
+		argN++
+	}
+	having := ""
+	if len(havingParts) > 0 {
+		having = " HAVING " + strings.Join(havingParts, " AND ")
 	}
 
 	countBase := `FROM student_fee_accounts sfa
@@ -233,8 +265,8 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 		%s %s
 		GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name
 		%s
-		ORDER BY s.last_name, s.first_name
-		LIMIT $%d OFFSET $%d`, countBase, where, having, argN, argN+1)
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d`, countBase, where, having, buildFeeAccountOrder(f.SortBy, f.SortOrder), argN, argN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.pool.Query(ctx, q, args...)

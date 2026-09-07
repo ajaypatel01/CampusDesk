@@ -3,6 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, Filter, X, Download } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
+import SortHeader from '../components/SortHeader'
 import './Fees.css'
 
 function Fees() {
@@ -18,8 +19,22 @@ function Fees() {
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('')
+  const [minBalance, setMinBalance] = useState('')
+  const [maxBalance, setMaxBalance] = useState('')
+  const [sortBy, setSortBy] = useState('name')
+  const [sortOrder, setSortOrder] = useState('asc')
   const [offset, setOffset] = useState(0)
   const limit = 20
+
+  function handleSort(field) {
+    if (sortBy === field) {
+      setSortOrder(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+    setOffset(0)
+  }
 
   useEffect(() => {
     if (!currentSchool) return
@@ -38,6 +53,10 @@ function Fees() {
         search: search || undefined,
         grade_level: gradeFilter || undefined,
         payment_status: paymentStatus || undefined,
+        min_balance: minBalance !== '' ? minBalance : undefined,
+        max_balance: maxBalance !== '' ? maxBalance : undefined,
+        sort_by: sortBy || undefined,
+        sort_order: sortOrder || undefined,
         limit,
         offset,
       }),
@@ -54,14 +73,16 @@ function Fees() {
       })
       .catch(() => { setAccounts([]); setTotal(0) })
       .finally(() => setLoading(false))
-  }, [currentSchool, currentYear, search, gradeFilter, paymentStatus, offset, isRegistrar])
+  }, [currentSchool, currentYear, search, gradeFilter, paymentStatus, minBalance, maxBalance, sortBy, sortOrder, offset, isRegistrar])
 
-  const activeFilterCount = [gradeFilter, paymentStatus].filter(Boolean).length
+  const activeFilterCount = [gradeFilter, paymentStatus, minBalance, maxBalance].filter(v => v !== '' && v != null).length
 
   function clearFilters() {
     setGradeFilter('')
     setPaymentStatus('')
     setSearch('')
+    setMinBalance('')
+    setMaxBalance('')
     setOffset(0)
   }
 
@@ -184,6 +205,17 @@ function Fees() {
             </select>
           </div>
         )}
+        <div className="filter-amount-range">
+          <input
+            type="number" min="0" placeholder="Min balance"
+            value={minBalance} onChange={e => { setMinBalance(e.target.value); setOffset(0) }}
+          />
+          <span>–</span>
+          <input
+            type="number" min="0" placeholder="Max balance"
+            value={maxBalance} onChange={e => { setMaxBalance(e.target.value); setOffset(0) }}
+          />
+        </div>
         {activeFilterCount > 0 && (
           <button className="filter-clear" onClick={clearFilters}>
             <X size={14} /> Clear ({activeFilterCount})
@@ -198,16 +230,16 @@ function Fees() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Student</th>
+                <SortHeader label="Student" field="name" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <th>Code</th>
-                <th>Grade</th>
-                <th>Tuition</th>
+                <SortHeader label="Grade" field="grade" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
+                <SortHeader label="Tuition" field="tuition_fee" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <th>Discount</th>
                 <th>Van Fee</th>
                 <th>Prev Dues</th>
-                <th>Total Due</th>
-                <th>Paid</th>
-                <th>Balance</th>
+                <SortHeader label="Total Due" field="total_due" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
+                <SortHeader label="Paid" field="total_paid" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
+                <SortHeader label="Balance" field="balance_remaining" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <th>RTE</th>
               </tr>
             </thead>

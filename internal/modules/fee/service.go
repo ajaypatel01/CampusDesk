@@ -120,6 +120,19 @@ type FeeAccountFilter struct {
 	Search         string
 	GradeLevel     string
 	PaymentStatus  string // "paid", "due", "partial"
+	MinBalance     *int   // filters on balance_remaining
+	MaxBalance     *int
+	SortBy         string
+	SortOrder      string
+}
+
+var feeAccountSortColumns = map[string]string{
+	"name":              "s.last_name %s, s.first_name %s",
+	"grade":             "gl.sort_order %s, gl.name %s",
+	"tuition_fee":       "sfa.tuition_fee %s",
+	"total_due":         "total_due %s",
+	"total_paid":        "total_paid %s",
+	"balance_remaining": "balance_remaining %s",
 }
 
 type SchoolFeeSummaryResponse struct {
