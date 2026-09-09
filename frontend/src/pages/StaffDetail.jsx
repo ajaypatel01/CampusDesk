@@ -86,7 +86,7 @@ function StaffDetail() {
     bank_account_holder: '',
     phone: '',
     staff_type: 'teaching',
-    cl_quota_per_year: 12,
+    cl_quota_per_year: 7,
   })
 
   useEffect(() => {
@@ -109,7 +109,7 @@ function StaffDetail() {
             bank_account_holder: m.profile.bank_account_holder || '',
             phone: m.profile.phone || '',
             staff_type: m.profile.staff_type || 'teaching',
-            cl_quota_per_year: m.profile.cl_quota_per_year || 12,
+            cl_quota_per_year: m.profile.cl_quota_per_year || 7,
           })
         }
       })

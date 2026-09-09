@@ -1,9 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Filter, X, Users, GraduationCap, Briefcase, Phone, ChevronRight } from 'lucide-react'
+import { Search, Filter, X, Users, GraduationCap, Briefcase, Phone, ChevronRight, Plus } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
-import { staffApi } from '../services/api'
+import { staffApi, usersApi } from '../services/api'
 import './Staff.css'
+
+const DESIGNATION_OPTIONS = [
+  'Principal', 'Pre Primary Teacher', 'Primary Teacher', 'Upper Primary Teacher',
+  'Secondary Teacher', 'Receptionist', 'Registrar', 'Driver', 'Cleaning Staff',
+  'Housekeeping Staff', 'Peon',
+]
+
+const NEW_STAFF_FORM = {
+  first_name: '', last_name: '', email: '', password: '', role: 'teacher',
+  designation: '', staff_type: 'teaching', salary: '', cl_quota_per_year: '7', phone: '',
+}
 
 const roleLabels = {
   super_admin: 'Super Admin',
@@ -30,15 +41,47 @@ function Staff() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [designFilter, setDesignFilter] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState(NEW_STAFF_FORM)
+  const [addSaving, setAddSaving] = useState(false)
+  const [addErr, setAddErr] = useState('')
 
-  useEffect(() => {
+  function loadStaff() {
     if (!currentSchool) return
     setLoading(true)
     staffApi.list({ school_id: currentSchool.id, limit: 500 })
       .then(res => setStaff(res.items || []))
       .catch(() => setStaff([]))
       .finally(() => setLoading(false))
-  }, [currentSchool])
+  }
+
+  useEffect(loadStaff, [currentSchool])
+
+  async function handleAddStaff(e) {
+    e.preventDefault()
+    setAddSaving(true); setAddErr('')
+    try {
+      const user = await usersApi.create({
+        first_name: addForm.first_name, last_name: addForm.last_name,
+        email: addForm.email, password: addForm.password, role: addForm.role,
+        school_id: currentSchool.id,
+      })
+      await staffApi.upsertProfile(user.id, {
+        designation: addForm.designation,
+        staff_type: addForm.staff_type,
+        salary: addForm.salary ? parseInt(addForm.salary, 10) : 0,
+        cl_quota_per_year: addForm.cl_quota_per_year ? parseInt(addForm.cl_quota_per_year, 10) : 7,
+        phone: addForm.phone,
+      })
+      setShowAddModal(false)
+      setAddForm(NEW_STAFF_FORM)
+      loadStaff()
+    } catch (err) {
+      setAddErr(err.message || 'Failed to add staff member')
+    } finally {
+      setAddSaving(false)
+    }
+  }
 
   const designations = useMemo(() => {
     const set = new Set()
@@ -91,6 +134,9 @@ function Staff() {
           <h1>Staff</h1>
           <p className="page-subtitle">All staff members with their profiles</p>
         </div>
+        <button className="btn btn--primary" onClick={() => setShowAddModal(true)}>
+          <Plus size={18} /> Add Staff
+        </button>
       </div>
 
       <div className="staff-stats">
@@ -225,6 +271,91 @@ function Staff() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Add Staff</h2>
+            <form className="modal__form" onSubmit={handleAddStaff}>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>First Name *</span>
+                  <input required value={addForm.first_name} onChange={e => setAddForm({ ...addForm, first_name: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>Last Name *</span>
+                  <input required value={addForm.last_name} onChange={e => setAddForm({ ...addForm, last_name: e.target.value })} />
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Email *</span>
+                  <input type="email" required value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>Password *</span>
+                  <input type="password" required minLength={6} value={addForm.password} onChange={e => setAddForm({ ...addForm, password: e.target.value })} />
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Login Role</span>
+                  <select value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}>
+                    <option value="teacher">Teacher / Staff</option>
+                    <option value="school_admin">School Admin</option>
+                    <option value="registrar">Registrar</option>
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Staff Type</span>
+                  <select value={addForm.staff_type} onChange={e => setAddForm({ ...addForm, staff_type: e.target.value })}>
+                    <option value="teaching">Teaching</option>
+                    <option value="non_teaching">Non-Teaching</option>
+                  </select>
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Designation</span>
+                  <select
+                    value={DESIGNATION_OPTIONS.includes(addForm.designation) ? addForm.designation : (addForm.designation ? 'Other' : '')}
+                    onChange={e => setAddForm({ ...addForm, designation: e.target.value === 'Other' ? '' : e.target.value })}
+                  >
+                    <option value="">Select...</option>
+                    {DESIGNATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                    <option value="Other">Other (custom)</option>
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Phone</span>
+                  <input value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} />
+                </label>
+              </div>
+              {!DESIGNATION_OPTIONS.includes(addForm.designation) && (
+                <label className="form-field">
+                  <span>Custom Designation</span>
+                  <input value={addForm.designation} onChange={e => setAddForm({ ...addForm, designation: e.target.value })} placeholder="e.g. Lab Assistant" />
+                </label>
+              )}
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Salary (₹/month)</span>
+                  <input type="number" min="0" value={addForm.salary} onChange={e => setAddForm({ ...addForm, salary: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>CL Quota (per year)</span>
+                  <input type="number" min="0" value={addForm.cl_quota_per_year} onChange={e => setAddForm({ ...addForm, cl_quota_per_year: e.target.value })} />
+                </label>
+              </div>
+              {addErr && <p className="doc-msg doc-msg--error">{addErr}</p>}
+              <div className="modal__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={addSaving}>{addSaving ? 'Saving...' : 'Add Staff'}</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

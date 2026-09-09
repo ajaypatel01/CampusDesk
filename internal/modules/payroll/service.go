@@ -153,7 +153,7 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 	var rows []MonthRow
 	for _, m := range members {
 		salary := 0
-		quota := 12
+		quota := 7
 		designation := ""
 		if m.Profile != nil {
 			salary = m.Profile.Salary

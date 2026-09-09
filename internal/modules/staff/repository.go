@@ -26,7 +26,7 @@ const staffSelect = `
 		sp.id, sp.user_id, sp.guardian_name, sp.aadhar_number, sp.education_qualification,
 		sp.professional_qualification, sp.designation, COALESCE(sp.salary, 0) AS salary,
 		sp.bank_name, sp.bank_ifsc, sp.bank_branch, sp.bank_account_number, sp.bank_account_holder,
-		sp.phone, sp.staff_type, COALESCE(sp.cl_quota_per_year, 12) AS cl_quota_per_year,
+		sp.phone, sp.staff_type, COALESCE(sp.cl_quota_per_year, 7) AS cl_quota_per_year,
 		COALESCE(sp.created_at, u.created_at), COALESCE(sp.updated_at, u.updated_at)
 	FROM users u
 	LEFT JOIN staff_profiles sp ON sp.user_id = u.id`
@@ -85,7 +85,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StaffMe
 
 func (r *Repository) UpsertProfile(ctx context.Context, p *domain.StaffProfile) error {
 	if p.CLQuotaPerYear <= 0 {
-		p.CLQuotaPerYear = 12
+		p.CLQuotaPerYear = 7
 	}
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO staff_profiles (user_id, guardian_name, aadhar_number, education_qualification,
