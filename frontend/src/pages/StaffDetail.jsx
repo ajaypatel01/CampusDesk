@@ -68,7 +68,7 @@ function StaffDetail() {
   const [leaves, setLeaves] = useState([])
   const [slipDownloading, setSlipDownloading] = useState(false)
   const [showLeaveModal, setShowLeaveModal] = useState(false)
-  const [leaveForm, setLeaveForm] = useState({ leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+  const [leaveForm, setLeaveForm] = useState({ leave_type: 'cl', start_date: '', end_date: '', half_day: false, reason: '' })
   const [leaveSaving, setLeaveSaving] = useState(false)
   const [leaveErr, setLeaveErr] = useState('')
 
@@ -146,7 +146,7 @@ function StaffDetail() {
     try {
       await payrollApi.createLeave({ ...leaveForm, user_id: id, academic_year_id: currentYear.id })
       setShowLeaveModal(false)
-      setLeaveForm({ leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+      setLeaveForm({ leave_type: 'cl', start_date: '', end_date: '', half_day: false, reason: '' })
       loadLeaves()
       loadPayrollRow()
     } catch (err) {
@@ -365,7 +365,7 @@ function StaffDetail() {
                     <tr><td colSpan={5} className="data-table__empty">No leave records yet</td></tr>
                   ) : leaves.map(l => (
                     <tr key={l.id}>
-                      <td><span className={`badge badge--${l.leave_type === 'cl' ? 'info' : 'danger'}`}>{l.leave_type === 'cl' ? 'CL' : 'Unpaid'}</span></td>
+                      <td><span className={`badge badge--${l.leave_type === 'cl' ? 'info' : 'danger'}`}>{l.leave_type === 'cl' ? 'CL' : 'Unpaid'}{l.half_day ? ' (½ day)' : ''}</span></td>
                       <td className="data-table__muted">{l.start_date}</td>
                       <td className="data-table__muted">{l.end_date}</td>
                       <td className="data-table__muted">{l.reason || '-'}</td>
@@ -396,13 +396,19 @@ function StaffDetail() {
               <div className="form-row">
                 <label className="form-field">
                   <span>From *</span>
-                  <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })} />
+                  <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value, half_day: e.target.value === leaveForm.end_date ? leaveForm.half_day : false })} />
                 </label>
                 <label className="form-field">
                   <span>To *</span>
-                  <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })} />
+                  <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value, half_day: e.target.value === leaveForm.start_date ? leaveForm.half_day : false })} />
                 </label>
               </div>
+              {leaveForm.start_date && leaveForm.start_date === leaveForm.end_date && (
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={leaveForm.half_day} onChange={e => setLeaveForm({ ...leaveForm, half_day: e.target.checked })} />
+                  <span>Half day only</span>
+                </label>
+              )}
               <label className="form-field">
                 <span>Reason</span>
                 <input value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="Optional" />

@@ -22,12 +22,12 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 }
 
 const leaveSelect = `
-	SELECT id, user_id, academic_year_id, leave_type, start_date, end_date, COALESCE(reason,''), created_at, updated_at
+	SELECT id, user_id, academic_year_id, leave_type, start_date, end_date, half_day, COALESCE(reason,''), created_at, updated_at
 	FROM staff_leaves`
 
 func scanLeave(row interface{ Scan(...interface{}) error }) (*domain.StaffLeave, error) {
 	var l domain.StaffLeave
-	if err := row.Scan(&l.ID, &l.UserID, &l.AcademicYearID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.Reason, &l.CreatedAt, &l.UpdatedAt); err != nil {
+	if err := row.Scan(&l.ID, &l.UserID, &l.AcademicYearID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.HalfDay, &l.Reason, &l.CreatedAt, &l.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -35,10 +35,10 @@ func scanLeave(row interface{ Scan(...interface{}) error }) (*domain.StaffLeave,
 
 func (r *Repository) CreateLeave(ctx context.Context, l *domain.StaffLeave) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO staff_leaves (user_id, academic_year_id, leave_type, start_date, end_date, reason)
-		VALUES ($1,$2,$3,$4,$5,$6)
+		INSERT INTO staff_leaves (user_id, academic_year_id, leave_type, start_date, end_date, half_day, reason)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		RETURNING id, created_at, updated_at`,
-		l.UserID, l.AcademicYearID, l.LeaveType, l.StartDate, l.EndDate, l.Reason,
+		l.UserID, l.AcademicYearID, l.LeaveType, l.StartDate, l.EndDate, l.HalfDay, l.Reason,
 	)
 	if err := row.Scan(&l.ID, &l.CreatedAt, &l.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -48,9 +48,9 @@ func (r *Repository) CreateLeave(ctx context.Context, l *domain.StaffLeave) erro
 
 func (r *Repository) UpdateLeave(ctx context.Context, l *domain.StaffLeave) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE staff_leaves SET leave_type=$2, start_date=$3, end_date=$4, reason=$5, updated_at=NOW()
+		UPDATE staff_leaves SET leave_type=$2, start_date=$3, end_date=$4, half_day=$5, reason=$6, updated_at=NOW()
 		WHERE id=$1`,
-		l.ID, l.LeaveType, l.StartDate, l.EndDate, l.Reason,
+		l.ID, l.LeaveType, l.StartDate, l.EndDate, l.HalfDay, l.Reason,
 	)
 	if err != nil {
 		return err
@@ -104,7 +104,7 @@ func (r *Repository) ListLeavesByUserYear(ctx context.Context, userID, academicY
 // academicYearID, used to compute payroll for the whole school in one query.
 func (r *Repository) ListLeavesBySchoolYear(ctx context.Context, schoolID, academicYearID uuid.UUID) ([]domain.StaffLeave, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT sl.id, sl.user_id, sl.academic_year_id, sl.leave_type, sl.start_date, sl.end_date, COALESCE(sl.reason,''), sl.created_at, sl.updated_at
+		SELECT sl.id, sl.user_id, sl.academic_year_id, sl.leave_type, sl.start_date, sl.end_date, sl.half_day, COALESCE(sl.reason,''), sl.created_at, sl.updated_at
 		FROM staff_leaves sl
 		JOIN users u ON u.id = sl.user_id
 		WHERE u.school_id=$1 AND sl.academic_year_id=$2

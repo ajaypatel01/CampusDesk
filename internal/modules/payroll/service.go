@@ -31,6 +31,7 @@ type LeaveInput struct {
 	LeaveType      string    `json:"leave_type"`
 	StartDate      string    `json:"start_date"` // YYYY-MM-DD
 	EndDate        string    `json:"end_date"`
+	HalfDay        bool      `json:"half_day"` // only valid when start_date == end_date
 	Reason         string    `json:"reason"`
 }
 
@@ -76,12 +77,16 @@ func (s *Service) parseLeave(in LeaveInput) (*domain.StaffLeave, error) {
 	if end.Before(start) {
 		return nil, fmt.Errorf("%w: end_date must not be before start_date", apperr.ErrInvalidInput)
 	}
+	if in.HalfDay && !start.Equal(end) {
+		return nil, fmt.Errorf("%w: half_day is only valid for a single-day leave (start_date must equal end_date)", apperr.ErrInvalidInput)
+	}
 	return &domain.StaffLeave{
 		UserID:         in.UserID,
 		AcademicYearID: in.AcademicYearID,
 		LeaveType:      leaveType,
 		StartDate:      start,
 		EndDate:        end,
+		HalfDay:        in.HalfDay,
 		Reason:         strings.TrimSpace(in.Reason),
 	}, nil
 }
@@ -107,15 +112,15 @@ type MonthRow struct {
 	MonthlySalary int       `json:"monthly_salary"`
 	WorkingDays   int       `json:"working_days_per_month"`
 	PerDayRate    float64   `json:"per_day_rate"`
-	CLPaidDays    int       `json:"cl_paid_days"`
-	CLExcessDays  int       `json:"cl_excess_days"`
-	UnpaidDays    int       `json:"unpaid_days"`
-	DeductedDays  int       `json:"deducted_days"`
+	CLPaidDays    float64   `json:"cl_paid_days"`
+	CLExcessDays  float64   `json:"cl_excess_days"`
+	UnpaidDays    float64   `json:"unpaid_days"`
+	DeductedDays  float64   `json:"deducted_days"`
 	Deduction     int       `json:"deduction"`
 	NetSalary     int       `json:"net_salary"`
 	CLQuota       int       `json:"cl_quota_per_year"`
-	CLUsedYTD     int       `json:"cl_used_ytd"`
-	CLBalance     int       `json:"cl_balance"`
+	CLUsedYTD     float64   `json:"cl_used_ytd"`
+	CLBalance     float64   `json:"cl_balance"`
 }
 
 // ComputeMonth computes every staff member's payroll for schoolID for the given
@@ -131,7 +136,7 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 	}
 	workingDays := sch.WorkingDaysPerMonth
 	if workingDays <= 0 {
-		workingDays = 26
+		workingDays = 30
 	}
 
 	members, _, err := s.staffRepo.List(ctx, &schoolID, 1000, 0)
@@ -169,24 +174,28 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 		}
 
 		userLeaves := byUser[m.ID]
-		clUsedBeforeThisMonth := 0
-		clDaysThisMonth := 0
-		unpaidDaysThisMonth := 0
+		clUsedBeforeThisMonth := 0.0
+		clDaysThisMonth := 0.0
+		unpaidDaysThisMonth := 0.0
 		for _, lv := range userLeaves {
+			factor := 1.0
+			if lv.HalfDay {
+				factor = 0.5
+			}
 			if lv.LeaveType == "cl" && lv.EndDate.Before(monthStart) {
-				clUsedBeforeThisMonth += daysBetween(lv.StartDate, lv.EndDate)
+				clUsedBeforeThisMonth += factor * float64(daysBetween(lv.StartDate, lv.EndDate))
 				continue
 			}
 			overlapDays, beforeMonthDays := overlap(lv.StartDate, lv.EndDate, monthStart, monthEnd)
 			if lv.LeaveType == "cl" {
-				clUsedBeforeThisMonth += beforeMonthDays
-				clDaysThisMonth += overlapDays
+				clUsedBeforeThisMonth += factor * float64(beforeMonthDays)
+				clDaysThisMonth += factor * float64(overlapDays)
 			} else {
-				unpaidDaysThisMonth += overlapDays
+				unpaidDaysThisMonth += factor * float64(overlapDays)
 			}
 		}
 
-		remainingBefore := quota - clUsedBeforeThisMonth
+		remainingBefore := float64(quota) - clUsedBeforeThisMonth
 		if remainingBefore < 0 {
 			remainingBefore = 0
 		}
@@ -198,13 +207,13 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 
 		deductedDays := excessCL + unpaidDaysThisMonth
 		perDayRate := float64(salary) / float64(workingDays)
-		deduction := int(perDayRate*float64(deductedDays) + 0.5)
+		deduction := int(perDayRate*deductedDays + 0.5)
 		if deduction > salary {
 			deduction = salary
 		}
 
 		clUsedYTD := clUsedBeforeThisMonth + paidCL + excessCL
-		clBalance := quota - clUsedYTD
+		clBalance := float64(quota) - clUsedYTD
 		if clBalance < 0 {
 			clBalance = 0
 		}

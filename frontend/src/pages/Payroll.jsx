@@ -25,7 +25,7 @@ function Payroll() {
   const [leaves, setLeaves] = useState([])
 
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ user_id: '', leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+  const [form, setForm] = useState({ user_id: '', leave_type: 'cl', start_date: '', end_date: '', half_day: false, reason: '' })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -67,7 +67,7 @@ function Payroll() {
     try {
       await payrollApi.createLeave({ ...form, academic_year_id: currentYear.id })
       setShowForm(false)
-      setForm({ user_id: '', leave_type: 'cl', start_date: '', end_date: '', reason: '' })
+      setForm({ user_id: '', leave_type: 'cl', start_date: '', end_date: '', half_day: false, reason: '' })
       loadLeaves()
       loadPayroll()
     } catch (e2) {
@@ -164,7 +164,7 @@ function Payroll() {
               return (
                 <tr key={l.id}>
                   <td>{s ? `${s.first_name} ${s.last_name}` : l.user_id}</td>
-                  <td><span className={`badge badge--${l.leave_type === 'cl' ? 'info' : 'danger'}`}>{l.leave_type === 'cl' ? 'CL' : 'Unpaid'}</span></td>
+                  <td><span className={`badge badge--${l.leave_type === 'cl' ? 'info' : 'danger'}`}>{l.leave_type === 'cl' ? 'CL' : 'Unpaid'}{l.half_day ? ' (½ day)' : ''}</span></td>
                   <td className="data-table__muted">{l.start_date}</td>
                   <td className="data-table__muted">{l.end_date}</td>
                   <td className="data-table__muted">{l.reason || '-'}</td>
@@ -200,13 +200,19 @@ function Payroll() {
               <div className="form-row">
                 <label className="form-field">
                   <span>From *</span>
-                  <input required type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+                  <input required type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value, half_day: e.target.value === form.end_date ? form.half_day : false })} />
                 </label>
                 <label className="form-field">
                   <span>To *</span>
-                  <input required type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
+                  <input required type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value, half_day: e.target.value === form.start_date ? form.half_day : false })} />
                 </label>
               </div>
+              {form.start_date && form.start_date === form.end_date && (
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={form.half_day} onChange={e => setForm({ ...form, half_day: e.target.checked })} />
+                  <span>Half day only</span>
+                </label>
+              )}
               <label className="form-field">
                 <span>Reason</span>
                 <input value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="Optional" />

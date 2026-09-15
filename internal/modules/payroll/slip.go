@@ -26,6 +26,15 @@ type SlipData struct {
 	BankIFSC          string
 }
 
+// fmtDays renders a day count without a trailing ".0" for whole numbers,
+// while still showing fractional days like "3.5" for half-day leave.
+func fmtDays(v float64) string {
+	if v == float64(int(v)) {
+		return fmt.Sprintf("%d", int(v))
+	}
+	return fmt.Sprintf("%.1f", v)
+}
+
 func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetAutoPageBreak(true, 20)
@@ -100,7 +109,7 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf.SetFont("Arial", "B", 11)
 	pdf.CellFormat(w, 7, "Attendance", "", 1, "L", false, 0, "")
 
-	presentDays := d.Row.WorkingDays - d.Row.DeductedDays
+	presentDays := float64(d.Row.WorkingDays) - d.Row.DeductedDays
 	attRow := func(label string, value string, shade bool) {
 		if shade {
 			pdf.SetFillColor(245, 245, 245)
@@ -110,11 +119,11 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 		pdf.CellFormat(60, 7, value, "1", 1, "R", shade, 0, "")
 	}
 	attRow("Working Days in Month", fmt.Sprintf("%d", d.Row.WorkingDays), true)
-	attRow("Present Days", fmt.Sprintf("%d", presentDays), false)
-	attRow("CL Availed (Paid)", fmt.Sprintf("%d", d.Row.CLPaidDays), true)
-	attRow("CL Availed (Beyond Quota)", fmt.Sprintf("%d", d.Row.CLExcessDays), false)
-	attRow("Unpaid Leave Days", fmt.Sprintf("%d", d.Row.UnpaidDays), true)
-	attRow("Total Deducted Days", fmt.Sprintf("%d", d.Row.DeductedDays), false)
+	attRow("Present Days", fmtDays(presentDays), false)
+	attRow("CL Availed (Paid)", fmtDays(d.Row.CLPaidDays), true)
+	attRow("CL Availed (Beyond Quota)", fmtDays(d.Row.CLExcessDays), false)
+	attRow("Unpaid Leave Days", fmtDays(d.Row.UnpaidDays), true)
+	attRow("Total Deducted Days", fmtDays(d.Row.DeductedDays), false)
 	pdf.Ln(4)
 
 	// Earnings / Deductions table
@@ -133,7 +142,7 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf.CellFormat(120, 7, fmt.Sprintf("Per Day Rate (Salary / %d days)", d.Row.WorkingDays), "1", 0, "L", false, 0, "")
 	pdf.CellFormat(60, 7, fmt.Sprintf("%.2f", d.Row.PerDayRate), "1", 1, "R", false, 0, "")
 
-	pdf.CellFormat(120, 7, fmt.Sprintf("Deduction (%d day(s) x Rs. %.2f)", d.Row.DeductedDays, d.Row.PerDayRate), "1", 0, "L", false, 0, "")
+	pdf.CellFormat(120, 7, fmt.Sprintf("Deduction (%s day(s) x Rs. %.2f)", fmtDays(d.Row.DeductedDays), d.Row.PerDayRate), "1", 0, "L", false, 0, "")
 	pdf.CellFormat(60, 7, fmt.Sprintf("- %d/-", d.Row.Deduction), "1", 1, "R", false, 0, "")
 
 	pdf.SetFont("Arial", "B", 10)
@@ -146,14 +155,14 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf.SetFont("Arial", "B", 11)
 	pdf.CellFormat(w, 7, "Casual Leave Balance (Year to Date)", "", 1, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 10)
-	clRow := func(label string, value int, shade bool) {
+	clRow := func(label string, value float64, shade bool) {
 		if shade {
 			pdf.SetFillColor(245, 245, 245)
 		}
 		pdf.CellFormat(120, 7, label, "1", 0, "L", shade, 0, "")
-		pdf.CellFormat(60, 7, fmt.Sprintf("%d", value), "1", 1, "R", shade, 0, "")
+		pdf.CellFormat(60, 7, fmtDays(value), "1", 1, "R", shade, 0, "")
 	}
-	clRow("Annual CL Quota", d.Row.CLQuota, true)
+	clRow("Annual CL Quota", float64(d.Row.CLQuota), true)
 	clRow("CL Used So Far This Year", d.Row.CLUsedYTD, false)
 	clRow("CL Balance Remaining", d.Row.CLBalance, true)
 	pdf.Ln(8)

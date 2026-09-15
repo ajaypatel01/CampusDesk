@@ -16,6 +16,7 @@ type StaffLeave struct {
 	LeaveType      string    `json:"leave_type"` // "cl" or "unpaid"
 	StartDate      time.Time `json:"start_date"`
 	EndDate        time.Time `json:"end_date"`
+	HalfDay        bool      `json:"half_day"` // only valid when StartDate == EndDate
 	Reason         string    `json:"reason,omitempty"`
 	Timestamps
 }
