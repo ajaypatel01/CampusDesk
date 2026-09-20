@@ -16,6 +16,7 @@ type SlipData struct {
 	SchoolPhone   string
 	SchoolEmail   string
 	Logo          []byte // optional; school letterhead logo, nil if none on file
+	Signature     []byte // optional; authorized signatory's signature image, nil if none on file
 
 	Month time.Month
 	Year  int
@@ -176,11 +177,23 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 
 	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
 	pdf.Ln(3)
+	noteY := pdf.GetY()
 	pdf.SetFont("Arial", "I", 8)
 	pdf.CellFormat(w/2, 5, "This is a computer-generated salary slip.", "", 0, "L", false, 0, "")
-	pdf.Ln(10)
+
+	if len(d.Signature) > 0 {
+		opt := fpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}
+		pdf.RegisterImageOptionsReader("auth-signature", opt, bytes.NewReader(d.Signature))
+		sigW := 32.0
+		sigH := sigW * (198.0 / 818.0)
+		pdf.ImageOptions("auth-signature", 15+w-sigW, noteY, sigW, sigH, false, opt, 0, "")
+		pdf.SetY(noteY + sigH + 1)
+	} else {
+		pdf.Ln(10)
+		pdf.SetFont("Arial", "", 10)
+		pdf.CellFormat(w, 5, "________________________", "", 1, "R", false, 0, "")
+	}
 	pdf.SetFont("Arial", "", 10)
-	pdf.CellFormat(w, 5, "________________________", "", 1, "R", false, 0, "")
 	pdf.CellFormat(w, 5, "Authorized Signatory", "", 1, "R", false, 0, "")
 
 	var buf bytes.Buffer
