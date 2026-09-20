@@ -20,6 +20,20 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+func isAdminRole(role string) bool {
+	return role == "super_admin" || role == "school_admin"
+}
+
+// canAccessUser reports whether the caller may view/download data scoped to
+// targetUserID: any admin can, and everyone else only for their own data.
+func canAccessUser(r *http.Request, targetUserID uuid.UUID) bool {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		return false
+	}
+	return isAdminRole(claims.Role) || claims.Sub == targetUserID.String()
+}
+
 func (h *Handler) CreateLeave(w http.ResponseWriter, r *http.Request) {
 	var in LeaveInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -79,12 +93,21 @@ func (h *Handler) ListLeaves(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusBadRequest, "invalid user_id")
 			return
 		}
+		if !canAccessUser(r, userID) {
+			httpx.Error(w, http.StatusForbidden, "access denied: insufficient role")
+			return
+		}
 		items, err = h.svc.ListLeaves(r.Context(), userID, yearID)
 		if err != nil {
 			httpx.WriteServiceError(w, err)
 			return
 		}
 	} else {
+		claims := httpx.ClaimsFromContext(r.Context())
+		if claims == nil || !isAdminRole(claims.Role) {
+			httpx.Error(w, http.StatusForbidden, "access denied: insufficient role")
+			return
+		}
 		schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
 		if err != nil {
 			httpx.Error(w, http.StatusBadRequest, "school_id or user_id required")
@@ -120,6 +143,31 @@ func (h *Handler) ComputeMonth(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "month (1-12) required")
 		return
 	}
+
+	if uid := r.URL.Query().Get("user_id"); uid != "" {
+		userID, err := uuid.Parse(uid)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid user_id")
+			return
+		}
+		if !canAccessUser(r, userID) {
+			httpx.Error(w, http.StatusForbidden, "access denied: insufficient role")
+			return
+		}
+		row, err := h.svc.ComputeForUser(r.Context(), schoolID, yearID, userID, year, time.Month(monthNum))
+		if err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": []MonthRow{*row}})
+		return
+	}
+
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil || !isAdminRole(claims.Role) {
+		httpx.Error(w, http.StatusForbidden, "access denied: insufficient role")
+		return
+	}
 	rows, err := h.svc.ComputeMonth(r.Context(), schoolID, yearID, year, time.Month(monthNum))
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -142,6 +190,10 @@ func (h *Handler) DownloadSlip(w http.ResponseWriter, r *http.Request) {
 	userID, err := uuid.Parse(r.URL.Query().Get("user_id"))
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "user_id required")
+		return
+	}
+	if !canAccessUser(r, userID) {
+		httpx.Error(w, http.StatusForbidden, "access denied: insufficient role")
 		return
 	}
 	year, err := strconv.Atoi(r.URL.Query().Get("year"))

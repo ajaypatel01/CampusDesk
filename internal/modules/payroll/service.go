@@ -157,87 +157,128 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 
 	var rows []MonthRow
 	for _, m := range members {
-		salary := 0
-		quota := 7
-		designation := ""
-		if m.Profile != nil {
-			salary = m.Profile.Salary
-			if m.Profile.CLQuotaPerYear > 0 {
-				quota = m.Profile.CLQuotaPerYear
-			}
-			if m.Profile.Designation != nil {
-				designation = *m.Profile.Designation
-			}
+		if row, ok := computeMemberRow(m, byUser[m.ID], workingDays, monthStart, monthEnd); ok {
+			rows = append(rows, row)
 		}
-		if salary <= 0 {
-			continue // nothing to compute for staff with no salary on file
-		}
-
-		userLeaves := byUser[m.ID]
-		clUsedBeforeThisMonth := 0.0
-		clDaysThisMonth := 0.0
-		unpaidDaysThisMonth := 0.0
-		for _, lv := range userLeaves {
-			factor := 1.0
-			if lv.HalfDay {
-				factor = 0.5
-			}
-			if lv.LeaveType == "cl" && lv.EndDate.Before(monthStart) {
-				clUsedBeforeThisMonth += factor * float64(daysBetween(lv.StartDate, lv.EndDate))
-				continue
-			}
-			overlapDays, beforeMonthDays := overlap(lv.StartDate, lv.EndDate, monthStart, monthEnd)
-			if lv.LeaveType == "cl" {
-				clUsedBeforeThisMonth += factor * float64(beforeMonthDays)
-				clDaysThisMonth += factor * float64(overlapDays)
-			} else {
-				unpaidDaysThisMonth += factor * float64(overlapDays)
-			}
-		}
-
-		remainingBefore := float64(quota) - clUsedBeforeThisMonth
-		if remainingBefore < 0 {
-			remainingBefore = 0
-		}
-		paidCL := clDaysThisMonth
-		if paidCL > remainingBefore {
-			paidCL = remainingBefore
-		}
-		excessCL := clDaysThisMonth - paidCL
-
-		deductedDays := excessCL + unpaidDaysThisMonth
-		perDayRate := float64(salary) / float64(workingDays)
-		deduction := int(perDayRate*deductedDays + 0.5)
-		if deduction > salary {
-			deduction = salary
-		}
-
-		clUsedYTD := clUsedBeforeThisMonth + paidCL + excessCL
-		clBalance := float64(quota) - clUsedYTD
-		if clBalance < 0 {
-			clBalance = 0
-		}
-
-		rows = append(rows, MonthRow{
-			UserID:        m.ID,
-			FirstName:     m.FirstName,
-			LastName:      m.LastName,
-			Designation:   designation,
-			MonthlySalary: salary,
-			WorkingDays:   workingDays,
-			PerDayRate:    perDayRate,
-			CLPaidDays:    paidCL,
-			CLExcessDays:  excessCL,
-			UnpaidDays:    unpaidDaysThisMonth,
-			DeductedDays:  deductedDays,
-			Deduction:     deduction,
-			NetSalary:     salary - deduction,
-			CLQuota:       quota,
-			CLUsedYTD:     clUsedYTD,
-			CLBalance:     clBalance,
-		})
 	}
 	return rows, nil
+}
+
+// computeMemberRow is the pure per-member half of ComputeMonth's calculation,
+// shared with ComputeForUser so a single staff member's payroll can be computed
+// without pulling (or exposing) the rest of the school's payroll.
+func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, workingDays int, monthStart, monthEnd time.Time) (MonthRow, bool) {
+	salary := 0
+	quota := 7
+	designation := ""
+	if m.Profile != nil {
+		salary = m.Profile.Salary
+		if m.Profile.CLQuotaPerYear > 0 {
+			quota = m.Profile.CLQuotaPerYear
+		}
+		if m.Profile.Designation != nil {
+			designation = *m.Profile.Designation
+		}
+	}
+	if salary <= 0 {
+		return MonthRow{}, false // nothing to compute for staff with no salary on file
+	}
+
+	clUsedBeforeThisMonth := 0.0
+	clDaysThisMonth := 0.0
+	unpaidDaysThisMonth := 0.0
+	for _, lv := range userLeaves {
+		factor := 1.0
+		if lv.HalfDay {
+			factor = 0.5
+		}
+		if lv.LeaveType == "cl" && lv.EndDate.Before(monthStart) {
+			clUsedBeforeThisMonth += factor * float64(daysBetween(lv.StartDate, lv.EndDate))
+			continue
+		}
+		overlapDays, beforeMonthDays := overlap(lv.StartDate, lv.EndDate, monthStart, monthEnd)
+		if lv.LeaveType == "cl" {
+			clUsedBeforeThisMonth += factor * float64(beforeMonthDays)
+			clDaysThisMonth += factor * float64(overlapDays)
+		} else {
+			unpaidDaysThisMonth += factor * float64(overlapDays)
+		}
+	}
+
+	remainingBefore := float64(quota) - clUsedBeforeThisMonth
+	if remainingBefore < 0 {
+		remainingBefore = 0
+	}
+	paidCL := clDaysThisMonth
+	if paidCL > remainingBefore {
+		paidCL = remainingBefore
+	}
+	excessCL := clDaysThisMonth - paidCL
+
+	deductedDays := excessCL + unpaidDaysThisMonth
+	perDayRate := float64(salary) / float64(workingDays)
+	deduction := int(perDayRate*deductedDays + 0.5)
+	if deduction > salary {
+		deduction = salary
+	}
+
+	clUsedYTD := clUsedBeforeThisMonth + paidCL + excessCL
+	clBalance := float64(quota) - clUsedYTD
+	if clBalance < 0 {
+		clBalance = 0
+	}
+
+	return MonthRow{
+		UserID:        m.ID,
+		FirstName:     m.FirstName,
+		LastName:      m.LastName,
+		Designation:   designation,
+		MonthlySalary: salary,
+		WorkingDays:   workingDays,
+		PerDayRate:    perDayRate,
+		CLPaidDays:    paidCL,
+		CLExcessDays:  excessCL,
+		UnpaidDays:    unpaidDaysThisMonth,
+		DeductedDays:  deductedDays,
+		Deduction:     deduction,
+		NetSalary:     salary - deduction,
+		CLQuota:       quota,
+		CLUsedYTD:     clUsedYTD,
+		CLBalance:     clBalance,
+	}, true
+}
+
+// ComputeForUser computes a single staff member's payroll for the month without
+// pulling the rest of the school's staff/leave data - used when a non-admin
+// requests only their own salary.
+func (s *Service) ComputeForUser(ctx context.Context, schoolID, academicYearID, userID uuid.UUID, year int, month time.Month) (*MonthRow, error) {
+	sch, err := s.schoolRepo.GetByID(ctx, schoolID)
+	if err != nil {
+		return nil, err
+	}
+	workingDays := sch.WorkingDaysPerMonth
+	if workingDays <= 0 {
+		workingDays = 30
+	}
+
+	member, err := s.staffRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	leaves, err := s.repo.ListLeavesByUserYear(ctx, userID, academicYearID)
+	if err != nil {
+		return nil, err
+	}
+
+	monthStart := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := monthStart.AddDate(0, 1, -1)
+
+	row, ok := computeMemberRow(*member, leaves, workingDays, monthStart, monthEnd)
+	if !ok {
+		return nil, fmt.Errorf("%w: no salary on file for this staff member", apperr.ErrNotFound)
+	}
+	return &row, nil
 }
 
 // slipUnlockDate is the earliest a given month's salary slip may be downloaded:
@@ -253,19 +294,9 @@ func (s *Service) GenerateSlip(ctx context.Context, schoolID, academicYearID, us
 	if unlock := slipUnlockDate(year, month); time.Now().Before(unlock) {
 		return nil, "", fmt.Errorf("%w: %s %d's salary slip is available from %s", apperr.ErrForbidden, month, year, unlock.Format("Jan 2, 2006"))
 	}
-	rows, err := s.ComputeMonth(ctx, schoolID, academicYearID, year, month)
+	row, err := s.ComputeForUser(ctx, schoolID, academicYearID, userID, year, month)
 	if err != nil {
 		return nil, "", err
-	}
-	var row *MonthRow
-	for i := range rows {
-		if rows[i].UserID == userID {
-			row = &rows[i]
-			break
-		}
-	}
-	if row == nil {
-		return nil, "", fmt.Errorf("%w: no salary on file for this staff member", apperr.ErrNotFound)
 	}
 
 	member, err := s.staffRepo.GetByID(ctx, userID)

@@ -53,7 +53,9 @@ function StaffDetail() {
   const { id } = useParams()
   const { user } = useOutletContext() || {}
   const { currentSchool, currentYear } = useSchool()
-  const isSuperAdmin = user?.role === 'super_admin'
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'school_admin'
+  const isOwnProfile = user?.id === id
+  const canViewPayroll = isAdmin || isOwnProfile
   const [member, setMember] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -122,23 +124,23 @@ function StaffDetail() {
   }
 
   function loadLeaves() {
-    if (!isSuperAdmin || !currentYear) return
+    if (!canViewPayroll || !currentYear) return
     payrollApi.listLeaves({ user_id: id, academic_year_id: currentYear.id })
       .then(r => setLeaves(r.items || []))
       .catch(() => setLeaves([]))
   }
 
   function loadPayrollRow() {
-    if (!isSuperAdmin || !currentSchool || !currentYear) return
+    if (!canViewPayroll || !currentSchool || !currentYear) return
     setPayrollLoading(true)
-    payrollApi.computeMonth({ school_id: currentSchool.id, academic_year_id: currentYear.id, year: payYear, month: payMonth })
+    payrollApi.computeMonth({ school_id: currentSchool.id, academic_year_id: currentYear.id, user_id: id, year: payYear, month: payMonth })
       .then(r => setPayrollRow((r.items || []).find(row => row.user_id === id) || null))
       .catch(() => setPayrollRow(null))
       .finally(() => setPayrollLoading(false))
   }
 
-  useEffect(loadPayrollRow, [isSuperAdmin, currentSchool, currentYear, payYear, payMonth, id])
-  useEffect(loadLeaves, [isSuperAdmin, currentYear, id])
+  useEffect(loadPayrollRow, [canViewPayroll, currentSchool, currentYear, payYear, payMonth, id])
+  useEffect(loadLeaves, [canViewPayroll, currentYear, id])
 
   async function handleAddLeave(e) {
     e.preventDefault()
@@ -311,7 +313,7 @@ function StaffDetail() {
         </div>
       </div>
 
-      {isSuperAdmin && (
+      {canViewPayroll && (
         <div className="sd-card" style={{ marginTop: '20px' }}>
           <div className="sd-card__header">
             <Wallet size={16} />
@@ -362,13 +364,15 @@ function StaffDetail() {
 
               <div className="sd-card__header" style={{ marginTop: '18px', justifyContent: 'space-between' }}>
                 <h3>Leave Records — {currentYear.name}</h3>
-                <button className="btn btn--outline btn--sm" onClick={() => setShowLeaveModal(true)}>
-                  <Plus size={14} /> Log Leave
-                </button>
+                {isAdmin && (
+                  <button className="btn btn--outline btn--sm" onClick={() => setShowLeaveModal(true)}>
+                    <Plus size={14} /> Log Leave
+                  </button>
+                )}
               </div>
               <table className="data-table">
                 <thead>
-                  <tr><th>Type</th><th>From</th><th>To</th><th>Reason</th><th></th></tr>
+                  <tr><th>Type</th><th>From</th><th>To</th><th>Reason</th>{isAdmin && <th></th>}</tr>
                 </thead>
                 <tbody>
                   {leaves.length === 0 ? (
@@ -379,7 +383,7 @@ function StaffDetail() {
                       <td className="data-table__muted">{l.start_date}</td>
                       <td className="data-table__muted">{l.end_date}</td>
                       <td className="data-table__muted">{l.reason || '-'}</td>
-                      <td><button className="btn btn--outline btn--sm" onClick={() => handleDeleteLeave(l.id)}><Trash2 size={14} /></button></td>
+                      {isAdmin && <td><button className="btn btn--outline btn--sm" onClick={() => handleDeleteLeave(l.id)}><Trash2 size={14} /></button></td>}
                     </tr>
                   ))}
                 </tbody>
