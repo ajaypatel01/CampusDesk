@@ -15,6 +15,7 @@ type SlipData struct {
 	SchoolAddress string
 	SchoolPhone   string
 	SchoolEmail   string
+	Logo          []byte // optional; school letterhead logo, nil if none on file
 
 	Month time.Month
 	Year  int
@@ -42,6 +43,12 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf.AddPage()
 
 	w := 180.0
+
+	if len(d.Logo) > 0 {
+		opt := fpdf.ImageOptions{ImageType: "JPEG", ReadDpi: true}
+		pdf.RegisterImageOptionsReader("school-logo", opt, bytes.NewReader(d.Logo))
+		pdf.ImageOptions("school-logo", 15, 10, 20, 0, false, opt, 0, "")
+	}
 
 	pdf.SetFont("Arial", "B", 18)
 	pdf.CellFormat(w, 10, d.SchoolName, "", 1, "C", false, 0, "")

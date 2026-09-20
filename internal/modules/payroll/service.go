@@ -272,6 +272,7 @@ func (s *Service) GenerateSlip(ctx context.Context, schoolID, academicYearID, us
 		SchoolAddress: sch.Address,
 		SchoolPhone:   sch.Phone,
 		SchoolEmail:   sch.Email,
+		Logo:          schoolLogo(sch.Name),
 		Month:         month,
 		Year:          year,
 		Row:           *row,
