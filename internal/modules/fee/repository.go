@@ -291,9 +291,9 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 func (r *Repository) UpdateFeeAccount(ctx context.Context, fa *domain.StudentFeeAccount) error {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE student_fee_accounts SET tuition_fee=$2, discount_amount=$3, discount_reason=$4,
-			previous_year_dues=$5, van_fee=$6, is_rte=$7, updated_at=NOW()
+			previous_year_dues=$5, van_fee=$6, is_rte=$7, fee_structure_id=$8, updated_at=NOW()
 		WHERE id=$1`,
-		fa.ID, fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.IsRTE,
+		fa.ID, fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.IsRTE, fa.FeeStructureID,
 	)
 	if err != nil {
 		return err
@@ -302,6 +302,25 @@ func (r *Repository) UpdateFeeAccount(ctx context.Context, fa *domain.StudentFee
 		return apperr.ErrNotFound
 	}
 	return nil
+}
+
+// GetFeeStructureByGrade finds the fee structure for a school/year/grade combination,
+// used when reassigning a student's class - the new fee_structure_id must exist for
+// that grade before the student's account can be pointed at it.
+func (r *Repository) GetFeeStructureByGrade(ctx context.Context, schoolID, yearID, gradeLevelID uuid.UUID) (*domain.FeeStructure, error) {
+	var fs domain.FeeStructure
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, school_id, academic_year_id, grade_level_id, tuition_fee_annual, num_installments, van_fee_annual, created_at, updated_at
+		FROM fee_structures WHERE school_id=$1 AND academic_year_id=$2 AND grade_level_id=$3`,
+		schoolID, yearID, gradeLevelID,
+	).Scan(&fs.ID, &fs.SchoolID, &fs.AcademicYearID, &fs.GradeLevelID, &fs.TuitionFeeAnnual, &fs.NumInstallments, &fs.VanFeeAnnual, &fs.CreatedAt, &fs.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get fee structure by grade: %w", err)
+	}
+	return &fs, nil
 }
 
 // ---- Payments ----

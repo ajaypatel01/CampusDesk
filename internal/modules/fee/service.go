@@ -58,12 +58,13 @@ type CreateFeeAccountInput struct {
 }
 
 type UpdateFeeAccountInput struct {
-	TuitionFee       *int    `json:"tuition_fee"`
-	DiscountAmount   *int    `json:"discount_amount"`
-	DiscountReason   *string `json:"discount_reason"`
-	PreviousYearDues *int    `json:"previous_year_dues"`
-	VanFee           *int    `json:"van_fee"`
-	IsRTE            *bool   `json:"is_rte"`
+	TuitionFee       *int       `json:"tuition_fee"`
+	DiscountAmount   *int       `json:"discount_amount"`
+	DiscountReason   *string    `json:"discount_reason"`
+	PreviousYearDues *int       `json:"previous_year_dues"`
+	VanFee           *int       `json:"van_fee"`
+	IsRTE            *bool      `json:"is_rte"`
+	GradeLevelID     *uuid.UUID `json:"grade_level_id"`
 }
 
 type RecordPaymentInput struct {
@@ -165,6 +166,7 @@ type StudentFeeSummaryResponse struct {
 	StudentName      string              `json:"student_name"`
 	StudentCode      string              `json:"student_code"`
 	AcademicYearID   uuid.UUID           `json:"academic_year_id"`
+	GradeLevelID     uuid.UUID           `json:"grade_level_id"`
 	GradeLevelName   string              `json:"grade_level_name"`
 	TuitionFee       int                 `json:"tuition_fee"`
 	DiscountAmount   int                 `json:"discount_amount"`
@@ -399,6 +401,17 @@ func (s *Service) UpdateFeeAccount(ctx context.Context, id uuid.UUID, in UpdateF
 	if err != nil {
 		return nil, err
 	}
+	if in.GradeLevelID != nil && *in.GradeLevelID != uuid.Nil {
+		newFS, err := s.repo.GetFeeStructureByGrade(ctx, fa.SchoolID, fa.AcademicYearID, *in.GradeLevelID)
+		if err != nil {
+			return nil, err
+		}
+		fa.FeeStructureID = newFS.ID
+		// Changing class re-bases tuition/van to the new grade's fee structure;
+		// an explicit tuition_fee/van_fee in the same request (below) still wins.
+		fa.TuitionFee = newFS.TuitionFeeAnnual
+		fa.VanFee = newFS.VanFeeAnnual
+	}
 	if in.TuitionFee != nil {
 		fa.TuitionFee = *in.TuitionFee
 	}
@@ -517,6 +530,10 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 	}
 
 	name, code, grade, _ := s.repo.GetStudentInfo(ctx, studentID)
+	var gradeLevelID uuid.UUID
+	if currentFS, err := s.repo.GetFeeStructureByID(ctx, fa.FeeStructureID); err == nil {
+		gradeLevelID = currentFS.GradeLevelID
+	}
 	netTuition := fa.TuitionFee - fa.DiscountAmount
 	totalDue := netTuition + fa.VanFee + fa.PreviousYearDues
 	var totalPaid int
@@ -532,6 +549,7 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 		StudentName:      name,
 		StudentCode:      code,
 		AcademicYearID:   yearID,
+		GradeLevelID:     gradeLevelID,
 		GradeLevelName:   grade,
 		TuitionFee:       fa.TuitionFee,
 		DiscountAmount:   fa.DiscountAmount,

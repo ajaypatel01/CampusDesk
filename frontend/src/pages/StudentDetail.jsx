@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useOutletContext } from 'react-router-dom'
 import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee } from 'lucide-react'
-import { studentsApi, guardiansApi, feesApi } from '../services/api'
+import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import './StudentDetail.css'
 
@@ -9,12 +9,13 @@ const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
 
 function StudentDetail() {
   const { id } = useParams()
-  const { currentYear } = useSchool()
+  const { currentYear, currentSchool } = useSchool()
   const { user } = useOutletContext() || {}
   const canEditFees = FEE_EDITOR_ROLES.includes(user?.role)
   const [student, setStudent] = useState(null)
   const [guardians, setGuardians] = useState([])
   const [feeSummary, setFeeSummary] = useState(null)
+  const [grades, setGrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
@@ -24,6 +25,13 @@ function StudentDetail() {
   const [feeEditing, setFeeEditing] = useState(false)
   const [feeForm, setFeeForm] = useState({})
   const [feeSaving, setFeeSaving] = useState(false)
+
+  useEffect(() => {
+    if (!currentSchool) return
+    academicApi.listGrades(currentSchool.id)
+      .then(res => setGrades(res.items || []))
+      .catch(() => setGrades([]))
+  }, [currentSchool])
 
   function fmt(amt) {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amt || 0)
@@ -47,7 +55,7 @@ function StudentDetail() {
         setFeeForm({
           tuition_fee: fee.tuition_fee, discount_amount: fee.discount_amount,
           discount_reason: fee.discount_reason || '', van_fee: fee.van_fee,
-          previous_year_dues: fee.previous_year_dues,
+          previous_year_dues: fee.previous_year_dues, grade_level_id: fee.grade_level_id,
         })
       }
     }).catch(() => {})
@@ -58,15 +66,27 @@ function StudentDetail() {
     if (!feeSummary?.account_id) return
     setFeeSaving(true)
     try {
-      await feesApi.updateAccount(feeSummary.account_id, {
+      const body = {
         tuition_fee: parseInt(feeForm.tuition_fee, 10) || 0,
         discount_amount: parseInt(feeForm.discount_amount, 10) || 0,
         discount_reason: feeForm.discount_reason,
         van_fee: parseInt(feeForm.van_fee, 10) || 0,
         previous_year_dues: parseInt(feeForm.previous_year_dues, 10) || 0,
-      })
+      }
+      // Only send grade_level_id when it actually changed - the backend re-bases
+      // tuition/van to the new grade's fee structure, which would silently
+      // overwrite a custom tuition otherwise.
+      if (feeForm.grade_level_id && feeForm.grade_level_id !== feeSummary.grade_level_id) {
+        body.grade_level_id = feeForm.grade_level_id
+      }
+      await feesApi.updateAccount(feeSummary.account_id, body)
       const updated = await feesApi.studentSummary(id, currentYear.id)
       setFeeSummary(updated)
+      setFeeForm({
+        tuition_fee: updated.tuition_fee, discount_amount: updated.discount_amount,
+        discount_reason: updated.discount_reason || '', van_fee: updated.van_fee,
+        previous_year_dues: updated.previous_year_dues, grade_level_id: updated.grade_level_id,
+      })
       setFeeEditing(false)
     } catch (err) {
       alert(err.message)
@@ -228,7 +248,7 @@ function StudentDetail() {
               <div className="student-detail__actions">
                 {canEditFees && (feeEditing ? (
                   <>
-                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues }) }}><X size={14} /> Cancel</button>
+                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues, grade_level_id: feeSummary.grade_level_id }) }}><X size={14} /> Cancel</button>
                     <button className="btn btn--primary btn--sm" onClick={handleSaveFee} disabled={feeSaving}><Save size={14} /> {feeSaving ? 'Saving...' : 'Save'}</button>
                   </>
                 ) : (
@@ -238,7 +258,16 @@ function StudentDetail() {
               </div>
             </div>
             <div className="detail-fields">
-              <Field label="Class" value={feeSummary.grade_level_name} editing={false} />
+              {feeEditing ? (
+                <div className="detail-field">
+                  <span className="detail-field__label">Class</span>
+                  <select className="detail-field__input" value={feeForm.grade_level_id || ''} onChange={e => setFeeForm({ ...feeForm, grade_level_id: e.target.value })}>
+                    {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <Field label="Class" value={feeSummary.grade_level_name} editing={false} />
+              )}
               <Field label="Tuition Fee" value={feeEditing ? feeForm.tuition_fee : fmt(feeSummary.tuition_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, tuition_fee: v })} />
               <Field label="Discount" value={feeEditing ? feeForm.discount_amount : (feeSummary.discount_amount ? `${fmt(feeSummary.discount_amount)}${feeSummary.discount_reason ? ` (${feeSummary.discount_reason})` : ''}` : '-')} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, discount_amount: v })} />
               {feeEditing && (
