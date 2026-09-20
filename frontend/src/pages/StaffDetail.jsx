@@ -167,6 +167,11 @@ function StaffDetail() {
     }
   }
 
+  // A month's slip unlocks the 16th of the following month (payMonth is 1-12,
+  // so that value used as a 0-indexed JS month is already "next month").
+  const slipUnlockDate = new Date(payYear, payMonth, 16)
+  const slipLocked = new Date() < slipUnlockDate
+
   async function handleDownloadSlip() {
     if (!currentSchool || !currentYear) return
     setSlipDownloading(true)
@@ -328,10 +333,15 @@ function StaffDetail() {
                   <span>Year</span>
                   <input type="number" value={payYear} onChange={e => setPayYear(parseInt(e.target.value, 10) || now.getFullYear())} />
                 </label>
-                <button className="btn btn--outline btn--sm" onClick={handleDownloadSlip} disabled={slipDownloading || !payrollRow}>
+                <button className="btn btn--outline btn--sm" onClick={handleDownloadSlip} disabled={slipDownloading || !payrollRow || slipLocked} title={slipLocked ? `Available from ${slipUnlockDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined}>
                   <Download size={14} /> {slipDownloading ? 'Downloading...' : 'Download Salary Slip'}
                 </button>
               </div>
+              {slipLocked && payrollRow && (
+                <p className="empty-text" style={{ marginTop: '-8px', marginBottom: '12px' }}>
+                  This month's slip unlocks on {slipUnlockDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                </p>
+              )}
 
               {payrollLoading ? (
                 <p className="empty-text">Loading...</p>

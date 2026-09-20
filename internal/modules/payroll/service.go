@@ -240,9 +240,19 @@ func (s *Service) ComputeMonth(ctx context.Context, schoolID, academicYearID uui
 	return rows, nil
 }
 
+// slipUnlockDate is the earliest a given month's salary slip may be downloaded:
+// the 16th of the following month, i.e. strictly after the 15th, giving payroll
+// time to finalize attendance/leave for the month before slips go out.
+func slipUnlockDate(year int, month time.Month) time.Time {
+	return time.Date(year, month, 16, 0, 0, 0, 0, time.UTC).AddDate(0, 1, 0)
+}
+
 // GenerateSlip computes one staff member's salary for the given month and renders
 // it as a downloadable PDF, using the same present-day/CL logic as ComputeMonth.
 func (s *Service) GenerateSlip(ctx context.Context, schoolID, academicYearID, userID uuid.UUID, year int, month time.Month) ([]byte, string, error) {
+	if unlock := slipUnlockDate(year, month); time.Now().Before(unlock) {
+		return nil, "", fmt.Errorf("%w: %s %d's salary slip is available from %s", apperr.ErrForbidden, month, year, unlock.Format("Jan 2, 2006"))
+	}
 	rows, err := s.ComputeMonth(ctx, schoolID, academicYearID, year, month)
 	if err != nil {
 		return nil, "", err
