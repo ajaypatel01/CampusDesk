@@ -105,22 +105,38 @@ func (s *Service) ListLeavesForSchool(ctx context.Context, schoolID, academicYea
 
 // MonthRow is one staff member's computed payroll for a single calendar month.
 type MonthRow struct {
-	UserID        uuid.UUID `json:"user_id"`
-	FirstName     string    `json:"first_name"`
-	LastName      string    `json:"last_name"`
-	Designation   string    `json:"designation,omitempty"`
-	MonthlySalary int       `json:"monthly_salary"`
-	WorkingDays   int       `json:"working_days_per_month"`
-	PerDayRate    float64   `json:"per_day_rate"`
-	CLPaidDays    float64   `json:"cl_paid_days"`
-	CLExcessDays  float64   `json:"cl_excess_days"`
-	UnpaidDays    float64   `json:"unpaid_days"`
-	DeductedDays  float64   `json:"deducted_days"`
-	Deduction     int       `json:"deduction"`
-	NetSalary     int       `json:"net_salary"`
-	CLQuota       int       `json:"cl_quota_per_year"`
-	CLUsedYTD     float64   `json:"cl_used_ytd"`
-	CLBalance     float64   `json:"cl_balance"`
+	UserID      uuid.UUID `json:"user_id"`
+	FirstName   string    `json:"first_name"`
+	LastName    string    `json:"last_name"`
+	Designation string    `json:"designation,omitempty"`
+
+	// Earnings breakdown; MonthlySalary (gross) = sum of the four below.
+	BasicSalary      int `json:"basic_salary"`
+	HRA              int `json:"hra"`
+	SpecialAllowance int `json:"special_allowance"`
+	Bonus            int `json:"bonus"`
+	MonthlySalary    int `json:"monthly_salary"`
+
+	WorkingDays  int     `json:"working_days_per_month"`
+	PerDayRate   float64 `json:"per_day_rate"`
+	CLPaidDays   float64 `json:"cl_paid_days"`
+	CLExcessDays float64 `json:"cl_excess_days"`
+	UnpaidDays   float64 `json:"unpaid_days"`
+	DeductedDays float64 `json:"deducted_days"`
+
+	// Deduction breakdown; Deduction (total, subtracted to get NetSalary) =
+	// AttendanceDeduction + EPF + ESIC + AdditionalDeduction.
+	AttendanceDeduction      int    `json:"attendance_deduction"`
+	EPF                      int    `json:"epf"`
+	ESIC                     int    `json:"esic"`
+	AdditionalDeduction      int    `json:"additional_deduction"`
+	AdditionalDeductionLabel string `json:"additional_deduction_label,omitempty"`
+	Deduction                int    `json:"deduction"`
+	NetSalary                int    `json:"net_salary"`
+
+	CLQuota   int     `json:"cl_quota_per_year"`
+	CLUsedYTD float64 `json:"cl_used_ytd"`
+	CLBalance float64 `json:"cl_balance"`
 }
 
 // ComputeMonth computes every staff member's payroll for schoolID for the given
@@ -171,6 +187,9 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 	salary := 0
 	quota := 7
 	designation := ""
+	basic, hra, specialAllowance, bonus := 0, 0, 0, 0
+	epf, esic, additionalDeduction := 0, 0, 0
+	additionalDeductionLabel := ""
 	if m.Profile != nil {
 		salary = m.Profile.Salary
 		if m.Profile.CLQuotaPerYear > 0 {
@@ -178,6 +197,11 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 		}
 		if m.Profile.Designation != nil {
 			designation = *m.Profile.Designation
+		}
+		basic, hra, specialAllowance, bonus = m.Profile.BasicSalary, m.Profile.HRA, m.Profile.SpecialAllowance, m.Profile.Bonus
+		epf, esic, additionalDeduction = m.Profile.EPF, m.Profile.ESIC, m.Profile.AdditionalDeduction
+		if m.Profile.AdditionalDeductionLabel != nil {
+			additionalDeductionLabel = *m.Profile.AdditionalDeductionLabel
 		}
 	}
 	if salary <= 0 {
@@ -217,9 +241,13 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 
 	deductedDays := excessCL + unpaidDaysThisMonth
 	perDayRate := float64(salary) / float64(workingDays)
-	deduction := int(perDayRate*deductedDays + 0.5)
-	if deduction > salary {
-		deduction = salary
+	attendanceDeduction := int(perDayRate*deductedDays + 0.5)
+	if attendanceDeduction > salary {
+		attendanceDeduction = salary
+	}
+	totalDeduction := attendanceDeduction + epf + esic + additionalDeduction
+	if totalDeduction > salary {
+		totalDeduction = salary
 	}
 
 	clUsedYTD := clUsedBeforeThisMonth + paidCL + excessCL
@@ -229,22 +257,31 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 	}
 
 	return MonthRow{
-		UserID:        m.ID,
-		FirstName:     m.FirstName,
-		LastName:      m.LastName,
-		Designation:   designation,
-		MonthlySalary: salary,
-		WorkingDays:   workingDays,
-		PerDayRate:    perDayRate,
-		CLPaidDays:    paidCL,
-		CLExcessDays:  excessCL,
-		UnpaidDays:    unpaidDaysThisMonth,
-		DeductedDays:  deductedDays,
-		Deduction:     deduction,
-		NetSalary:     salary - deduction,
-		CLQuota:       quota,
-		CLUsedYTD:     clUsedYTD,
-		CLBalance:     clBalance,
+		UserID:                   m.ID,
+		FirstName:                m.FirstName,
+		LastName:                 m.LastName,
+		Designation:              designation,
+		BasicSalary:              basic,
+		HRA:                      hra,
+		SpecialAllowance:         specialAllowance,
+		Bonus:                    bonus,
+		MonthlySalary:            salary,
+		WorkingDays:              workingDays,
+		PerDayRate:               perDayRate,
+		CLPaidDays:               paidCL,
+		CLExcessDays:             excessCL,
+		UnpaidDays:               unpaidDaysThisMonth,
+		DeductedDays:             deductedDays,
+		AttendanceDeduction:      attendanceDeduction,
+		EPF:                      epf,
+		ESIC:                     esic,
+		AdditionalDeduction:      additionalDeduction,
+		AdditionalDeductionLabel: additionalDeductionLabel,
+		Deduction:                totalDeduction,
+		NetSalary:                salary - totalDeduction,
+		CLQuota:                  quota,
+		CLUsedYTD:                clUsedYTD,
+		CLBalance:                clBalance,
 	}, true
 }
 

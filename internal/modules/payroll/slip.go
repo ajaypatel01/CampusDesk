@@ -134,9 +134,40 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	attRow("Total Deducted Days", fmtDays(d.Row.DeductedDays), false)
 	pdf.Ln(4)
 
-	// Earnings / Deductions table
+	// Earnings table
 	pdf.SetFont("Arial", "B", 11)
-	pdf.CellFormat(w, 7, "Salary Calculation", "", 1, "L", false, 0, "")
+	pdf.CellFormat(w, 7, "Earnings", "", 1, "L", false, 0, "")
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetFillColor(230, 230, 230)
+	pdf.CellFormat(120, 7, "Particulars", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(60, 7, "Amount (Rs.)", "1", 1, "C", true, 0, "")
+
+	earnRow := func(label string, amount int, shade bool) {
+		if amount == 0 {
+			return
+		}
+		if shade {
+			pdf.SetFillColor(245, 245, 245)
+		}
+		pdf.SetFont("Arial", "", 10)
+		pdf.CellFormat(120, 7, label, "1", 0, "L", shade, 0, "")
+		pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", amount), "1", 1, "R", shade, 0, "")
+	}
+	earnRow("Basic Salary", d.Row.BasicSalary, true)
+	earnRow("HRA", d.Row.HRA, false)
+	earnRow("Special Allowance", d.Row.SpecialAllowance, true)
+	earnRow("Bonus", d.Row.Bonus, false)
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetFillColor(230, 230, 230)
+	pdf.CellFormat(120, 7, "Gross Salary", "1", 0, "L", true, 0, "")
+	pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", d.Row.MonthlySalary), "1", 1, "R", true, 0, "")
+	pdf.Ln(4)
+
+	// Deductions table
+	pdf.SetFont("Arial", "B", 11)
+	pdf.CellFormat(w, 7, "Deductions", "", 1, "L", false, 0, "")
 
 	pdf.SetFont("Arial", "B", 10)
 	pdf.SetFillColor(230, 230, 230)
@@ -144,16 +175,36 @@ func generateSalarySlipPDF(d SlipData) ([]byte, error) {
 	pdf.CellFormat(60, 7, "Amount (Rs.)", "1", 1, "C", true, 0, "")
 
 	pdf.SetFont("Arial", "", 10)
-	pdf.CellFormat(120, 7, "Monthly Salary (Gross)", "1", 0, "L", false, 0, "")
-	pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", d.Row.MonthlySalary), "1", 1, "R", false, 0, "")
+	pdf.SetFillColor(245, 245, 245)
+	pdf.CellFormat(120, 7, fmt.Sprintf("Attendance (%s day(s) x Rs. %.2f)", fmtDays(d.Row.DeductedDays), d.Row.PerDayRate), "1", 0, "L", true, 0, "")
+	pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", d.Row.AttendanceDeduction), "1", 1, "R", true, 0, "")
 
-	pdf.CellFormat(120, 7, fmt.Sprintf("Per Day Rate (Salary / %d days)", d.Row.WorkingDays), "1", 0, "L", false, 0, "")
-	pdf.CellFormat(60, 7, fmt.Sprintf("%.2f", d.Row.PerDayRate), "1", 1, "R", false, 0, "")
-
-	pdf.CellFormat(120, 7, fmt.Sprintf("Deduction (%s day(s) x Rs. %.2f)", fmtDays(d.Row.DeductedDays), d.Row.PerDayRate), "1", 0, "L", false, 0, "")
-	pdf.CellFormat(60, 7, fmt.Sprintf("- %d/-", d.Row.Deduction), "1", 1, "R", false, 0, "")
+	deductRow := func(label string, amount int, shade bool) {
+		if amount == 0 {
+			return
+		}
+		if shade {
+			pdf.SetFillColor(245, 245, 245)
+		}
+		pdf.SetFont("Arial", "", 10)
+		pdf.CellFormat(120, 7, label, "1", 0, "L", shade, 0, "")
+		pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", amount), "1", 1, "R", shade, 0, "")
+	}
+	deductRow("EPF", d.Row.EPF, false)
+	deductRow("ESIC", d.Row.ESIC, true)
+	additionalLabel := d.Row.AdditionalDeductionLabel
+	if additionalLabel == "" {
+		additionalLabel = "Additional Items"
+	}
+	deductRow(additionalLabel, d.Row.AdditionalDeduction, false)
 
 	pdf.SetFont("Arial", "B", 10)
+	pdf.SetFillColor(230, 230, 230)
+	pdf.CellFormat(120, 7, "Total Deductions", "1", 0, "L", true, 0, "")
+	pdf.CellFormat(60, 7, fmt.Sprintf("%d/-", d.Row.Deduction), "1", 1, "R", true, 0, "")
+	pdf.Ln(4)
+
+	pdf.SetFont("Arial", "B", 11)
 	pdf.SetFillColor(230, 230, 230)
 	pdf.CellFormat(120, 8, "Net Salary Payable", "1", 0, "L", true, 0, "")
 	pdf.CellFormat(60, 8, fmt.Sprintf("Rs. %d/-", d.Row.NetSalary), "1", 1, "R", true, 0, "")

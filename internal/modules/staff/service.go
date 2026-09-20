@@ -31,7 +31,14 @@ func (s *Service) UpsertProfile(ctx context.Context, userID uuid.UUID, in Update
 		EducationQualification:    in.EducationQualification,
 		ProfessionalQualification: in.ProfessionalQualification,
 		Designation:               in.Designation,
-		Salary:                    in.Salary,
+		BasicSalary:               in.BasicSalary,
+		HRA:                       in.HRA,
+		SpecialAllowance:          in.SpecialAllowance,
+		Bonus:                     in.Bonus,
+		EPF:                       in.EPF,
+		ESIC:                      in.ESIC,
+		AdditionalDeduction:       in.AdditionalDeduction,
+		AdditionalDeductionLabel:  in.AdditionalDeductionLabel,
 		BankName:                  in.BankName,
 		BankIFSC:                  in.BankIFSC,
 		BankBranch:                in.BankBranch,
@@ -53,7 +60,14 @@ type UpdateProfileInput struct {
 	EducationQualification    *string `json:"education_qualification"`
 	ProfessionalQualification *string `json:"professional_qualification"`
 	Designation               *string `json:"designation"`
-	Salary                    int     `json:"salary"`
+	BasicSalary               int     `json:"basic_salary"`
+	HRA                       int     `json:"hra"`
+	SpecialAllowance          int     `json:"special_allowance"`
+	Bonus                     int     `json:"bonus"`
+	EPF                       int     `json:"epf"`
+	ESIC                      int     `json:"esic"`
+	AdditionalDeduction       int     `json:"additional_deduction"`
+	AdditionalDeductionLabel  *string `json:"additional_deduction_label"`
 	BankName                  *string `json:"bank_name"`
 	BankIFSC                  *string `json:"bank_ifsc"`
 	BankBranch                *string `json:"bank_branch"`

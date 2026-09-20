@@ -80,7 +80,8 @@ function StaffDetail() {
     education_qualification: '',
     professional_qualification: '',
     designation: '',
-    salary: '',
+    basic_salary: '', hra: '', special_allowance: '', bonus: '',
+    epf: '', esic: '', additional_deduction: '', additional_deduction_label: '',
     bank_name: '',
     bank_ifsc: '',
     bank_branch: '',
@@ -103,7 +104,14 @@ function StaffDetail() {
             education_qualification: m.profile.education_qualification || '',
             professional_qualification: m.profile.professional_qualification || '',
             designation: m.profile.designation || '',
-            salary: m.profile.salary != null ? String(m.profile.salary) : '',
+            basic_salary: m.profile.basic_salary != null ? String(m.profile.basic_salary) : '',
+            hra: m.profile.hra != null ? String(m.profile.hra) : '',
+            special_allowance: m.profile.special_allowance != null ? String(m.profile.special_allowance) : '',
+            bonus: m.profile.bonus != null ? String(m.profile.bonus) : '',
+            epf: m.profile.epf != null ? String(m.profile.epf) : '',
+            esic: m.profile.esic != null ? String(m.profile.esic) : '',
+            additional_deduction: m.profile.additional_deduction != null ? String(m.profile.additional_deduction) : '',
+            additional_deduction_label: m.profile.additional_deduction_label || '',
             bank_name: m.profile.bank_name || '',
             bank_ifsc: m.profile.bank_ifsc || '',
             bank_branch: m.profile.bank_branch || '',
@@ -196,7 +204,17 @@ function StaffDetail() {
     setSaving(true)
     setSaveErr('')
     try {
-      const body = { ...form, salary: form.salary ? parseInt(form.salary, 10) : 0 }
+      const body = {
+        ...form,
+        basic_salary: parseInt(form.basic_salary, 10) || 0,
+        hra: parseInt(form.hra, 10) || 0,
+        special_allowance: parseInt(form.special_allowance, 10) || 0,
+        bonus: parseInt(form.bonus, 10) || 0,
+        epf: parseInt(form.epf, 10) || 0,
+        esic: parseInt(form.esic, 10) || 0,
+        additional_deduction: parseInt(form.additional_deduction, 10) || 0,
+        additional_deduction_label: form.additional_deduction_label || null,
+      }
       await staffApi.upsertProfile(id, body)
       const updated = await staffApi.get(id)
       setMember(updated)
@@ -273,7 +291,22 @@ function StaffDetail() {
           </div>
           <Field label="Designation" value={p?.designation} />
           <Field label="Staff Type" value={p?.staff_type ? staffTypeLabels[p.staff_type] : null} />
-          <Field label="Salary" value={p?.salary != null ? `₹${Number(p.salary).toLocaleString('en-IN')} / month` : null} />
+          <Field label="Gross Salary" value={p?.salary != null ? `₹${Number(p.salary).toLocaleString('en-IN')} / month` : null} />
+          {p && (p.basic_salary > 0 || p.hra > 0 || p.special_allowance > 0 || p.bonus > 0) && (
+            <Field label="Earnings Breakdown" value={[
+              p.basic_salary > 0 && `Basic ₹${p.basic_salary.toLocaleString('en-IN')}`,
+              p.hra > 0 && `HRA ₹${p.hra.toLocaleString('en-IN')}`,
+              p.special_allowance > 0 && `Special Allowance ₹${p.special_allowance.toLocaleString('en-IN')}`,
+              p.bonus > 0 && `Bonus ₹${p.bonus.toLocaleString('en-IN')}`,
+            ].filter(Boolean).join(' + ')} />
+          )}
+          {p && (p.epf > 0 || p.esic > 0 || p.additional_deduction > 0) && (
+            <Field label="Fixed Deductions" value={[
+              p.epf > 0 && `EPF ₹${p.epf.toLocaleString('en-IN')}`,
+              p.esic > 0 && `ESIC ₹${p.esic.toLocaleString('en-IN')}`,
+              p.additional_deduction > 0 && `${p.additional_deduction_label || 'Additional'} ₹${p.additional_deduction.toLocaleString('en-IN')}`,
+            ].filter(Boolean).join(' + ')} />
+          )}
           <Field label="CL Quota" value={p?.cl_quota_per_year != null ? `${p.cl_quota_per_year} / year` : null} />
           <Field label="Education" value={p?.education_qualification} />
           <Field label="Professional Qual." value={p?.professional_qualification} />
@@ -351,12 +384,21 @@ function StaffDetail() {
                 <p className="empty-text">No salary on file, or no data for {MONTHS[payMonth - 1]} {payYear}.</p>
               ) : (
                 <div className="sd-payroll-summary">
+                  <Field label="Gross Salary" value={fmtCurrency(payrollRow.monthly_salary)} />
                   <Field label="Working Days" value={payrollRow.working_days_per_month} />
                   <Field label="Present Days" value={payrollRow.working_days_per_month - payrollRow.deducted_days} />
                   <Field label="CL Availed (Paid)" value={payrollRow.cl_paid_days} />
                   <Field label="CL Beyond Quota" value={payrollRow.cl_excess_days} />
                   <Field label="Unpaid Days" value={payrollRow.unpaid_days} />
-                  <Field label="Deduction" value={fmtCurrency(payrollRow.deduction)} />
+                  <Field label="Attendance Deduction" value={fmtCurrency(payrollRow.attendance_deduction)} />
+                  {(payrollRow.epf > 0 || payrollRow.esic > 0 || payrollRow.additional_deduction > 0) && (
+                    <Field label="Fixed Deductions" value={[
+                      payrollRow.epf > 0 && `EPF ${fmtCurrency(payrollRow.epf)}`,
+                      payrollRow.esic > 0 && `ESIC ${fmtCurrency(payrollRow.esic)}`,
+                      payrollRow.additional_deduction > 0 && `${payrollRow.additional_deduction_label || 'Additional'} ${fmtCurrency(payrollRow.additional_deduction)}`,
+                    ].filter(Boolean).join(' + ')} />
+                  )}
+                  <Field label="Total Deduction" value={fmtCurrency(payrollRow.deduction)} />
                   <Field label="Net Salary" value={fmtCurrency(payrollRow.net_salary)} />
                   <Field label="CL Balance (YTD)" value={`${payrollRow.cl_balance} / ${payrollRow.cl_quota_per_year}`} />
                 </div>
@@ -480,8 +522,29 @@ function StaffDetail() {
                   <label>Custom Job Profile<input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Lab Assistant" /></label>
                 </div>
               )}
+              <p className="sd-modal__section-title">Earnings (₹/month)</p>
               <div className="sd-form-row">
-                <label>Salary (₹)<input type="number" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="Monthly salary" /></label>
+                <label>Basic Salary<input type="number" min="0" value={form.basic_salary} onChange={e => set('basic_salary', e.target.value)} /></label>
+                <label>HRA<input type="number" min="0" value={form.hra} onChange={e => set('hra', e.target.value)} /></label>
+              </div>
+              <div className="sd-form-row">
+                <label>Special Allowance<input type="number" min="0" value={form.special_allowance} onChange={e => set('special_allowance', e.target.value)} /></label>
+                <label>Bonus<input type="number" min="0" value={form.bonus} onChange={e => set('bonus', e.target.value)} /></label>
+              </div>
+              <p className="empty-text" style={{ margin: '-6px 0 10px' }}>
+                Gross salary: ₹{((parseInt(form.basic_salary, 10) || 0) + (parseInt(form.hra, 10) || 0) + (parseInt(form.special_allowance, 10) || 0) + (parseInt(form.bonus, 10) || 0)).toLocaleString('en-IN')} / month
+              </p>
+
+              <p className="sd-modal__section-title">Deductions (₹/month)</p>
+              <div className="sd-form-row">
+                <label>EPF<input type="number" min="0" value={form.epf} onChange={e => set('epf', e.target.value)} /></label>
+                <label>ESIC<input type="number" min="0" value={form.esic} onChange={e => set('esic', e.target.value)} /></label>
+              </div>
+              <div className="sd-form-row">
+                <label>Additional Deduction<input type="number" min="0" value={form.additional_deduction} onChange={e => set('additional_deduction', e.target.value)} /></label>
+                <label>Additional Deduction Label<input value={form.additional_deduction_label} onChange={e => set('additional_deduction_label', e.target.value)} placeholder="e.g. Uniform Advance" /></label>
+              </div>
+              <div className="sd-form-row">
                 <label>CL Quota (per year)<input type="number" min="0" value={form.cl_quota_per_year} onChange={e => set('cl_quota_per_year', parseInt(e.target.value, 10) || 0)} /></label>
               </div>
               <div className="sd-form-row">

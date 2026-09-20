@@ -13,7 +13,9 @@ const DESIGNATION_OPTIONS = [
 
 const NEW_STAFF_FORM = {
   first_name: '', last_name: '', email: '', password: '', role: 'teacher',
-  designation: '', staff_type: 'teaching', salary: '', cl_quota_per_year: '7', phone: '',
+  designation: '', staff_type: 'teaching', cl_quota_per_year: '7', phone: '',
+  basic_salary: '', hra: '', special_allowance: '', bonus: '',
+  epf: '', esic: '', additional_deduction: '', additional_deduction_label: '',
 }
 
 const roleLabels = {
@@ -69,7 +71,14 @@ function Staff() {
       await staffApi.upsertProfile(user.id, {
         designation: addForm.designation,
         staff_type: addForm.staff_type,
-        salary: addForm.salary ? parseInt(addForm.salary, 10) : 0,
+        basic_salary: parseInt(addForm.basic_salary, 10) || 0,
+        hra: parseInt(addForm.hra, 10) || 0,
+        special_allowance: parseInt(addForm.special_allowance, 10) || 0,
+        bonus: parseInt(addForm.bonus, 10) || 0,
+        epf: parseInt(addForm.epf, 10) || 0,
+        esic: parseInt(addForm.esic, 10) || 0,
+        additional_deduction: parseInt(addForm.additional_deduction, 10) || 0,
+        additional_deduction_label: addForm.additional_deduction_label || null,
         cl_quota_per_year: addForm.cl_quota_per_year ? parseInt(addForm.cl_quota_per_year, 10) : 7,
         phone: addForm.phone,
       })
@@ -339,16 +348,57 @@ function Staff() {
                   <input value={addForm.designation} onChange={e => setAddForm({ ...addForm, designation: e.target.value })} placeholder="e.g. Lab Assistant" />
                 </label>
               )}
+              <p className="sd-modal__section-title">Earnings (₹/month)</p>
               <div className="form-row">
                 <label className="form-field">
-                  <span>Salary (₹/month)</span>
-                  <input type="number" min="0" value={addForm.salary} onChange={e => setAddForm({ ...addForm, salary: e.target.value })} />
+                  <span>Basic Salary</span>
+                  <input type="number" min="0" value={addForm.basic_salary} onChange={e => setAddForm({ ...addForm, basic_salary: e.target.value })} />
                 </label>
                 <label className="form-field">
-                  <span>CL Quota (per year)</span>
-                  <input type="number" min="0" value={addForm.cl_quota_per_year} onChange={e => setAddForm({ ...addForm, cl_quota_per_year: e.target.value })} />
+                  <span>HRA</span>
+                  <input type="number" min="0" value={addForm.hra} onChange={e => setAddForm({ ...addForm, hra: e.target.value })} />
                 </label>
               </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Special Allowance</span>
+                  <input type="number" min="0" value={addForm.special_allowance} onChange={e => setAddForm({ ...addForm, special_allowance: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>Bonus</span>
+                  <input type="number" min="0" value={addForm.bonus} onChange={e => setAddForm({ ...addForm, bonus: e.target.value })} />
+                </label>
+              </div>
+              <p className="empty-text" style={{ margin: '-6px 0 10px' }}>
+                Gross salary: ₹{((parseInt(addForm.basic_salary, 10) || 0) + (parseInt(addForm.hra, 10) || 0) + (parseInt(addForm.special_allowance, 10) || 0) + (parseInt(addForm.bonus, 10) || 0)).toLocaleString('en-IN')} / month
+              </p>
+
+              <p className="sd-modal__section-title">Deductions (₹/month)</p>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>EPF</span>
+                  <input type="number" min="0" value={addForm.epf} onChange={e => setAddForm({ ...addForm, epf: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>ESIC</span>
+                  <input type="number" min="0" value={addForm.esic} onChange={e => setAddForm({ ...addForm, esic: e.target.value })} />
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Additional Deduction</span>
+                  <input type="number" min="0" value={addForm.additional_deduction} onChange={e => setAddForm({ ...addForm, additional_deduction: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>Additional Deduction Label</span>
+                  <input value={addForm.additional_deduction_label} onChange={e => setAddForm({ ...addForm, additional_deduction_label: e.target.value })} placeholder="e.g. Uniform Advance" />
+                </label>
+              </div>
+
+              <label className="form-field">
+                <span>CL Quota (per year)</span>
+                <input type="number" min="0" value={addForm.cl_quota_per_year} onChange={e => setAddForm({ ...addForm, cl_quota_per_year: e.target.value })} />
+              </label>
               {addErr && <p className="doc-msg doc-msg--error">{addErr}</p>}
               <div className="modal__actions">
                 <button type="button" className="btn btn--outline" onClick={() => setShowAddModal(false)}>Cancel</button>

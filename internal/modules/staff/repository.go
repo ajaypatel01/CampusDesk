@@ -25,6 +25,8 @@ const staffSelect = `
 		u.id, u.school_id, u.email, u.first_name, u.last_name, u.role, u.is_active, u.created_at, u.updated_at,
 		sp.id, sp.user_id, sp.guardian_name, sp.aadhar_number, sp.education_qualification,
 		sp.professional_qualification, sp.designation, COALESCE(sp.salary, 0) AS salary,
+		COALESCE(sp.basic_salary, 0), COALESCE(sp.hra, 0), COALESCE(sp.special_allowance, 0), COALESCE(sp.bonus, 0),
+		COALESCE(sp.epf, 0), COALESCE(sp.esic, 0), COALESCE(sp.additional_deduction, 0), sp.additional_deduction_label,
 		sp.bank_name, sp.bank_ifsc, sp.bank_branch, sp.bank_account_number, sp.bank_account_holder,
 		sp.phone, sp.staff_type, COALESCE(sp.cl_quota_per_year, 7) AS cl_quota_per_year,
 		COALESCE(sp.created_at, u.created_at), COALESCE(sp.updated_at, u.updated_at)
@@ -87,20 +89,27 @@ func (r *Repository) UpsertProfile(ctx context.Context, p *domain.StaffProfile) 
 	if p.CLQuotaPerYear <= 0 {
 		p.CLQuotaPerYear = 7
 	}
+	// Gross salary is derived from the earnings components, not entered directly.
+	p.Salary = p.BasicSalary + p.HRA + p.SpecialAllowance + p.Bonus
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO staff_profiles (user_id, guardian_name, aadhar_number, education_qualification,
-			professional_qualification, designation, salary, bank_name, bank_ifsc, bank_branch,
-			bank_account_number, bank_account_holder, phone, staff_type, cl_quota_per_year)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			professional_qualification, designation, salary, basic_salary, hra, special_allowance, bonus,
+			epf, esic, additional_deduction, additional_deduction_label,
+			bank_name, bank_ifsc, bank_branch, bank_account_number, bank_account_holder,
+			phone, staff_type, cl_quota_per_year)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 		ON CONFLICT (user_id) DO UPDATE SET
 			guardian_name=$2, aadhar_number=$3, education_qualification=$4,
-			professional_qualification=$5, designation=$6, salary=$7, bank_name=$8,
-			bank_ifsc=$9, bank_branch=$10, bank_account_number=$11,
-			bank_account_holder=$12, phone=$13, staff_type=$14, cl_quota_per_year=$15, updated_at=NOW()
+			professional_qualification=$5, designation=$6, salary=$7, basic_salary=$8, hra=$9,
+			special_allowance=$10, bonus=$11, epf=$12, esic=$13, additional_deduction=$14,
+			additional_deduction_label=$15, bank_name=$16, bank_ifsc=$17, bank_branch=$18,
+			bank_account_number=$19, bank_account_holder=$20, phone=$21, staff_type=$22,
+			cl_quota_per_year=$23, updated_at=NOW()
 		RETURNING id, created_at, updated_at`,
 		p.UserID, p.GuardianName, p.AadharNumber, p.EducationQualification,
-		p.ProfessionalQualification, p.Designation, p.Salary, p.BankName,
-		p.BankIFSC, p.BankBranch, p.BankAccountNumber, p.BankAccountHolder, p.Phone, p.StaffType,
+		p.ProfessionalQualification, p.Designation, p.Salary, p.BasicSalary, p.HRA, p.SpecialAllowance, p.Bonus,
+		p.EPF, p.ESIC, p.AdditionalDeduction, p.AdditionalDeductionLabel,
+		p.BankName, p.BankIFSC, p.BankBranch, p.BankAccountNumber, p.BankAccountHolder, p.Phone, p.StaffType,
 		p.CLQuotaPerYear,
 	)
 	return row.Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
@@ -120,6 +129,8 @@ func scanMember(row scannable) (*domain.StaffMember, error) {
 		&m.ID, &m.SchoolID, &m.Email, &m.FirstName, &m.LastName, &m.Role, &m.IsActive, &m.CreatedAt, &m.UpdatedAt,
 		&profileID, &profileUserID, &p.GuardianName, &p.AadharNumber, &p.EducationQualification,
 		&p.ProfessionalQualification, &p.Designation, &p.Salary,
+		&p.BasicSalary, &p.HRA, &p.SpecialAllowance, &p.Bonus,
+		&p.EPF, &p.ESIC, &p.AdditionalDeduction, &p.AdditionalDeductionLabel,
 		&p.BankName, &p.BankIFSC, &p.BankBranch, &p.BankAccountNumber, &p.BankAccountHolder,
 		&p.Phone, &p.StaffType, &p.CLQuotaPerYear, &p.CreatedAt, &p.UpdatedAt,
 	)
