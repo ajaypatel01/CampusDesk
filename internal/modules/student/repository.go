@@ -59,6 +59,15 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
+// nullIfEmpty converts an empty string to nil so it lands as SQL NULL instead of
+// violating CHECK constraints (e.g. gender) that only permit NULL or specific values.
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO students (school_id, student_code, first_name, last_name, date_of_birth,
@@ -69,7 +78,7 @@ func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
 		RETURNING id, created_at, updated_at`,
 		s.SchoolID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
-		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
+		nullIfEmpty(s.Gender), s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
 		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.EnrollmentNumber, s.AdmissionClass, s.AdmissionYear,
 		s.PreviousSchool, s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
@@ -210,7 +219,7 @@ func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
 			bank_holder_name=$24, bank_branch=$25, status=$26, updated_at=NOW()
 		WHERE id=$1`,
 		s.ID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
-		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
+		nullIfEmpty(s.Gender), s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
 		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.EnrollmentNumber, s.AdmissionClass, s.AdmissionYear,
 		s.PreviousSchool, s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
