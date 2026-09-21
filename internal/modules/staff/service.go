@@ -37,6 +37,7 @@ func (s *Service) UpsertProfile(ctx context.Context, userID uuid.UUID, in Update
 		Bonus:                     in.Bonus,
 		EPF:                       in.EPF,
 		ESIC:                      in.ESIC,
+		Tax:                       in.Tax,
 		AdditionalDeduction:       in.AdditionalDeduction,
 		AdditionalDeductionLabel:  in.AdditionalDeductionLabel,
 		BankName:                  in.BankName,
@@ -66,6 +67,7 @@ type UpdateProfileInput struct {
 	Bonus                     int     `json:"bonus"`
 	EPF                       int     `json:"epf"`
 	ESIC                      int     `json:"esic"`
+	Tax                       int     `json:"tax"`
 	AdditionalDeduction       int     `json:"additional_deduction"`
 	AdditionalDeductionLabel  *string `json:"additional_deduction_label"`
 	BankName                  *string `json:"bank_name"`

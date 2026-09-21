@@ -125,10 +125,11 @@ type MonthRow struct {
 	DeductedDays float64 `json:"deducted_days"`
 
 	// Deduction breakdown; Deduction (total, subtracted to get NetSalary) =
-	// AttendanceDeduction + EPF + ESIC + AdditionalDeduction.
+	// AttendanceDeduction + EPF + ESIC + Tax + AdditionalDeduction.
 	AttendanceDeduction      int    `json:"attendance_deduction"`
 	EPF                      int    `json:"epf"`
 	ESIC                     int    `json:"esic"`
+	Tax                      int    `json:"tax"`
 	AdditionalDeduction      int    `json:"additional_deduction"`
 	AdditionalDeductionLabel string `json:"additional_deduction_label,omitempty"`
 	Deduction                int    `json:"deduction"`
@@ -188,7 +189,7 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 	quota := 7
 	designation := ""
 	basic, hra, specialAllowance, bonus := 0, 0, 0, 0
-	epf, esic, additionalDeduction := 0, 0, 0
+	epf, esic, tax, additionalDeduction := 0, 0, 0, 0
 	additionalDeductionLabel := ""
 	if m.Profile != nil {
 		salary = m.Profile.Salary
@@ -199,7 +200,7 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 			designation = *m.Profile.Designation
 		}
 		basic, hra, specialAllowance, bonus = m.Profile.BasicSalary, m.Profile.HRA, m.Profile.SpecialAllowance, m.Profile.Bonus
-		epf, esic, additionalDeduction = m.Profile.EPF, m.Profile.ESIC, m.Profile.AdditionalDeduction
+		epf, esic, tax, additionalDeduction = m.Profile.EPF, m.Profile.ESIC, m.Profile.Tax, m.Profile.AdditionalDeduction
 		if m.Profile.AdditionalDeductionLabel != nil {
 			additionalDeductionLabel = *m.Profile.AdditionalDeductionLabel
 		}
@@ -245,7 +246,7 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 	if attendanceDeduction > salary {
 		attendanceDeduction = salary
 	}
-	totalDeduction := attendanceDeduction + epf + esic + additionalDeduction
+	totalDeduction := attendanceDeduction + epf + esic + tax + additionalDeduction
 	if totalDeduction > salary {
 		totalDeduction = salary
 	}
@@ -275,6 +276,7 @@ func computeMemberRow(m domain.StaffMember, userLeaves []domain.StaffLeave, work
 		AttendanceDeduction:      attendanceDeduction,
 		EPF:                      epf,
 		ESIC:                     esic,
+		Tax:                      tax,
 		AdditionalDeduction:      additionalDeduction,
 		AdditionalDeductionLabel: additionalDeductionLabel,
 		Deduction:                totalDeduction,

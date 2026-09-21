@@ -17,6 +17,7 @@ type StaffProfile struct {
 	Bonus                     int       `json:"bonus"`
 	EPF                       int       `json:"epf"`
 	ESIC                      int       `json:"esic"`
+	Tax                       int       `json:"tax"`
 	AdditionalDeduction       int       `json:"additional_deduction"`
 	AdditionalDeductionLabel  *string   `json:"additional_deduction_label,omitempty"`
 	BankName                  *string   `json:"bank_name,omitempty"`

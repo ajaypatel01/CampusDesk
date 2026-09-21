@@ -15,7 +15,7 @@ const NEW_STAFF_FORM = {
   first_name: '', last_name: '', email: '', password: '', role: 'teacher',
   designation: '', staff_type: 'teaching', cl_quota_per_year: '7', phone: '',
   basic_salary: '', hra: '', special_allowance: '', bonus: '',
-  epf: '', esic: '', additional_deduction: '', additional_deduction_label: '',
+  epf: '', esic: '', tax: '', additional_deduction: '', additional_deduction_label: '',
 }
 
 const roleLabels = {
@@ -77,6 +77,7 @@ function Staff() {
         bonus: parseInt(addForm.bonus, 10) || 0,
         epf: parseInt(addForm.epf, 10) || 0,
         esic: parseInt(addForm.esic, 10) || 0,
+        tax: parseInt(addForm.tax, 10) || 0,
         additional_deduction: parseInt(addForm.additional_deduction, 10) || 0,
         additional_deduction_label: addForm.additional_deduction_label || null,
         cl_quota_per_year: addForm.cl_quota_per_year ? parseInt(addForm.cl_quota_per_year, 10) : 7,
@@ -386,9 +387,15 @@ function Staff() {
               </div>
               <div className="form-row">
                 <label className="form-field">
+                  <span>Tax</span>
+                  <input type="number" min="0" value={addForm.tax} onChange={e => setAddForm({ ...addForm, tax: e.target.value })} />
+                </label>
+                <label className="form-field">
                   <span>Additional Deduction</span>
                   <input type="number" min="0" value={addForm.additional_deduction} onChange={e => setAddForm({ ...addForm, additional_deduction: e.target.value })} />
                 </label>
+              </div>
+              <div className="form-row">
                 <label className="form-field">
                   <span>Additional Deduction Label</span>
                   <input value={addForm.additional_deduction_label} onChange={e => setAddForm({ ...addForm, additional_deduction_label: e.target.value })} placeholder="e.g. Uniform Advance" />

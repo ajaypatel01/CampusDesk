@@ -81,7 +81,7 @@ function StaffDetail() {
     professional_qualification: '',
     designation: '',
     basic_salary: '', hra: '', special_allowance: '', bonus: '',
-    epf: '', esic: '', additional_deduction: '', additional_deduction_label: '',
+    epf: '', esic: '', tax: '', additional_deduction: '', additional_deduction_label: '',
     bank_name: '',
     bank_ifsc: '',
     bank_branch: '',
@@ -110,6 +110,7 @@ function StaffDetail() {
             bonus: m.profile.bonus != null ? String(m.profile.bonus) : '',
             epf: m.profile.epf != null ? String(m.profile.epf) : '',
             esic: m.profile.esic != null ? String(m.profile.esic) : '',
+            tax: m.profile.tax != null ? String(m.profile.tax) : '',
             additional_deduction: m.profile.additional_deduction != null ? String(m.profile.additional_deduction) : '',
             additional_deduction_label: m.profile.additional_deduction_label || '',
             bank_name: m.profile.bank_name || '',
@@ -212,6 +213,7 @@ function StaffDetail() {
         bonus: parseInt(form.bonus, 10) || 0,
         epf: parseInt(form.epf, 10) || 0,
         esic: parseInt(form.esic, 10) || 0,
+        tax: parseInt(form.tax, 10) || 0,
         additional_deduction: parseInt(form.additional_deduction, 10) || 0,
         additional_deduction_label: form.additional_deduction_label || null,
       }
@@ -300,10 +302,11 @@ function StaffDetail() {
               p.bonus > 0 && `Bonus ₹${p.bonus.toLocaleString('en-IN')}`,
             ].filter(Boolean).join(' + ')} />
           )}
-          {p && (p.epf > 0 || p.esic > 0 || p.additional_deduction > 0) && (
+          {p && (p.epf > 0 || p.esic > 0 || p.tax > 0 || p.additional_deduction > 0) && (
             <Field label="Fixed Deductions" value={[
               p.epf > 0 && `EPF ₹${p.epf.toLocaleString('en-IN')}`,
               p.esic > 0 && `ESIC ₹${p.esic.toLocaleString('en-IN')}`,
+              p.tax > 0 && `Tax ₹${p.tax.toLocaleString('en-IN')}`,
               p.additional_deduction > 0 && `${p.additional_deduction_label || 'Additional'} ₹${p.additional_deduction.toLocaleString('en-IN')}`,
             ].filter(Boolean).join(' + ')} />
           )}
@@ -391,10 +394,11 @@ function StaffDetail() {
                   <Field label="CL Beyond Quota" value={payrollRow.cl_excess_days} />
                   <Field label="Unpaid Days" value={payrollRow.unpaid_days} />
                   <Field label="Attendance Deduction" value={fmtCurrency(payrollRow.attendance_deduction)} />
-                  {(payrollRow.epf > 0 || payrollRow.esic > 0 || payrollRow.additional_deduction > 0) && (
+                  {(payrollRow.epf > 0 || payrollRow.esic > 0 || payrollRow.tax > 0 || payrollRow.additional_deduction > 0) && (
                     <Field label="Fixed Deductions" value={[
                       payrollRow.epf > 0 && `EPF ${fmtCurrency(payrollRow.epf)}`,
                       payrollRow.esic > 0 && `ESIC ${fmtCurrency(payrollRow.esic)}`,
+                      payrollRow.tax > 0 && `Tax ${fmtCurrency(payrollRow.tax)}`,
                       payrollRow.additional_deduction > 0 && `${payrollRow.additional_deduction_label || 'Additional'} ${fmtCurrency(payrollRow.additional_deduction)}`,
                     ].filter(Boolean).join(' + ')} />
                   )}
@@ -541,7 +545,10 @@ function StaffDetail() {
                 <label>ESIC<input type="number" min="0" value={form.esic} onChange={e => set('esic', e.target.value)} /></label>
               </div>
               <div className="sd-form-row">
+                <label>Tax<input type="number" min="0" value={form.tax} onChange={e => set('tax', e.target.value)} /></label>
                 <label>Additional Deduction<input type="number" min="0" value={form.additional_deduction} onChange={e => set('additional_deduction', e.target.value)} /></label>
+              </div>
+              <div className="sd-form-row">
                 <label>Additional Deduction Label<input value={form.additional_deduction_label} onChange={e => set('additional_deduction_label', e.target.value)} placeholder="e.g. Uniform Advance" /></label>
               </div>
               <div className="sd-form-row">
