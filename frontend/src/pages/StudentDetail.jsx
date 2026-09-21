@@ -56,6 +56,7 @@ function StudentDetail() {
           tuition_fee: fee.tuition_fee, discount_amount: fee.discount_amount,
           discount_reason: fee.discount_reason || '', van_fee: fee.van_fee,
           previous_year_dues: fee.previous_year_dues, grade_level_id: fee.grade_level_id,
+          is_rte: fee.is_rte || false,
         })
       }
     }).catch(() => {})
@@ -72,6 +73,7 @@ function StudentDetail() {
         discount_reason: feeForm.discount_reason,
         van_fee: parseInt(feeForm.van_fee, 10) || 0,
         previous_year_dues: parseInt(feeForm.previous_year_dues, 10) || 0,
+        is_rte: !!feeForm.is_rte,
       }
       // Only send grade_level_id when it actually changed - the backend re-bases
       // tuition/van to the new grade's fee structure, which would silently
@@ -86,6 +88,7 @@ function StudentDetail() {
         tuition_fee: updated.tuition_fee, discount_amount: updated.discount_amount,
         discount_reason: updated.discount_reason || '', van_fee: updated.van_fee,
         previous_year_dues: updated.previous_year_dues, grade_level_id: updated.grade_level_id,
+        is_rte: updated.is_rte || false,
       })
       setFeeEditing(false)
     } catch (err) {
@@ -112,6 +115,8 @@ function StudentDetail() {
         admission_date: toISODate(form.admission_date), caste: form.caste, category: form.category,
         aadhar_number: form.aadhar_number, samagra_id: form.samagra_id,
         pen_number: form.pen_number, apar_id: form.apar_id,
+        enrollment_number: form.enrollment_number,
+        admission_class: form.admission_class, admission_year: form.admission_year,
         previous_school: form.previous_school,
         bank_name: form.bank_name, bank_ifsc: form.bank_ifsc,
         bank_account_number: form.bank_account_number,
@@ -197,8 +202,11 @@ function StudentDetail() {
             <Field label="Samagra ID" value={f.samagra_id} editing={editing} onChange={v => setForm({ ...form, samagra_id: v })} />
             <Field label="PEN Number" value={f.pen_number} editing={editing} onChange={v => setForm({ ...form, pen_number: v })} />
             <Field label="APAR ID" value={f.apar_id} editing={editing} onChange={v => setForm({ ...form, apar_id: v })} />
+            <Field label="Enrollment No. (9th & 10th)" value={f.enrollment_number} editing={editing} onChange={v => setForm({ ...form, enrollment_number: v })} />
             <Field label="Previous School" value={f.previous_school} editing={editing} onChange={v => setForm({ ...form, previous_school: v })} />
             <Field label="Admission Date" value={f.admission_date?.split('T')[0] || ''} editing={editing} onChange={v => setForm({ ...form, admission_date: v })} type="date" />
+            <Field label="Class of Admission" value={f.admission_class} editing={editing} onChange={v => setForm({ ...form, admission_class: v })} />
+            <Field label="Admission Year" value={f.admission_year} editing={editing} onChange={v => setForm({ ...form, admission_year: v })} placeholder="e.g. 2023-24" />
           </div>
         </div>
 
@@ -248,7 +256,7 @@ function StudentDetail() {
               <div className="student-detail__actions">
                 {canEditFees && (feeEditing ? (
                   <>
-                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues, grade_level_id: feeSummary.grade_level_id }) }}><X size={14} /> Cancel</button>
+                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues, grade_level_id: feeSummary.grade_level_id, is_rte: feeSummary.is_rte || false }) }}><X size={14} /> Cancel</button>
                     <button className="btn btn--primary btn--sm" onClick={handleSaveFee} disabled={feeSaving}><Save size={14} /> {feeSaving ? 'Saving...' : 'Save'}</button>
                   </>
                 ) : (
@@ -268,7 +276,13 @@ function StudentDetail() {
               ) : (
                 <Field label="Class" value={feeSummary.grade_level_name} editing={false} />
               )}
-              <Field label="Tuition Fee" value={feeEditing ? feeForm.tuition_fee : fmt(feeSummary.tuition_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, tuition_fee: v })} />
+              {feeEditing && (
+                <label className="form-field--checkbox" style={{ gridColumn: '1 / -1' }}>
+                  <input type="checkbox" checked={!!feeForm.is_rte} onChange={e => setFeeForm({ ...feeForm, is_rte: e.target.checked })} />
+                  <span>RTE (Right to Education) — waives tuition fee &amp; discount; van fee still applies if the student uses the bus</span>
+                </label>
+              )}
+              <Field label="Tuition Fee" value={feeEditing && !feeForm.is_rte ? feeForm.tuition_fee : fmt(feeEditing ? 0 : feeSummary.tuition_fee)} editing={feeEditing && !feeForm.is_rte} type="number" onChange={v => setFeeForm({ ...feeForm, tuition_fee: v })} />
               <Field label="Discount" value={feeEditing ? feeForm.discount_amount : (feeSummary.discount_amount ? `${fmt(feeSummary.discount_amount)}${feeSummary.discount_reason ? ` (${feeSummary.discount_reason})` : ''}` : '-')} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, discount_amount: v })} />
               {feeEditing && (
                 <Field label="Discount Reason" value={feeForm.discount_reason} editing={true} onChange={v => setFeeForm({ ...feeForm, discount_reason: v })} />
@@ -344,7 +358,7 @@ function StudentDetail() {
   )
 }
 
-function Field({ label, value, editing, onChange, type = 'text', options }) {
+function Field({ label, value, editing, onChange, type = 'text', options, placeholder }) {
   if (editing) {
     if (type === 'select') {
       return (
@@ -359,7 +373,7 @@ function Field({ label, value, editing, onChange, type = 'text', options }) {
     return (
       <div className="detail-field">
         <span className="detail-field__label">{label}</span>
-        <input className="detail-field__input" type={type} value={value || ''} onChange={e => onChange(e.target.value)} />
+        <input className="detail-field__input" type={type} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
       </div>
     )
   }

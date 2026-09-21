@@ -18,6 +18,7 @@ const studentCols = `s.id, s.school_id, s.student_code, s.first_name, s.last_nam
 	COALESCE(s.gender,''), COALESCE(s.email,''), COALESCE(s.phone,''), COALESCE(s.address,''),
 	s.admission_date, COALESCE(s.caste,''), COALESCE(s.category,''), COALESCE(s.aadhar_number,''),
 	COALESCE(s.samagra_id,''), COALESCE(s.pen_number,''), COALESCE(s.apar_id,''),
+	COALESCE(s.enrollment_number,''), COALESCE(s.admission_class,''), COALESCE(s.admission_year,''),
 	COALESCE(s.previous_school,''), COALESCE(s.bank_name,''), COALESCE(s.bank_ifsc,''),
 	COALESCE(s.bank_account_number,''), COALESCE(s.bank_holder_name,''), COALESCE(s.bank_branch,''),
 	s.status, s.created_at, s.updated_at`
@@ -26,6 +27,7 @@ const studentColsSingle = `id, school_id, student_code, first_name, last_name, d
 	COALESCE(gender,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(address,''),
 	admission_date, COALESCE(caste,''), COALESCE(category,''), COALESCE(aadhar_number,''),
 	COALESCE(samagra_id,''), COALESCE(pen_number,''), COALESCE(apar_id,''),
+	COALESCE(enrollment_number,''), COALESCE(admission_class,''), COALESCE(admission_year,''),
 	COALESCE(previous_school,''), COALESCE(bank_name,''), COALESCE(bank_ifsc,''),
 	COALESCE(bank_account_number,''), COALESCE(bank_holder_name,''), COALESCE(bank_branch,''),
 	status, created_at, updated_at`
@@ -61,14 +63,15 @@ func (r *Repository) Create(ctx context.Context, s *domain.Student) error {
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO students (school_id, student_code, first_name, last_name, date_of_birth,
 			gender, email, phone, address, admission_date, caste, category, aadhar_number,
-			samagra_id, pen_number, apar_id, previous_school, bank_name, bank_ifsc,
+			samagra_id, pen_number, apar_id, enrollment_number, admission_class, admission_year,
+			previous_school, bank_name, bank_ifsc,
 			bank_account_number, bank_holder_name, bank_branch, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
 		RETURNING id, created_at, updated_at`,
 		s.SchoolID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
 		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
-		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.PreviousSchool,
-		s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
+		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.EnrollmentNumber, s.AdmissionClass, s.AdmissionYear,
+		s.PreviousSchool, s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
 	if err := row.Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -202,13 +205,14 @@ func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
 		UPDATE students SET student_code=$2, first_name=$3, last_name=$4, date_of_birth=$5,
 			gender=$6, email=$7, phone=$8, address=$9, admission_date=$10, caste=$11,
 			category=$12, aadhar_number=$13, samagra_id=$14, pen_number=$15, apar_id=$16,
-			previous_school=$17, bank_name=$18, bank_ifsc=$19, bank_account_number=$20,
-			bank_holder_name=$21, bank_branch=$22, status=$23, updated_at=NOW()
+			enrollment_number=$17, admission_class=$18, admission_year=$19,
+			previous_school=$20, bank_name=$21, bank_ifsc=$22, bank_account_number=$23,
+			bank_holder_name=$24, bank_branch=$25, status=$26, updated_at=NOW()
 		WHERE id=$1`,
 		s.ID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
 		s.Gender, s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
-		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.PreviousSchool,
-		s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
+		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.EnrollmentNumber, s.AdmissionClass, s.AdmissionYear,
+		s.PreviousSchool, s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
 	)
 	if err != nil {
 		return database.MapError(err)
@@ -250,6 +254,7 @@ func scanRow(row scannable) (*domain.Student, error) {
 		&s.Gender, &s.Email, &s.Phone, &s.Address,
 		&s.AdmissionDate, &s.Caste, &s.Category, &s.AadharNumber,
 		&s.SamagraID, &s.PenNumber, &s.AparID,
+		&s.EnrollmentNumber, &s.AdmissionClass, &s.AdmissionYear,
 		&s.PreviousSchool, &s.BankName, &s.BankIFSC,
 		&s.BankAccountNumber, &s.BankHolderName, &s.BankBranch,
 		&s.Status, &s.CreatedAt, &s.UpdatedAt,
@@ -267,6 +272,7 @@ func scanListRow(row scannable) (*StudentListItem, error) {
 		&item.Gender, &item.Email, &item.Phone, &item.Address,
 		&item.AdmissionDate, &item.Caste, &item.Category, &item.AadharNumber,
 		&item.SamagraID, &item.PenNumber, &item.AparID,
+		&item.EnrollmentNumber, &item.AdmissionClass, &item.AdmissionYear,
 		&item.PreviousSchool, &item.BankName, &item.BankIFSC,
 		&item.BankAccountNumber, &item.BankHolderName, &item.BankBranch,
 		&item.Status, &item.CreatedAt, &item.UpdatedAt,

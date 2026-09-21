@@ -24,6 +24,9 @@ type Student struct {
 	SamagraID         string        `json:"samagra_id,omitempty"`
 	PenNumber         string        `json:"pen_number,omitempty"`
 	AparID            string        `json:"apar_id,omitempty"`
+	EnrollmentNumber  string        `json:"enrollment_number,omitempty"` // board enrollment no. (9th/10th)
+	AdmissionClass    string        `json:"admission_class,omitempty"`   // class the student was admitted into
+	AdmissionYear     string        `json:"admission_year,omitempty"`    // e.g. "2023-24"
 	PreviousSchool    string        `json:"previous_school,omitempty"`
 	BankName          string        `json:"bank_name,omitempty"`
 	BankIFSC          string        `json:"bank_ifsc,omitempty"`

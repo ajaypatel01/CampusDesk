@@ -45,6 +45,9 @@ type CreateInput struct {
 	SamagraID         string     `json:"samagra_id"`
 	PenNumber         string     `json:"pen_number"`
 	AparID            string     `json:"apar_id"`
+	EnrollmentNumber  string     `json:"enrollment_number"`
+	AdmissionClass    string     `json:"admission_class"`
+	AdmissionYear     string     `json:"admission_year"`
 	PreviousSchool    string     `json:"previous_school"`
 	BankName          string     `json:"bank_name"`
 	BankIFSC          string     `json:"bank_ifsc"`
@@ -70,6 +73,9 @@ type UpdateInput struct {
 	SamagraID         string     `json:"samagra_id"`
 	PenNumber         string     `json:"pen_number"`
 	AparID            string     `json:"apar_id"`
+	EnrollmentNumber  string     `json:"enrollment_number"`
+	AdmissionClass    string     `json:"admission_class"`
+	AdmissionYear     string     `json:"admission_year"`
 	PreviousSchool    string     `json:"previous_school"`
 	BankName          string     `json:"bank_name"`
 	BankIFSC          string     `json:"bank_ifsc"`
@@ -122,6 +128,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, 
 		SamagraID:         strings.TrimSpace(in.SamagraID),
 		PenNumber:         strings.TrimSpace(in.PenNumber),
 		AparID:            strings.TrimSpace(in.AparID),
+		EnrollmentNumber:  strings.TrimSpace(in.EnrollmentNumber),
+		AdmissionClass:    strings.TrimSpace(in.AdmissionClass),
+		AdmissionYear:     strings.TrimSpace(in.AdmissionYear),
 		PreviousSchool:    strings.TrimSpace(in.PreviousSchool),
 		BankName:          strings.TrimSpace(in.BankName),
 		BankIFSC:          strings.TrimSpace(in.BankIFSC),
@@ -183,6 +192,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	st.SamagraID = strings.TrimSpace(in.SamagraID)
 	st.PenNumber = strings.TrimSpace(in.PenNumber)
 	st.AparID = strings.TrimSpace(in.AparID)
+	st.EnrollmentNumber = strings.TrimSpace(in.EnrollmentNumber)
+	st.AdmissionClass = strings.TrimSpace(in.AdmissionClass)
+	st.AdmissionYear = strings.TrimSpace(in.AdmissionYear)
 	st.PreviousSchool = strings.TrimSpace(in.PreviousSchool)
 	st.BankName = strings.TrimSpace(in.BankName)
 	st.BankIFSC = strings.TrimSpace(in.BankIFSC)
