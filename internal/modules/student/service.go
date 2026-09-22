@@ -8,8 +8,16 @@ import (
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/google/uuid"
 )
+
+// scholarNoEditRoles are the only roles allowed to change a student's scholar
+// number (student_code) once set.
+var scholarNoEditRoles = map[string]bool{
+	"registrar":   true,
+	"super_admin": true,
+}
 
 type Service struct {
 	repo *Repository
@@ -170,14 +178,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(in.StudentCode) == "" || strings.TrimSpace(in.FirstName) == "" {
+	newCode := strings.TrimSpace(in.StudentCode)
+	if newCode == "" || strings.TrimSpace(in.FirstName) == "" {
 		return nil, apperr.ErrInvalidInput
+	}
+	if newCode != st.StudentCode {
+		claims := httpx.ClaimsFromContext(ctx)
+		if claims == nil || !scholarNoEditRoles[claims.Role] {
+			return nil, apperr.ErrForbidden
+		}
 	}
 	gender, err := normalizeGender(in.Gender)
 	if err != nil {
 		return nil, err
 	}
-	st.StudentCode = strings.TrimSpace(in.StudentCode)
+	st.StudentCode = newCode
 	st.FirstName = strings.TrimSpace(in.FirstName)
 	st.LastName = strings.TrimSpace(in.LastName)
 	st.DateOfBirth = in.DateOfBirth
