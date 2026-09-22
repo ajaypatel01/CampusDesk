@@ -6,12 +6,14 @@ import { useSchool } from '../services/SchoolContext'
 import './StudentDetail.css'
 
 const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
+const SCHOLAR_NO_EDITOR_ROLES = ['registrar', 'super_admin']
 
 function StudentDetail() {
   const { id } = useParams()
   const { currentYear, currentSchool } = useSchool()
   const { user } = useOutletContext() || {}
   const canEditFees = FEE_EDITOR_ROLES.includes(user?.role)
+  const canEditScholarNo = SCHOLAR_NO_EDITOR_ROLES.includes(user?.role)
   const [student, setStudent] = useState(null)
   const [guardians, setGuardians] = useState([])
   const [feeSummary, setFeeSummary] = useState(null)
@@ -182,6 +184,12 @@ function StudentDetail() {
         <div className="detail-card">
           <h3>Personal Information</h3>
           <div className="detail-fields">
+            <Field
+              label="Scholar No"
+              value={f.student_code}
+              editing={editing && canEditScholarNo}
+              onChange={v => setForm({ ...form, student_code: v })}
+            />
             <Field label="First Name" value={f.first_name} editing={editing} onChange={v => setForm({ ...form, first_name: v })} />
             <Field label="Last Name" value={f.last_name} editing={editing} onChange={v => setForm({ ...form, last_name: v })} />
             <Field label="Gender" value={f.gender} editing={editing} onChange={v => setForm({ ...form, gender: v })} type="select" options={['', 'male', 'female']} />
