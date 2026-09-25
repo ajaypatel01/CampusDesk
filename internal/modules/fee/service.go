@@ -516,6 +516,12 @@ func (s *Service) GenerateReceipt(ctx context.Context, paymentID uuid.UUID) ([]b
 	return pdfBytes, filename, nil
 }
 
+// GetPaymentContactPhone returns the student's registered phone number for
+// a payment, used to auto-deliver the fee receipt over WhatsApp.
+func (s *Service) GetPaymentContactPhone(ctx context.Context, paymentID uuid.UUID) (string, error) {
+	return s.repo.GetPaymentContactPhone(ctx, paymentID)
+}
+
 func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.UUID) (*StudentFeeSummaryResponse, error) {
 	if studentID == uuid.Nil || yearID == uuid.Nil {
 		return nil, apperr.ErrInvalidInput
