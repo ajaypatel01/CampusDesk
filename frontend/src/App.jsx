@@ -17,6 +17,7 @@ import IdCards from './pages/IdCards'
 import Transport from './pages/Transport'
 import Rte from './pages/Rte'
 import Books from './pages/Books'
+import UdiseChecklist from './pages/UdiseChecklist'
 import Admissions from './pages/Admissions'
 import Staff from './pages/Staff'
 import StaffDetail from './pages/StaffDetail'
@@ -105,6 +106,7 @@ function App() {
             <Route path="transport" element={<Transport />} />
             <Route path="rte" element={<Rte />} />
             <Route path="books" element={<Books />} />
+            <Route path="udise-checklist" element={<UdiseChecklist />} />
             <Route path="settings" element={<Settings />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="register" element={<Navigate to="/" replace />} />

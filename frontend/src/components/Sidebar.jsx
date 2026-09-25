@@ -22,6 +22,7 @@ import {
   LogOut,
   Wallet,
   PieChart,
+  ClipboardCheck,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -36,6 +37,7 @@ const navItems = [
   { to: '/ledger', icon: LedgerIcon, label: 'Fee Ledger', deny: ['parent'] },
   { to: '/fee-report', icon: PieChart, label: 'Fee Report', deny: ['registrar', 'parent'] },
   { to: '/tc-records', icon: FileMinus, label: 'TC Records', deny: ['parent'] },
+  { to: '/udise-checklist', icon: ClipboardCheck, label: 'UDISE+ Checklist', deny: ['parent'] },
   { to: '/vouchers', icon: Receipt, label: 'Vouchers', deny: ['parent'] },
   { to: '/documents', icon: FileText, label: 'Documents', deny: ['registrar', 'parent'] },
   { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts', deny: ['registrar', 'parent'] },
