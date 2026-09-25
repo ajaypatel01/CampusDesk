@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -15,32 +16,35 @@ import (
 )
 
 type Module struct {
-	repo *Repository
+	repo  *Repository
+	wards *guardian.Repository
 }
 
 func New(pool *pgxpool.Pool) *Module {
-	return &Module{repo: NewRepository(pool)}
+	return &Module{repo: NewRepository(pool), wards: guardian.NewRepository(pool)}
 }
 
 func (m *Module) Name() string { return "results" }
 
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/subjects", func(r chi.Router) {
-		r.Get("/", m.ListSubjects)
+		r.With(httpx.BlockRoles("parent")).Get("/", m.ListSubjects)
 		// Subject/exam setup is admin work; class teachers only view and enter marks.
-		r.With(httpx.BlockRoles("teacher")).Post("/", m.CreateSubject)
-		r.With(httpx.BlockRoles("teacher")).Put("/{id}", m.UpdateSubject)
-		r.With(httpx.BlockRoles("teacher")).Delete("/{id}", m.DeleteSubject)
+		// Parents never manage results data, only view their own ward's marksheet below.
+		r.With(httpx.BlockRoles("teacher", "parent")).Post("/", m.CreateSubject)
+		r.With(httpx.BlockRoles("teacher", "parent")).Put("/{id}", m.UpdateSubject)
+		r.With(httpx.BlockRoles("teacher", "parent")).Delete("/{id}", m.DeleteSubject)
 	})
 	r.Route("/exams", func(r chi.Router) {
-		r.Get("/", m.ListExams)
-		r.With(httpx.BlockRoles("teacher")).Post("/", m.CreateExam)
-		r.With(httpx.BlockRoles("teacher")).Post("/{id}/publish", m.PublishExam)
+		r.With(httpx.BlockRoles("parent")).Get("/", m.ListExams)
+		r.With(httpx.BlockRoles("teacher", "parent")).Post("/", m.CreateExam)
+		r.With(httpx.BlockRoles("teacher", "parent")).Post("/{id}/publish", m.PublishExam)
 	})
 	r.Route("/exam-marks", func(r chi.Router) {
-		r.Post("/", m.UpsertMark)
-		r.Post("/bulk", m.BulkUpsertMarks)
+		r.With(httpx.BlockRoles("parent")).Post("/", m.UpsertMark)
+		r.With(httpx.BlockRoles("parent")).Post("/bulk", m.BulkUpsertMarks)
 	})
+	r.Get("/ward-exams", m.WardExams)
 	r.Route("/marksheets", func(r chi.Router) {
 		r.Get("/", m.GetMarksheet)
 		r.Get("/pdf", m.DownloadMarksheet)
@@ -367,6 +371,9 @@ func (m *Module) teacherCanAccessGradeInYear(ctx context.Context, claims *httpx.
 }
 
 func (m *Module) teacherCanAccessExamStudent(ctx context.Context, claims *httpx.Claims, examID, studentID uuid.UUID) (bool, error) {
+	if claims != nil && claims.Role == "parent" {
+		return m.parentCanAccessStudent(ctx, claims, studentID)
+	}
 	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
 	if err != nil || !restricted {
 		return err == nil, err
@@ -376,6 +383,55 @@ func (m *Module) teacherCanAccessExamStudent(ctx context.Context, claims *httpx.
 		return false, err
 	}
 	return m.repo.TeacherOwnsStudent(ctx, teacherID, yearID, studentID)
+}
+
+// WardExams returns the published exams for a parent's ward's current class.
+func (m *Module) WardExams(w http.ResponseWriter, r *http.Request) {
+	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "student_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	claims := httpx.ClaimsFromContext(r.Context())
+	if ok, err := m.parentCanAccessStudent(r.Context(), claims, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your ward")
+		return
+	}
+	items, err := m.repo.WardExams(r.Context(), studentID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+// parentCanAccessStudent restricts a parent to marksheets for their own ward(s) only.
+func (m *Module) parentCanAccessStudent(ctx context.Context, claims *httpx.Claims, studentID uuid.UUID) (bool, error) {
+	if claims == nil {
+		return false, nil
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		return false, nil
+	}
+	ids, err := m.wards.WardStudentIDs(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range ids {
+		if id == studentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // teacherCanAccessMarks checks every mark's (exam, student) pair against the teacher's

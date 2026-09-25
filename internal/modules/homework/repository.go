@@ -3,6 +3,7 @@ package homework
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
@@ -113,6 +114,48 @@ func (r *Repository) ListSubmissions(ctx context.Context, assignmentID uuid.UUID
 			return nil, err
 		}
 		items = append(items, s)
+	}
+	return items, rows.Err()
+}
+
+// WardHomeworkItem is a homework assignment for a student's current class, together
+// with that student's own submission status (if any) — everything a parent needs
+// for one row of their ward's homework list.
+type WardHomeworkItem struct {
+	domain.HomeworkAssignment
+	SubmissionStatus string     `json:"submission_status,omitempty"`
+	SubmittedDate    *time.Time `json:"submitted_date,omitempty"`
+}
+
+// GetWardHomework returns the homework assigned to a student's class (grade-wide, or
+// specific to their section) for the given academic year, resolving the student's
+// class placement from their enrollment rather than trusting a client-supplied grade.
+func (r *Repository) GetWardHomework(ctx context.Context, studentID, yearID uuid.UUID) ([]WardHomeworkItem, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT ha.id, ha.school_id, ha.academic_year_id, ha.grade_level_id, ha.class_section_id, ha.subject_id,
+			ha.title, COALESCE(ha.description,''), ha.assigned_by, ha.assigned_date, ha.due_date, ha.created_at, ha.updated_at,
+			COALESCE(hs.status,''), hs.submitted_date
+		FROM enrollments e
+		JOIN class_sections cs ON cs.id = e.class_section_id
+		JOIN homework_assignments ha ON ha.academic_year_id = e.academic_year_id
+			AND ha.grade_level_id = cs.grade_level_id
+			AND (ha.class_section_id IS NULL OR ha.class_section_id = cs.id)
+		LEFT JOIN homework_submissions hs ON hs.assignment_id = ha.id AND hs.student_id = e.student_id
+		WHERE e.student_id = $1 AND e.academic_year_id = $2
+		ORDER BY ha.due_date DESC`, studentID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WardHomeworkItem
+	for rows.Next() {
+		var it WardHomeworkItem
+		if err := rows.Scan(&it.ID, &it.SchoolID, &it.AcademicYearID, &it.GradeLevelID, &it.ClassSectionID, &it.SubjectID,
+			&it.Title, &it.Description, &it.AssignedBy, &it.AssignedDate, &it.DueDate, &it.CreatedAt, &it.UpdatedAt,
+			&it.SubmissionStatus, &it.SubmittedDate); err != nil {
+			return nil, err
+		}
+		items = append(items, it)
 	}
 	return items, rows.Err()
 }

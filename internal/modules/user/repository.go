@@ -39,6 +39,44 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, e
 	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE id=$1`, id)
 }
 
+// FindStudentIDByCode looks up a student by their scholar number (student_code) within
+// a school, for linking a newly-registered parent account to their ward.
+func (r *Repository) FindStudentIDByCode(ctx context.Context, schoolID uuid.UUID, code string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx, `SELECT id FROM students WHERE school_id=$1 AND student_code=$2`, schoolID, code).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, apperr.ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("find student by code: %w", err)
+	}
+	return id, nil
+}
+
+// LinkParentToStudent creates a guardian record carrying the parent user's id (so the
+// portal can scope their access) and links it to their ward student. Not marked primary
+// — this is a portal-access record, additive to whatever contact guardians already exist.
+func (r *Repository) LinkParentToStudent(ctx context.Context, userID, studentID uuid.UUID, firstName, lastName, relation string) error {
+	var guardianID uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO guardians (first_name, last_name, relation, user_id)
+		VALUES ($1,$2,$3,$4) RETURNING id`,
+		firstName, lastName, relation, userID,
+	).Scan(&guardianID)
+	if err != nil {
+		return fmt.Errorf("create parent guardian record: %w", err)
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO student_guardians (student_id, guardian_id, is_primary)
+		VALUES ($1,$2,false) ON CONFLICT DO NOTHING`,
+		studentID, guardianID,
+	)
+	if err != nil {
+		return fmt.Errorf("link parent to ward: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE email=$1`, email)
 }
