@@ -23,14 +23,39 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, g *domain.Guardian) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO guardians (first_name, last_name, email, phone, relation)
-		VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at, updated_at`,
-		g.FirstName, g.LastName, g.Email, g.Phone, g.Relation,
+		INSERT INTO guardians (first_name, last_name, email, phone, relation, user_id)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
+		g.FirstName, g.LastName, g.Email, g.Phone, g.Relation, g.UserID,
 	)
 	if err := row.Scan(&g.ID, &g.CreatedAt, &g.UpdatedAt); err != nil {
 		return database.MapError(err)
 	}
 	return nil
+}
+
+// WardStudentIDs returns the students a parent-role user has portal access to,
+// i.e. the students linked (via student_guardians) to the guardian record that
+// carries this user's id.
+func (r *Repository) WardStudentIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT sg.student_id
+		FROM student_guardians sg
+		JOIN guardians g ON g.id = sg.guardian_id
+		WHERE g.user_id = $1`, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (r *Repository) LinkStudent(ctx context.Context, studentID, guardianID uuid.UUID, isPrimary bool) error {

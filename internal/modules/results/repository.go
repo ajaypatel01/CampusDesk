@@ -108,6 +108,32 @@ func (r *Repository) GetExamByID(ctx context.Context, id uuid.UUID) (*domain.Exa
 	return &e, err
 }
 
+// WardExams returns the published exams for a student's current class, resolving
+// their grade from their enrollment rather than a client-supplied grade_level_id.
+func (r *Repository) WardExams(ctx context.Context, studentID, yearID uuid.UUID) ([]domain.Exam, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT ex.id, ex.school_id, ex.academic_year_id, ex.grade_level_id, ex.name, ex.exam_date, ex.weight_percent, ex.is_published, ex.created_at, ex.updated_at
+		FROM enrollments e
+		JOIN class_sections cs ON cs.id = e.class_section_id
+		JOIN exams ex ON ex.academic_year_id = e.academic_year_id AND ex.grade_level_id = cs.grade_level_id
+		WHERE e.student_id = $1 AND e.academic_year_id = $2 AND ex.is_published = true
+		ORDER BY ex.exam_date NULLS LAST, ex.name`, studentID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []domain.Exam
+	for rows.Next() {
+		var e domain.Exam
+		if err := rows.Scan(&e.ID, &e.SchoolID, &e.AcademicYearID, &e.GradeLevelID, &e.Name, &e.ExamDate,
+			&e.WeightPercent, &e.IsPublished, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, e)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) ListExams(ctx context.Context, schoolID, yearID, gradeLevelID uuid.UUID) ([]domain.Exam, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published, created_at, updated_at

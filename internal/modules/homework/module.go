@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -13,29 +14,82 @@ import (
 )
 
 type Module struct {
-	repo *Repository
+	repo  *Repository
+	wards *guardian.Repository
 }
 
 func New(pool *pgxpool.Pool) *Module {
-	return &Module{repo: NewRepository(pool)}
+	return &Module{repo: NewRepository(pool), wards: guardian.NewRepository(pool)}
 }
 
 func (m *Module) Name() string { return "homework" }
 
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/homework", func(r chi.Router) {
-		r.Get("/", m.ListAssignments)
-		r.Post("/", m.CreateAssignment)
+		r.With(httpx.BlockRoles("parent")).Get("/", m.ListAssignments)
+		r.With(httpx.BlockRoles("parent")).Post("/", m.CreateAssignment)
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", m.GetAssignment)
-			r.Delete("/", m.DeleteAssignment)
+			r.With(httpx.BlockRoles("parent")).Delete("/", m.DeleteAssignment)
 			r.Route("/submissions", func(r chi.Router) {
 				r.Get("/", m.ListSubmissions)
-				r.Post("/", m.UpsertSubmission)
+				r.With(httpx.BlockRoles("parent")).Post("/", m.UpsertSubmission)
 			})
 		})
 	})
 	r.Get("/homework-tracker", m.StudentTracker)
+	r.Get("/ward-homework", m.WardHomework)
+}
+
+// isWard reports whether the current request's claims belong to a parent whose
+// portal access includes studentID. Non-parent roles always return true (unaffected).
+func (m *Module) isWard(r *http.Request, studentID uuid.UUID) (bool, error) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil || claims.Role != "parent" {
+		return true, nil
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		return false, nil
+	}
+	ids, err := m.wards.WardStudentIDs(r.Context(), userID)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range ids {
+		if id == studentID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// WardHomework returns a parent's ward's class homework (grade/section-wide
+// assignments) together with that ward's own submission status for each.
+func (m *Module) WardHomework(w http.ResponseWriter, r *http.Request) {
+	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "student_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	if ok, err := m.isWard(r, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your ward")
+		return
+	}
+	items, err := m.repo.GetWardHomework(r.Context(), studentID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
 // ---- Assignment handlers ----
@@ -211,6 +265,13 @@ func (m *Module) StudentTracker(w http.ResponseWriter, r *http.Request) {
 	yearID, _ := uuid.Parse(r.URL.Query().Get("academic_year_id"))
 	if studentID == uuid.Nil || yearID == uuid.Nil {
 		httpx.Error(w, http.StatusBadRequest, "student_id and academic_year_id required")
+		return
+	}
+	if ok, err := m.isWard(r, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your ward")
 		return
 	}
 	items, err := m.repo.GetStudentSubmissions(r.Context(), studentID, yearID)

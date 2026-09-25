@@ -49,6 +49,10 @@ type RegisterInput struct {
 	FirstName string          `json:"first_name"`
 	LastName  string          `json:"last_name"`
 	Role      domain.UserRole `json:"role"`
+	// WardStudentCode and WardRelation are required when Role is "parent" — they
+	// identify the student this parent should have portal access to.
+	WardStudentCode string `json:"ward_student_code"`
+	WardRelation    string `json:"ward_relation"`
 }
 
 type LoginInput struct {
@@ -103,6 +107,21 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*domain.User,
 	if in.SchoolID == nil {
 		return nil, fmt.Errorf("%w: school_id is required", apperr.ErrInvalidInput)
 	}
+	var wardStudentID uuid.UUID
+	if in.Role == domain.RoleParent {
+		code := strings.TrimSpace(in.WardStudentCode)
+		if code == "" {
+			return nil, fmt.Errorf("%w: ward_student_code is required for parent registration", apperr.ErrInvalidInput)
+		}
+		id, err := s.repo.FindStudentIDByCode(ctx, *in.SchoolID, code)
+		if apperr.IsNotFound(err) {
+			return nil, fmt.Errorf("%w: no student found with that scholar number at this school", apperr.ErrInvalidInput)
+		}
+		if err != nil {
+			return nil, err
+		}
+		wardStudentID = id
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -119,6 +138,15 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*domain.User,
 	}
 	if err := s.repo.Create(ctx, u); err != nil {
 		return nil, err
+	}
+	if in.Role == domain.RoleParent {
+		relation := strings.TrimSpace(in.WardRelation)
+		if relation == "" {
+			relation = "guardian"
+		}
+		if err := s.repo.LinkParentToStudent(ctx, u.ID, wardStudentID, u.FirstName, u.LastName, relation); err != nil {
+			return nil, err
+		}
 	}
 	u.PasswordHash = ""
 	return u, nil

@@ -1,0 +1,70 @@
+.parent-dashboard .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.parent-dashboard__ward-select {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.parent-dashboard__profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.parent-dashboard__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), #a78bfa);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parent-dashboard__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: var(--gray-500);
+}
+
+.parent-dashboard__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.parent-dashboard__exam-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.parent-dashboard__exam-row select {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  flex: 1;
+  min-width: 160px;
+}
+
+.parent-dashboard__total {
+  margin-top: 12px;
+  font-weight: 600;
+}

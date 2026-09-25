@@ -71,6 +71,8 @@ export const studentsApi = {
   create: (body) => request('/students', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => request(`/students/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id) => request(`/students/${id}`, { method: 'DELETE' }),
+  // Parent portal: the logged-in parent's own ward(s).
+  myWards: () => request('/my-wards'),
 }
 
 export const guardiansApi = {
@@ -170,6 +172,8 @@ export const resultsApi = {
   getMarksheet: (examId, studentId) => request(`/marksheets${qs({ exam_id: examId, student_id: studentId })}`),
   downloadMarksheet: (examId, studentId) =>
     requestBlob(`/marksheets/pdf?exam_id=${examId}&student_id=${studentId}`),
+  // Parent portal: published exams for a ward's current class.
+  wardExams: (params) => request(`/ward-exams${qs(params)}`),
 }
 
 export const homeworkApi = {
@@ -180,6 +184,8 @@ export const homeworkApi = {
   listSubmissions: (id) => request(`/homework/${id}/submissions`),
   upsertSubmission: (id, body) => request(`/homework/${id}/submissions`, { method: 'POST', body: JSON.stringify(body) }),
   studentTracker: (params) => request(`/homework-tracker${qs(params)}`),
+  // Parent portal: a ward's class homework, with that ward's own submission status.
+  wardHomework: (params) => request(`/ward-homework${qs(params)}`),
 }
 
 export const idCardsApi = {

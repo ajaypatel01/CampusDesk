@@ -11,11 +11,13 @@ const ROLES = [
   { value: 'parent', label: 'Parent' },
 ]
 
+const RELATIONS = ['Father', 'Mother', 'Guardian']
+
 function Register() {
   const [schools, setSchools] = useState([])
   const [form, setForm] = useState({
     first_name: '', last_name: '', email: '', password: '', confirm: '',
-    role: 'teacher', school_id: '',
+    role: 'teacher', school_id: '', ward_student_code: '', ward_relation: 'Father',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -48,6 +50,10 @@ function Register() {
       setError('Please select a school')
       return
     }
+    if (form.role === 'parent' && !form.ward_student_code.trim()) {
+      setError("Please enter your child's Scholar No")
+      return
+    }
     setLoading(true)
     try {
       await usersApi.register({
@@ -57,6 +63,10 @@ function Register() {
         password: form.password,
         role: form.role,
         school_id: form.school_id,
+        ...(form.role === 'parent' ? {
+          ward_student_code: form.ward_student_code.trim(),
+          ward_relation: form.ward_relation,
+        } : {}),
       })
       setSubmitted(true)
     } catch (err) {
@@ -130,6 +140,21 @@ function Register() {
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </label>
+
+          {form.role === 'parent' && (
+            <div className="login-field-row">
+              <label className="login-field">
+                <span>Child&apos;s Scholar No</span>
+                <input required value={form.ward_student_code} onChange={update('ward_student_code')} placeholder="e.g. STU001" />
+              </label>
+              <label className="login-field">
+                <span>Relation</span>
+                <select value={form.ward_relation} onChange={update('ward_relation')}>
+                  {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
 
           <label className="login-field">
             <span>Password</span>

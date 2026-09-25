@@ -27,6 +27,7 @@ import Payroll from './pages/Payroll'
 import FeeReport from './pages/FeeReport'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ParentDashboard from './pages/ParentDashboard'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
@@ -80,7 +81,8 @@ function App() {
       <SchoolProvider user={user}>
         <Routes>
           <Route element={<RegistrarGuard user={user}><Layout onLogout={handleLogout} user={user} /></RegistrarGuard>}>
-            <Route index element={<Dashboard />} />
+            <Route index element={user.role === 'parent' ? <Navigate to="/my-ward" replace /> : <Dashboard />} />
+            <Route path="my-ward" element={<ParentDashboard />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />
             <Route path="students/:id" element={<StudentDetail />} />
