@@ -1,0 +1,44 @@
+.udise-page .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.udise-page .page-subtitle {
+  max-width: 640px;
+}
+
+.udise-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.udise-filters {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.udise-filters .form-field select {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  min-width: 140px;
+}
+
+.udise-table-wrap {
+  overflow-x: auto;
+}
+
+.udise-ok {
+  color: var(--success, #16a34a);
+}
+
+.udise-missing {
+  color: var(--danger, #ef4444);
+}
