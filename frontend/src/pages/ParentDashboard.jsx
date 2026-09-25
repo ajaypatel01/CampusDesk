@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react'
-import { GraduationCap, BookOpen, BarChart2, Download } from 'lucide-react'
+import { GraduationCap, BookOpen, BarChart2, Download, IndianRupee } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
-import { studentsApi, homeworkApi, resultsApi } from '../services/api'
+import { studentsApi, homeworkApi, resultsApi, feesApi } from '../services/api'
 import './ParentDashboard.css'
+
+function fmtAmount(n) {
+  return `₹${(n || 0).toLocaleString('en-IN')}`
+}
+
+function installmentLabel(p) {
+  const type = (p.fee_type || 'tuition').replace(/_/g, ' ')
+  const label = type.charAt(0).toUpperCase() + type.slice(1)
+  return p.installment_number ? `${label} - Installment ${p.installment_number}` : label
+}
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -36,6 +46,10 @@ function ParentDashboard() {
   const [marksheet, setMarksheet] = useState(null)
   const [marksheetLoading, setMarksheetLoading] = useState(false)
 
+  const [feeSummary, setFeeSummary] = useState(null)
+  const [feeLoading, setFeeLoading] = useState(false)
+  const [feeError, setFeeError] = useState('')
+
   const ward = wards.find(w => w.id === selectedWardId) || null
 
   useEffect(() => {
@@ -61,6 +75,13 @@ function ParentDashboard() {
       .then(res => { setExams(res.items || []); setExamId('') })
       .catch(() => setExams([]))
     setMarksheet(null)
+
+    setFeeLoading(true)
+    setFeeError('')
+    feesApi.studentSummary(selectedWardId, currentYear.id)
+      .then(setFeeSummary)
+      .catch(err => { setFeeSummary(null); setFeeError(err.message || 'Failed to load fee details') })
+      .finally(() => setFeeLoading(false))
   }, [selectedWardId, currentYear])
 
   function loadMarksheet() {
@@ -195,6 +216,57 @@ function ParentDashboard() {
                   <p className="parent-dashboard__total">
                     Total: {marksheet.total_obtained} / {marksheet.total_max} ({marksheet.percentage?.toFixed(1)}%) · {marksheet.result}
                   </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="detail-card">
+          <h3><IndianRupee size={16} /> Fees</h3>
+          {feeLoading ? (
+            <p className="loading-text">Loading...</p>
+          ) : feeError || !feeSummary ? (
+            <p className="empty-text">No fee details available for this year yet.</p>
+          ) : (
+            <>
+              <div className="parent-dashboard__fee-totals">
+                <div>
+                  <span className="parent-dashboard__fee-label">Total Due</span>
+                  <strong>{fmtAmount(feeSummary.total_due)}</strong>
+                </div>
+                <div>
+                  <span className="parent-dashboard__fee-label">Total Paid</span>
+                  <strong>{fmtAmount(feeSummary.total_paid)}</strong>
+                </div>
+                <div>
+                  <span className="parent-dashboard__fee-label">Balance Remaining</span>
+                  <strong className={feeSummary.balance_remaining > 0 ? 'parent-dashboard__fee-due' : 'parent-dashboard__fee-clear'}>
+                    {fmtAmount(feeSummary.balance_remaining)}
+                  </strong>
+                </div>
+              </div>
+
+              {feeSummary.payments?.length === 0 ? (
+                <p className="empty-text">No payments recorded yet</p>
+              ) : (
+                <div className="table-card">
+                  <table className="data-table">
+                    <thead><tr><th>Date</th><th>Details</th><th>Mode</th><th>Amount</th></tr></thead>
+                    <tbody>
+                      {feeSummary.payments.map(p => (
+                        <tr key={p.id}>
+                          <td className="data-table__muted">{fmtDate(p.payment_date)}</td>
+                          <td>
+                            {installmentLabel(p)}
+                            {p.reference_number && <div className="data-table__muted">Ref: {p.reference_number}</div>}
+                          </td>
+                          <td className="data-table__muted" style={{ textTransform: 'capitalize' }}>{p.payment_mode}</td>
+                          <td>{fmtAmount(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </>

@@ -1,6 +1,7 @@
 package fee
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
@@ -14,7 +15,7 @@ type Module struct {
 func New(pool *pgxpool.Pool, wa *whatsapp.Client) *Module {
 	repo := NewRepository(pool)
 	svc := NewService(repo)
-	return &Module{handler: NewHandler(svc, wa)}
+	return &Module{handler: NewHandler(svc, wa, guardian.NewRepository(pool))}
 }
 
 func (m *Module) Name() string { return "fee" }
