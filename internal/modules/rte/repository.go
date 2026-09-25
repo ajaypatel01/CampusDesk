@@ -60,7 +60,7 @@ func (r *Repository) ListQuotas(ctx context.Context, schoolID, yearID uuid.UUID)
 		LEFT JOIN fee_structures fs ON fs.grade_level_id = q.grade_level_id AND fs.academic_year_id = q.academic_year_id
 		LEFT JOIN student_fee_accounts sfa ON sfa.fee_structure_id = fs.id AND sfa.is_rte = TRUE
 		WHERE q.school_id=$1 AND q.academic_year_id=$2
-		GROUP BY q.id, gl.name
+		GROUP BY q.id, gl.id
 		ORDER BY gl.sort_order`, schoolID, yearID)
 	if err != nil {
 		return nil, err
