@@ -68,3 +68,35 @@
   margin-top: 12px;
   font-weight: 600;
 }
+
+.parent-dashboard__fee-totals {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.parent-dashboard__fee-totals > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parent-dashboard__fee-totals strong {
+  font-size: 1.1rem;
+}
+
+.parent-dashboard__fee-label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+.parent-dashboard__fee-due {
+  color: var(--danger, #dc2626);
+}
+
+.parent-dashboard__fee-clear {
+  color: var(--success, #16a34a);
+}

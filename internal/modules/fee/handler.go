@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
@@ -18,12 +19,37 @@ import (
 )
 
 type Handler struct {
-	svc *Service
-	wa  *whatsapp.Client
+	svc   *Service
+	wa    *whatsapp.Client
+	wards *guardian.Repository
 }
 
-func NewHandler(svc *Service, wa *whatsapp.Client) *Handler {
-	return &Handler{svc: svc, wa: wa}
+func NewHandler(svc *Service, wa *whatsapp.Client, wards *guardian.Repository) *Handler {
+	return &Handler{svc: svc, wa: wa, wards: wards}
+}
+
+// isWard reports whether the current request's claims belong to a parent whose
+// portal access includes studentID. Non-parent roles always return true
+// (unaffected) -- mirrors the same check in the homework and results modules.
+func (h *Handler) isWard(r *http.Request, studentID uuid.UUID) (bool, error) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil || claims.Role != "parent" {
+		return true, nil
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		return false, nil
+	}
+	ids, err := h.wards.WardStudentIDs(r.Context(), userID)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range ids {
+		if id == studentID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // ---- Fee Structures ----
@@ -329,6 +355,13 @@ func (h *Handler) StudentFeeSummary(w http.ResponseWriter, r *http.Request) {
 	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	if ok, err := h.isWard(r, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your ward")
 		return
 	}
 	summary, err := h.svc.StudentFeeSummary(r.Context(), studentID, yearID)
