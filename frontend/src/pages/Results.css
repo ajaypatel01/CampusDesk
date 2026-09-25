@@ -89,3 +89,21 @@
   font-size: 15px;
   color: var(--gray-700);
 }
+
+.marksheet-total-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.marksheet-total-edit input {
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.marksheet-total-error {
+  color: var(--danger, #ef4444);
+  font-size: 13px;
+  margin-top: 8px;
+}

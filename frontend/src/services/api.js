@@ -172,6 +172,11 @@ export const resultsApi = {
   getMarksheet: (examId, studentId) => request(`/marksheets${qs({ exam_id: examId, student_id: studentId })}`),
   downloadMarksheet: (examId, studentId) =>
     requestBlob(`/marksheets/pdf?exam_id=${examId}&student_id=${studentId}`),
+  // super_admin only: manually correct a marksheet's total.
+  setTotalOverride: (examId, studentId, totalObtained) =>
+    request('/marksheets/total-override', { method: 'PUT', body: JSON.stringify({ exam_id: examId, student_id: studentId, total_obtained: totalObtained }) }),
+  clearTotalOverride: (examId, studentId) =>
+    request(`/marksheets/total-override${qs({ exam_id: examId, student_id: studentId })}`, { method: 'DELETE' }),
   // Parent portal: published exams for a ward's current class.
   wardExams: (params) => request(`/ward-exams${qs(params)}`),
 }
