@@ -520,6 +520,26 @@ func (r *Repository) GetReceiptData(ctx context.Context, paymentID uuid.UUID) (*
 	return &d, nil
 }
 
+// GetPaymentContactPhone returns the phone number on file for the student
+// tied to a fee payment, so the receipt can be auto-delivered over WhatsApp.
+func (r *Repository) GetPaymentContactPhone(ctx context.Context, paymentID uuid.UUID) (string, error) {
+	var phone string
+	err := r.pool.QueryRow(ctx, `
+		SELECT COALESCE(s.phone, '')
+		FROM fee_payments fp
+		JOIN student_fee_accounts sfa ON sfa.id = fp.student_fee_account_id
+		JOIN students s ON s.id = sfa.student_id
+		WHERE fp.id = $1`, paymentID,
+	).Scan(&phone)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apperr.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get payment contact phone: %w", err)
+	}
+	return phone, nil
+}
+
 func (r *Repository) GetStudentInfo(ctx context.Context, studentID uuid.UUID) (name, code, gradeName string, err error) {
 	err = r.pool.QueryRow(ctx, `
 		SELECT s.first_name || ' ' || s.last_name, s.student_code, COALESCE(gl.name, '')

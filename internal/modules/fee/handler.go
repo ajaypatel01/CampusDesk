@@ -1,10 +1,14 @@
 package fee
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
@@ -191,7 +195,63 @@ func (h *Handler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
+	h.autoSendReceiptWhatsApp(p.ID)
 	httpx.JSON(w, http.StatusCreated, p)
+}
+
+// autoSendReceiptWhatsApp generates the fee receipt PDF and delivers it to
+// the student's registered phone number over WhatsApp as soon as a payment
+// is recorded. It runs in the background and is entirely best-effort: a
+// missing phone number, an unconfigured WhatsApp client, or a delivery
+// failure is logged and swallowed, never surfaced to the caller, so
+// WhatsApp outages can never block recording a fee payment.
+func (h *Handler) autoSendReceiptWhatsApp(paymentID uuid.UUID) {
+	if h.wa == nil || !h.wa.Enabled() {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		phone, err := h.svc.GetPaymentContactPhone(ctx, paymentID)
+		if err != nil {
+			log.Printf("whatsapp receipt: could not look up phone for payment %s: %v", paymentID, err)
+			return
+		}
+		phone = normalizeIndianPhone(phone)
+		if phone == "" {
+			log.Printf("whatsapp receipt: no phone on file for payment %s, skipping", paymentID)
+			return
+		}
+		pdfBytes, filename, err := h.svc.GenerateReceipt(ctx, paymentID)
+		if err != nil {
+			log.Printf("whatsapp receipt: failed to generate PDF for payment %s: %v", paymentID, err)
+			return
+		}
+		if err := h.wa.SendDocument(phone, "Fee Receipt", filename, pdfBytes); err != nil {
+			log.Printf("whatsapp receipt: failed to send for payment %s to %s: %v", paymentID, phone, err)
+			return
+		}
+		log.Printf("whatsapp receipt: sent for payment %s to %s", paymentID, phone)
+	}()
+}
+
+// normalizeIndianPhone strips non-digit characters and, for a bare 10-digit
+// local mobile number (how phone numbers are stored throughout this app),
+// prefixes the +91 country code Meta's WhatsApp Cloud API requires. Numbers
+// that already carry a country code are left as-is.
+func normalizeIndianPhone(phone string) string {
+	var digits strings.Builder
+	for _, r := range phone {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
+	}
+	d := digits.String()
+	if len(d) == 10 {
+		return "91" + d
+	}
+	return d
 }
 
 func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
