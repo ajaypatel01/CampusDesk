@@ -25,10 +25,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) CreateSubject(ctx context.Context, s *domain.Subject) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO subjects (school_id, grade_level_id, name, code, max_marks, passing_marks, sort_order)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO subjects (school_id, grade_level_id, name, code, max_marks, passing_marks, sort_order, is_co_scholastic)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		RETURNING id, created_at, updated_at`,
-		s.SchoolID, s.GradeLevelID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder,
+		s.SchoolID, s.GradeLevelID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic,
 	)
 	if err := row.Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -38,7 +38,7 @@ func (r *Repository) CreateSubject(ctx context.Context, s *domain.Subject) error
 
 func (r *Repository) ListSubjects(ctx context.Context, schoolID, gradeLevelID uuid.UUID) ([]domain.Subject, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, school_id, grade_level_id, name, COALESCE(code,''), max_marks, passing_marks, sort_order, created_at, updated_at
+		SELECT id, school_id, grade_level_id, name, COALESCE(code,''), max_marks, passing_marks, sort_order, is_co_scholastic, created_at, updated_at
 		FROM subjects WHERE school_id=$1 AND grade_level_id=$2
 		ORDER BY sort_order, name`, schoolID, gradeLevelID)
 	if err != nil {
@@ -49,7 +49,7 @@ func (r *Repository) ListSubjects(ctx context.Context, schoolID, gradeLevelID uu
 	for rows.Next() {
 		var s domain.Subject
 		if err := rows.Scan(&s.ID, &s.SchoolID, &s.GradeLevelID, &s.Name, &s.Code,
-			&s.MaxMarks, &s.PassingMarks, &s.SortOrder, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			&s.MaxMarks, &s.PassingMarks, &s.SortOrder, &s.IsCoScholastic, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, s)
@@ -59,8 +59,8 @@ func (r *Repository) ListSubjects(ctx context.Context, schoolID, gradeLevelID uu
 
 func (r *Repository) UpdateSubject(ctx context.Context, s *domain.Subject) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE subjects SET name=$2, code=$3, max_marks=$4, passing_marks=$5, sort_order=$6, updated_at=NOW()
-		WHERE id=$1`, s.ID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder)
+		UPDATE subjects SET name=$2, code=$3, max_marks=$4, passing_marks=$5, sort_order=$6, is_co_scholastic=$7, updated_at=NOW()
+		WHERE id=$1`, s.ID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic)
 	if err != nil {
 		return err
 	}
@@ -184,16 +184,17 @@ func (r *Repository) UpsertMark(ctx context.Context, m *domain.ExamMark) error {
 }
 
 type MarksheetRow struct {
-	SubjectName   string  `json:"subject_name"`
-	SubjectCode   string  `json:"subject_code"`
-	MaxMarks      int     `json:"max_marks"`
-	PassingMarks  int     `json:"passing_marks"`
-	MarksObtained float64 `json:"marks_obtained"`
-	IsAbsent      bool    `json:"is_absent"`
-	Percentage    float64 `json:"percentage"`
-	Grade         string  `json:"grade"`
-	GradePoint    float64 `json:"grade_point"`
-	Status        string  `json:"status"` // Pass / Fail / Absent
+	SubjectName    string  `json:"subject_name"`
+	SubjectCode    string  `json:"subject_code"`
+	MaxMarks       int     `json:"max_marks"`
+	PassingMarks   int     `json:"passing_marks"`
+	MarksObtained  float64 `json:"marks_obtained"`
+	IsAbsent       bool    `json:"is_absent"`
+	Percentage     float64 `json:"percentage"`
+	Grade          string  `json:"grade"`
+	GradePoint     float64 `json:"grade_point"`
+	Status         string  `json:"status"` // Pass / Fail / Absent
+	IsCoScholastic bool    `json:"is_co_scholastic"`
 }
 
 type StudentMarksheet struct {
@@ -238,7 +239,7 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT sub.name, COALESCE(sub.code,''), em.max_marks, sub.passing_marks,
-			em.marks_obtained, em.is_absent, COALESCE(em.remarks,'')
+			em.marks_obtained, em.is_absent, COALESCE(em.remarks,''), sub.is_co_scholastic
 		FROM exam_marks em
 		JOIN subjects sub ON sub.id = em.subject_id
 		WHERE em.exam_id=$1 AND em.student_id=$2
@@ -251,12 +252,13 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 	var totalObtained float64
 	var totalMax int
 	var totalGP float64
+	var scoredCount int
 
 	for rows.Next() {
 		var row MarksheetRow
 		var remarks string
 		if err := rows.Scan(&row.SubjectName, &row.SubjectCode, &row.MaxMarks, &row.PassingMarks,
-			&row.MarksObtained, &row.IsAbsent, &remarks); err != nil {
+			&row.MarksObtained, &row.IsAbsent, &remarks, &row.IsCoScholastic); err != nil {
 			return nil, err
 		}
 		if row.IsAbsent {
@@ -270,9 +272,15 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 			} else {
 				row.Status = "Fail"
 			}
-			totalObtained += row.MarksObtained
-			totalMax += row.MaxMarks
-			totalGP += row.GradePoint
+			// Co-scholastic subjects (Computer, Music, Games, etc.) are graded
+			// individually but excluded from the overall total/percentage/CGPA
+			// and from failing the whole result, same as on a typical report card.
+			if !row.IsCoScholastic {
+				totalObtained += row.MarksObtained
+				totalMax += row.MaxMarks
+				totalGP += row.GradePoint
+				scoredCount++
+			}
 		}
 		ms.Rows = append(ms.Rows, row)
 	}
@@ -285,14 +293,14 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 	if totalMax > 0 {
 		ms.Percentage = (totalObtained / float64(totalMax)) * 100
 	}
-	if len(ms.Rows) > 0 {
-		ms.CGPA = totalGP / float64(len(ms.Rows))
+	if scoredCount > 0 {
+		ms.CGPA = totalGP / float64(scoredCount)
 	}
 	ms.OverallGrade, _ = gradeFromPercent(ms.Percentage)
 
 	ms.Result = "Pass"
 	for _, row := range ms.Rows {
-		if row.Status == "Fail" {
+		if row.Status == "Fail" && !row.IsCoScholastic {
 			ms.Result = "Fail"
 			break
 		}

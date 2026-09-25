@@ -26,7 +26,7 @@ function Results() {
   // Subjects
   const [subjects, setSubjects] = useState([])
   const [showSubjectForm, setShowSubjectForm] = useState(false)
-  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0 })
+  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0, is_co_scholastic: false })
 
   // Exams
   const [exams, setExams] = useState([])
@@ -106,7 +106,7 @@ function Results() {
     try {
       await resultsApi.createSubject({ school_id: currentSchool.id, grade_level_id: selectedGrade, ...subjectForm })
       setShowSubjectForm(false)
-      setSubjectForm({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0 })
+      setSubjectForm({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0, is_co_scholastic: false })
       resultsApi.listSubjects({ school_id: currentSchool.id, grade_level_id: selectedGrade }).then(r => setSubjects(r.items || []))
     } catch (err) { alert(err.message) }
   }
@@ -222,6 +222,12 @@ function Results() {
                 <label className="form-field"><span>Passing Marks</span><input type="number" min="1" value={subjectForm.passing_marks} onChange={e => setSubjectForm({ ...subjectForm, passing_marks: parseInt(e.target.value) })} /></label>
                 <label className="form-field"><span>Sort Order</span><input type="number" min="0" value={subjectForm.sort_order} onChange={e => setSubjectForm({ ...subjectForm, sort_order: parseInt(e.target.value) })} /></label>
               </div>
+              <div className="form-row">
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={subjectForm.is_co_scholastic} onChange={e => setSubjectForm({ ...subjectForm, is_co_scholastic: e.target.checked })} />
+                  <span>Co-Scholastic / Grading subject (graded, but not counted in the overall total)</span>
+                </label>
+              </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="submit" className="btn btn--primary">Save</button>
                 <button type="button" className="btn btn--outline" onClick={() => setShowSubjectForm(false)}>Cancel</button>
@@ -230,16 +236,21 @@ function Results() {
           )}
           <div className="table-card">
             <table className="data-table">
-              <thead><tr><th>Name</th><th>Code</th><th>Max Marks</th><th>Passing</th><th></th></tr></thead>
+              <thead><tr><th>Name</th><th>Code</th><th>Max Marks</th><th>Passing</th><th>Type</th><th></th></tr></thead>
               <tbody>
                 {subjects.length === 0 ? (
-                  <tr><td colSpan={5} className="data-table__empty">No subjects yet</td></tr>
+                  <tr><td colSpan={6} className="data-table__empty">No subjects yet</td></tr>
                 ) : subjects.map(s => (
                   <tr key={s.id}>
                     <td>{s.name}</td>
                     <td className="data-table__muted">{s.code || '-'}</td>
                     <td>{s.max_marks}</td>
                     <td>{s.passing_marks}</td>
+                    <td>
+                      {s.is_co_scholastic
+                        ? <span className="badge badge--muted">Grading only</span>
+                        : <span className="data-table__muted">Scored</span>}
+                    </td>
                     <td>
                       {!isTeacher && (
                         <button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)}><Trash2 size={14} /></button>
@@ -402,7 +413,10 @@ function Results() {
                 <tbody>
                   {(marksheet.rows || []).map((row, i) => (
                     <tr key={i}>
-                      <td>{row.subject_name}</td>
+                      <td>
+                        {row.subject_name}
+                        {row.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
+                      </td>
                       <td className="data-table__muted">{row.max_marks}</td>
                       <td className="data-table__muted">{row.passing_marks}</td>
                       <td>{row.is_absent ? 'Absent' : row.marks_obtained}</td>
