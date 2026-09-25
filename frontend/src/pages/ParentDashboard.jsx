@@ -199,7 +199,10 @@ function ParentDashboard() {
                     <tbody>
                       {(marksheet.rows || []).map((row, i) => (
                         <tr key={i}>
-                          <td>{row.subject_name}</td>
+                          <td>
+                            {row.subject_name}
+                            {row.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
+                          </td>
                           <td className="data-table__muted">{row.max_marks}</td>
                           <td>{row.is_absent ? 'Absent' : row.marks_obtained}</td>
                           <td className="data-table__muted">{row.is_absent ? '-' : row.percentage?.toFixed(1) + '%'}</td>

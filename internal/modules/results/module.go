@@ -55,13 +55,14 @@ func (m *Module) Mount(r chi.Router) {
 
 func (m *Module) CreateSubject(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		SchoolID     string `json:"school_id"`
-		GradeLevelID string `json:"grade_level_id"`
-		Name         string `json:"name"`
-		Code         string `json:"code"`
-		MaxMarks     int    `json:"max_marks"`
-		PassingMarks int    `json:"passing_marks"`
-		SortOrder    int    `json:"sort_order"`
+		SchoolID       string `json:"school_id"`
+		GradeLevelID   string `json:"grade_level_id"`
+		Name           string `json:"name"`
+		Code           string `json:"code"`
+		MaxMarks       int    `json:"max_marks"`
+		PassingMarks   int    `json:"passing_marks"`
+		SortOrder      int    `json:"sort_order"`
+		IsCoScholastic bool   `json:"is_co_scholastic"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
@@ -82,6 +83,7 @@ func (m *Module) CreateSubject(w http.ResponseWriter, r *http.Request) {
 	s := &domain.Subject{
 		SchoolID: schoolID, GradeLevelID: gradeID, Name: in.Name, Code: in.Code,
 		MaxMarks: in.MaxMarks, PassingMarks: in.PassingMarks, SortOrder: in.SortOrder,
+		IsCoScholastic: in.IsCoScholastic,
 	}
 	if err := m.repo.CreateSubject(r.Context(), s); err != nil {
 		httpx.WriteServiceError(w, err)

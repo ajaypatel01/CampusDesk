@@ -1,0 +1,2 @@
+ALTER TABLE subjects
+    ADD COLUMN is_co_scholastic BOOLEAN NOT NULL DEFAULT FALSE;

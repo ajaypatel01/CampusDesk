@@ -7,14 +7,19 @@ import (
 )
 
 type Subject struct {
-	ID            uuid.UUID `json:"id"`
-	SchoolID      uuid.UUID `json:"school_id"`
-	GradeLevelID  uuid.UUID `json:"grade_level_id"`
-	Name          string    `json:"name"`
-	Code          string    `json:"code,omitempty"`
-	MaxMarks      int       `json:"max_marks"`
-	PassingMarks  int       `json:"passing_marks"`
-	SortOrder     int       `json:"sort_order"`
+	ID           uuid.UUID `json:"id"`
+	SchoolID     uuid.UUID `json:"school_id"`
+	GradeLevelID uuid.UUID `json:"grade_level_id"`
+	Name         string    `json:"name"`
+	Code         string    `json:"code,omitempty"`
+	MaxMarks     int       `json:"max_marks"`
+	PassingMarks int       `json:"passing_marks"`
+	SortOrder    int       `json:"sort_order"`
+	// IsCoScholastic marks a subject (e.g. Computer, Music, Games) as graded but
+	// excluded from the marksheet's overall total/percentage/CGPA and pass/fail
+	// determination -- mirrors how co-scholastic subjects work on a typical
+	// Indian school report card, as distinct from scored academic subjects.
+	IsCoScholastic bool `json:"is_co_scholastic"`
 	Timestamps
 }
 
@@ -31,13 +36,13 @@ type Exam struct {
 }
 
 type ExamMark struct {
-	ID             uuid.UUID `json:"id"`
-	ExamID         uuid.UUID `json:"exam_id"`
-	StudentID      uuid.UUID `json:"student_id"`
-	SubjectID      uuid.UUID `json:"subject_id"`
-	MarksObtained  float64   `json:"marks_obtained"`
-	MaxMarks       int       `json:"max_marks"`
-	IsAbsent       bool      `json:"is_absent"`
-	Remarks        string    `json:"remarks,omitempty"`
+	ID            uuid.UUID `json:"id"`
+	ExamID        uuid.UUID `json:"exam_id"`
+	StudentID     uuid.UUID `json:"student_id"`
+	SubjectID     uuid.UUID `json:"subject_id"`
+	MarksObtained float64   `json:"marks_obtained"`
+	MaxMarks      int       `json:"max_marks"`
+	IsAbsent      bool      `json:"is_absent"`
+	Remarks       string    `json:"remarks,omitempty"`
 	Timestamps
 }
