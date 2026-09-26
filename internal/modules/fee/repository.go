@@ -386,6 +386,20 @@ func (r *Repository) VoidPayment(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// MovePayment reassigns a payment to a different fee account -- for
+// correcting a payment recorded against the wrong academic year (the caller
+// has already verified the target account belongs to the same student).
+func (r *Repository) MovePayment(ctx context.Context, id, newAccountID uuid.UUID) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE fee_payments SET student_fee_account_id=$2, updated_at=NOW() WHERE id=$1 AND voided=FALSE`, id, newAccountID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 // ---- Summaries ----
 
 func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid.UUID) (*SchoolFeeSummaryResponse, error) {

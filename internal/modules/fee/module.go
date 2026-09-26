@@ -48,6 +48,11 @@ func (m *Module) Mount(r chi.Router) {
 		r.Get("/", h.ListPayments)
 		r.Post("/", h.RecordPayment)
 		r.Delete("/{id}", h.VoidPayment)
+		// Moving a payment to a different year corrects a mis-entered record
+		// (e.g. a 2025-26 payment logged under 2026-27) rather than editing
+		// its amount/date, so it's scoped more tightly than canEditFees --
+		// registrar and super_admin only, not school_admin.
+		r.With(httpx.RequireRole("super_admin", "registrar")).Put("/{id}/move", h.MovePayment)
 	})
 
 	r.Route("/fee-receipts", func(r chi.Router) {

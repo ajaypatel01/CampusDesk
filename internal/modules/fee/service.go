@@ -496,6 +496,39 @@ func (s *Service) VoidPayment(ctx context.Context, id uuid.UUID) error {
 	return s.repo.VoidPayment(ctx, id)
 }
 
+// MovePayment reassigns a payment to the same student's fee account for a
+// different academic year -- for correcting a payment that was recorded
+// against the wrong year (e.g. a 2025-26 payment entered under 2026-27).
+// The target account must already exist; this never creates one, since that
+// would need a fee structure decision this endpoint has no basis to make.
+func (s *Service) MovePayment(ctx context.Context, paymentID, targetAcademicYearID uuid.UUID) (*domain.FeePayment, error) {
+	if paymentID == uuid.Nil || targetAcademicYearID == uuid.Nil {
+		return nil, apperr.ErrInvalidInput
+	}
+	payment, err := s.repo.GetPaymentByID(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if payment.Voided {
+		return nil, apperr.ErrInvalidInput
+	}
+	currentAccount, err := s.repo.GetFeeAccountByID(ctx, payment.StudentFeeAccountID)
+	if err != nil {
+		return nil, err
+	}
+	if currentAccount.AcademicYearID == targetAcademicYearID {
+		return nil, apperr.ErrInvalidInput
+	}
+	targetAccount, err := s.repo.GetFeeAccountByStudent(ctx, currentAccount.StudentID, targetAcademicYearID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.MovePayment(ctx, paymentID, targetAccount.ID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetPaymentByID(ctx, paymentID)
+}
+
 func (s *Service) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid.UUID) (*SchoolFeeSummaryResponse, error) {
 	if schoolID == uuid.Nil || yearID == uuid.Nil {
 		return nil, apperr.ErrInvalidInput

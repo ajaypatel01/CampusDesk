@@ -307,6 +307,36 @@ func (h *Handler) VoidPayment(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
+// MovePayment reassigns a payment to a different academic year's fee account
+// for the same student -- for correcting a payment recorded under the wrong
+// year. Registrar/super_admin only (see Mount); the target year's fee
+// account must already exist.
+func (h *Handler) MovePayment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		AcademicYearID string `json:"academic_year_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	yearID, err := uuid.Parse(in.AcademicYearID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	p, err := h.svc.MovePayment(r.Context(), id, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, p)
+}
+
 // ---- Summaries ----
 
 func (h *Handler) SchoolFeeSummary(w http.ResponseWriter, r *http.Request) {
