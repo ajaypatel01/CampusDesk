@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -70,6 +71,25 @@ func (h *Handler) ListGrades(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *Handler) UpdateGrade(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in GradeUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	g, err := h.svc.UpdateGrade(r.Context(), id, in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, g)
 }
 
 func (h *Handler) CreateSection(w http.ResponseWriter, r *http.Request) {

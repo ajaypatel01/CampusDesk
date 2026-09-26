@@ -3,12 +3,15 @@ package results
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
+	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -49,6 +52,16 @@ func (m *Module) Mount(r chi.Router) {
 		r.Get("/", m.GetMarksheet)
 		r.Get("/pdf", m.DownloadMarksheet)
 	})
+	r.Route("/report-cards", func(r chi.Router) {
+		r.Get("/", m.GetReportCard)
+		r.Get("/pdf", m.DownloadReportCard)
+		// Attendance/remark/promoted-to and discipline grades are filled in
+		// by the class teacher, same access as entering marks -- open to
+		// teacher/admin, never parent.
+		r.With(httpx.BlockRoles("parent")).Put("/details", m.UpsertReportCardDetails)
+		r.With(httpx.BlockRoles("parent")).Put("/discipline-grades", m.UpsertDisciplineGrades)
+	})
+	r.Get("/discipline-criteria", m.ListDisciplineCriteria)
 }
 
 // ---- Subject handlers ----
@@ -184,7 +197,29 @@ func (m *Module) ListExams(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+	// Decorate with the grade's mark-component scheme so the marks-entry UI
+	// never has to hardcode a second copy of Written/Note Book/.../Theory.
+	template, err := m.repo.GetGradeReportTemplate(r.Context(), gradeID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	out := make([]examResponse, len(items))
+	for i, e := range items {
+		out[i] = examResponse{Exam: e, MarkComponents: MarkComponentsForTemplate(template)}
+		if template != nil {
+			out[i].ReportCardTemplate = *template
+		}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": out})
+}
+
+// examResponse decorates an Exam with its grade's mark-component scheme for
+// the marks-entry UI, without persisting either field on the exam itself.
+type examResponse struct {
+	domain.Exam
+	ReportCardTemplate string          `json:"report_card_template,omitempty"`
+	MarkComponents     []MarkComponent `json:"mark_components,omitempty"`
 }
 
 func (m *Module) PublishExam(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +228,9 @@ func (m *Module) PublishExam(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	var body struct{ Publish bool `json:"publish"` }
+	var body struct {
+		Publish bool `json:"publish"`
+	}
 	json.NewDecoder(r.Body).Decode(&body)
 	if err := m.repo.PublishExam(r.Context(), id, body.Publish); err != nil {
 		httpx.WriteServiceError(w, err)
@@ -220,11 +257,31 @@ func (m *Module) UpsertMark(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 		return
 	}
-	if err := m.repo.UpsertMark(r.Context(), &mark); err != nil {
+	if err := m.saveOneMark(r.Context(), &mark); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
 	httpx.JSON(w, http.StatusOK, mark)
+}
+
+// saveOneMark routes through the component-aware path when the mark carries
+// a component breakdown (i.e. its exam's grade has a report-card template
+// and the entry form sent one), otherwise saves the plain total as before.
+func (m *Module) saveOneMark(ctx context.Context, mark *domain.ExamMark) error {
+	if len(mark.Components) == 0 {
+		return m.repo.UpsertMark(ctx, mark)
+	}
+	template, err := m.repo.GetExamReportTemplate(ctx, mark.ExamID)
+	if err != nil {
+		return err
+	}
+	components := MarkComponentsForTemplate(template)
+	if len(components) == 0 {
+		// Grade has no template (or none matching a known scheme) -- fall
+		// back to treating the submitted total as a plain mark.
+		return m.repo.UpsertMark(ctx, mark)
+	}
+	return m.repo.UpsertMarkWithComponents(ctx, mark, components)
 }
 
 func (m *Module) BulkUpsertMarks(w http.ResponseWriter, r *http.Request) {
@@ -251,12 +308,36 @@ func (m *Module) BulkUpsertMarks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, error) {
+	// A bulk save is typically one exam across a whole class, so cache each
+	// exam's component scheme instead of re-querying it per row.
+	schemes := map[uuid.UUID][]MarkComponent{}
 	var saved int
 	for i := range marks {
-		if marks[i].MaxMarks <= 0 {
-			marks[i].MaxMarks = 100
+		mark := &marks[i]
+		if mark.MaxMarks <= 0 {
+			mark.MaxMarks = 100
 		}
-		if err := m.repo.UpsertMark(ctx, &marks[i]); err != nil {
+		if len(mark.Components) == 0 {
+			if err := m.repo.UpsertMark(ctx, mark); err != nil {
+				return saved, err
+			}
+			saved++
+			continue
+		}
+		components, ok := schemes[mark.ExamID]
+		if !ok {
+			template, err := m.repo.GetExamReportTemplate(ctx, mark.ExamID)
+			if err != nil {
+				return saved, err
+			}
+			components = MarkComponentsForTemplate(template)
+			schemes[mark.ExamID] = components
+		}
+		if len(components) == 0 {
+			if err := m.repo.UpsertMark(ctx, mark); err != nil {
+				return saved, err
+			}
+		} else if err := m.repo.UpsertMarkWithComponents(ctx, mark, components); err != nil {
 			return saved, err
 		}
 		saved++
@@ -332,6 +413,166 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 	w.Write(pdfBytes)
 }
 
+// ---- Report card handlers (combined multi-exam, class-wise templates) ----
+
+func (m *Module) getReportCardForRequest(r *http.Request) (*ReportCard, error) {
+	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
+	if err != nil {
+		return nil, apperr.ErrInvalidInput
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		return nil, apperr.ErrInvalidInput
+	}
+	if ok, err := m.teacherOrParentCanAccessStudentInYear(r.Context(), httpx.ClaimsFromContext(r.Context()), studentID, yearID); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, apperr.ErrForbidden
+	}
+	rc, err := m.repo.GetReportCard(r.Context(), studentID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	m.attachParentNames(r.Context(), rc)
+	return rc, nil
+}
+
+// attachParentNames fills Father/Mother name from the existing guardian
+// module rather than duplicating that lookup here. Best-effort: a lookup
+// failure leaves the names blank instead of failing the whole report card.
+func (m *Module) attachParentNames(ctx context.Context, rc *ReportCard) {
+	guardians, err := m.wards.ListByStudent(ctx, rc.StudentID)
+	if err != nil {
+		return
+	}
+	for _, g := range guardians {
+		name := strings.TrimSpace(strings.TrimSpace(g.FirstName) + " " + strings.TrimSpace(g.LastName))
+		switch strings.ToLower(strings.TrimSpace(g.Relation)) {
+		case "father":
+			rc.FatherName = name
+		case "mother":
+			rc.MotherName = name
+		}
+	}
+}
+
+func (m *Module) GetReportCard(w http.ResponseWriter, r *http.Request) {
+	rc, err := m.getReportCardForRequest(r)
+	if err != nil {
+		if errors.Is(err, apperr.ErrInvalidInput) {
+			httpx.Error(w, http.StatusBadRequest, "student_id and academic_year_id required")
+			return
+		}
+		if errors.Is(err, apperr.ErrForbidden) {
+			httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+			return
+		}
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, rc)
+}
+
+func (m *Module) DownloadReportCard(w http.ResponseWriter, r *http.Request) {
+	rc, err := m.getReportCardForRequest(r)
+	if err != nil {
+		if errors.Is(err, apperr.ErrInvalidInput) {
+			httpx.Error(w, http.StatusBadRequest, "student_id and academic_year_id required")
+			return
+		}
+		if errors.Is(err, apperr.ErrForbidden) {
+			httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+			return
+		}
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	var pdfBytes []byte
+	switch rc.Template {
+	case "kg":
+		pdfBytes, err = generateKGReportCardPDF(*rc)
+	case "primary":
+		pdfBytes, err = generatePrimaryReportCardPDF(*rc)
+	case "middle":
+		pdfBytes, err = generateMiddleReportCardPDF(*rc)
+	default:
+		httpx.Error(w, http.StatusBadRequest, "no report-card template for this grade")
+		return
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "pdf generation failed")
+		return
+	}
+	filename := fmt.Sprintf("report_card_%s_%s.pdf", rc.StudentCode, rc.AcademicYearID.String()[:8])
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(pdfBytes)
+}
+
+func (m *Module) UpsertReportCardDetails(w http.ResponseWriter, r *http.Request) {
+	var in domain.ReportCardDetails
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if in.SchoolID == uuid.Nil || in.AcademicYearID == uuid.Nil || in.GradeLevelID == uuid.Nil || in.StudentID == uuid.Nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id, academic_year_id, grade_level_id, student_id required")
+		return
+	}
+	if ok, err := m.teacherOrParentCanAccessStudentInYear(r.Context(), httpx.ClaimsFromContext(r.Context()), in.StudentID, in.AcademicYearID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
+	if err := m.repo.UpsertReportCardDetails(r.Context(), &in); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, in)
+}
+
+// ListDisciplineCriteria exposes the "middle" template's fixed 9 criteria so
+// the frontend never hardcodes a second copy.
+func (m *Module) ListDisciplineCriteria(w http.ResponseWriter, r *http.Request) {
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": disciplineCriteria})
+}
+
+func (m *Module) UpsertDisciplineGrades(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SchoolID       uuid.UUID         `json:"school_id"`
+		AcademicYearID uuid.UUID         `json:"academic_year_id"`
+		StudentID      uuid.UUID         `json:"student_id"`
+		Grades         map[string]string `json:"grades"` // criterion_key -> grade
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if body.SchoolID == uuid.Nil || body.AcademicYearID == uuid.Nil || body.StudentID == uuid.Nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id, academic_year_id, student_id required")
+		return
+	}
+	if ok, err := m.teacherOrParentCanAccessStudentInYear(r.Context(), httpx.ClaimsFromContext(r.Context()), body.StudentID, body.AcademicYearID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
+	for key, grade := range body.Grades {
+		g := domain.DisciplineGrade{SchoolID: body.SchoolID, AcademicYearID: body.AcademicYearID, StudentID: body.StudentID, CriterionKey: key, Grade: grade}
+		if err := m.repo.UpsertDisciplineGrade(r.Context(), &g); err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
 // ---- Class-teacher scoping helpers ----
 //
 // A teacher only sees/enters results for the grade(s)/student(s) of the class
@@ -370,6 +611,20 @@ func (m *Module) teacherCanAccessGradeInYear(ctx context.Context, claims *httpx.
 		return err == nil, err
 	}
 	return m.repo.TeacherOwnsGradeInYear(ctx, teacherID, yearID, gradeID)
+}
+
+// teacherOrParentCanAccessStudentInYear is teacherCanAccessExamStudent's
+// counterpart for report-card endpoints, which key on (student, academic
+// year) directly rather than resolving the year from an exam.
+func (m *Module) teacherOrParentCanAccessStudentInYear(ctx context.Context, claims *httpx.Claims, studentID, yearID uuid.UUID) (bool, error) {
+	if claims != nil && claims.Role == "parent" {
+		return m.parentCanAccessStudent(ctx, claims, studentID)
+	}
+	teacherID, restricted, err := m.teacherIDIfRestricted(ctx, claims)
+	if err != nil || !restricted {
+		return err == nil, err
+	}
+	return m.repo.TeacherOwnsStudent(ctx, teacherID, yearID, studentID)
 }
 
 func (m *Module) teacherCanAccessExamStudent(ctx context.Context, claims *httpx.Claims, examID, studentID uuid.UUID) (bool, error) {
@@ -463,4 +718,3 @@ func (m *Module) teacherCanAccessMarks(ctx context.Context, claims *httpx.Claims
 	}
 	return true, nil
 }
-

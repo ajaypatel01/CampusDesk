@@ -17,20 +17,24 @@ type AcademicYear struct {
 }
 
 type GradeLevel struct {
-	ID       uuid.UUID `json:"id"`
-	SchoolID uuid.UUID `json:"school_id"`
-	Name     string    `json:"name"`
-	SortOrder int      `json:"sort_order"`
+	ID        uuid.UUID `json:"id"`
+	SchoolID  uuid.UUID `json:"school_id"`
+	Name      string    `json:"name"`
+	SortOrder int       `json:"sort_order"`
+	// ReportCardTemplate selects which of the fixed report-card layouts this
+	// grade prints ("kg", "primary", "middle"), or nil for grades that still
+	// use the generic single-exam marksheet.
+	ReportCardTemplate *string `json:"report_card_template,omitempty"`
 	Timestamps
 }
 
 type ClassSection struct {
-	ID             uuid.UUID  `json:"id"`
-	SchoolID       uuid.UUID  `json:"school_id"`
-	AcademicYearID uuid.UUID  `json:"academic_year_id"`
-	GradeLevelID   uuid.UUID  `json:"grade_level_id"`
-	Name           string     `json:"name"`
-	Capacity       int        `json:"capacity"`
+	ID                uuid.UUID  `json:"id"`
+	SchoolID          uuid.UUID  `json:"school_id"`
+	AcademicYearID    uuid.UUID  `json:"academic_year_id"`
+	GradeLevelID      uuid.UUID  `json:"grade_level_id"`
+	Name              string     `json:"name"`
+	Capacity          int        `json:"capacity"`
 	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id,omitempty"`
 	Timestamps
 }
