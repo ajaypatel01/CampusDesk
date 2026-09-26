@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, XCircle, IndianRupee, Download, MessageCircle } from 'lucide-react'
-import { feesApi } from '../services/api'
+import { useParams, Link, useOutletContext } from 'react-router-dom'
+import { ArrowLeft, Plus, XCircle, IndianRupee, Download, MessageCircle, ArrowLeftRight } from 'lucide-react'
+import { feesApi, academicApi } from '../services/api'
 import { useConfig } from '../services/ConfigContext'
 import './FeeAccountDetail.css'
 
 function FeeAccountDetail() {
   const { id } = useParams()
+  const { user } = useOutletContext() || {}
+  // Moving a payment between years corrects a data-entry mistake, not a
+  // routine edit -- kept to the same two roles the backend enforces.
+  const canMovePayment = user?.role === 'super_admin' || user?.role === 'registrar'
   const { whatsapp_enabled } = useConfig()
   const [account, setAccount] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -16,6 +20,10 @@ function FeeAccountDetail() {
     installment_number: '', reference_number: '', notes: '', payment_date: new Date().toISOString().split('T')[0],
   })
   const [saving, setSaving] = useState(false)
+  const [movePaymentId, setMovePaymentId] = useState(null)
+  const [years, setYears] = useState([])
+  const [moveYearId, setMoveYearId] = useState('')
+  const [moving, setMoving] = useState(false)
 
   async function loadAccount() {
     setLoading(true)
@@ -27,6 +35,11 @@ function FeeAccountDetail() {
   }
 
   useEffect(() => { loadAccount() }, [id])
+
+  useEffect(() => {
+    if (!canMovePayment || !account?.school_id) return
+    academicApi.listYears(account.school_id).then(r => setYears(r.items || [])).catch(() => {})
+  }, [canMovePayment, account?.school_id])
 
   async function handlePayment(e) {
     e.preventDefault()
@@ -84,6 +97,26 @@ function FeeAccountDetail() {
       loadAccount()
     } catch (err) {
       alert(err.message)
+    }
+  }
+
+  function openMovePayment(paymentId) {
+    setMovePaymentId(paymentId)
+    setMoveYearId('')
+  }
+
+  async function handleMovePayment(e) {
+    e.preventDefault()
+    if (!moveYearId) return
+    setMoving(true)
+    try {
+      await feesApi.movePayment(movePaymentId, moveYearId)
+      setMovePaymentId(null)
+      loadAccount()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setMoving(false)
     }
   }
 
@@ -203,6 +236,11 @@ function FeeAccountDetail() {
                         <button className="btn btn--outline btn--sm" onClick={() => handleVoid(p.id)} title="Void payment">
                           <XCircle size={14} />
                         </button>
+                        {canMovePayment && (
+                          <button className="btn btn--outline btn--sm" onClick={() => openMovePayment(p.id)} title="Move to a different year">
+                            <ArrowLeftRight size={14} />
+                          </button>
+                        )}
                       </>
                     )}
                   </td>
@@ -265,6 +303,35 @@ function FeeAccountDetail() {
                 <button type="button" className="btn btn--outline" onClick={() => setShowPaymentModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>
                   {saving ? 'Saving...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {movePaymentId && (
+        <div className="modal-overlay" onClick={() => setMovePaymentId(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Move Payment to a Different Year</h2>
+            <p className="empty-text">
+              Use this to correct a payment that was recorded under the wrong academic year
+              (e.g. a 2025-26 payment entered under 2026-27). The student must already have a
+              fee account for the target year.
+            </p>
+            <form className="modal__form" onSubmit={handleMovePayment}>
+              <label className="form-field">
+                <span>Move to Academic Year *</span>
+                <select required value={moveYearId} onChange={e => setMoveYearId(e.target.value)}>
+                  <option value="">Select year...</option>
+                  {years.filter(y => y.id !== account.academic_year_id).map(y => (
+                    <option key={y.id} value={y.id}>{y.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="modal__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setMovePaymentId(null)}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={moving || !moveYearId}>
+                  {moving ? 'Moving...' : 'Move Payment'}
                 </button>
               </div>
             </form>

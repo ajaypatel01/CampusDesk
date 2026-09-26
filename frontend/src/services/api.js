@@ -157,6 +157,10 @@ export const feesApi = {
   listPayments: (accountId) => request(`/fee-payments${qs({ student_fee_account_id: accountId })}`),
   recordPayment: (body) => request('/fee-payments', { method: 'POST', body: JSON.stringify(body) }),
   voidPayment: (id) => request(`/fee-payments/${id}`, { method: 'DELETE' }),
+  // Reassigns a payment to a different academic year's fee account for the
+  // same student -- for correcting a payment entered under the wrong year.
+  // Registrar/super_admin only; the target year's fee account must exist.
+  movePayment: (id, academicYearId) => request(`/fee-payments/${id}/move`, { method: 'PUT', body: JSON.stringify({ academic_year_id: academicYearId }) }),
 
   schoolSummary: (params) => request(`/fee-summary${qs(params)}`),
   studentSummary: (studentId, yearId) => request(`/fee-summary/student/${studentId}${qs({ academic_year_id: yearId })}`),
