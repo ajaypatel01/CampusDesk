@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap } from 'lucide-react'
+import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap, Pencil, RotateCcw } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
 import './Results.css'
@@ -15,6 +15,7 @@ function downloadBlob(blob, filename) {
 function Results() {
   const { user } = useOutletContext() || {}
   const isTeacher = user?.role === 'teacher'
+  const isSuperAdmin = user?.role === 'super_admin'
   const { currentSchool, currentYear } = useSchool()
   const [tab, setTab] = useState('subjects')
   const [grades, setGrades] = useState([])
@@ -47,6 +48,10 @@ function Results() {
   const [msStudentId, setMsStudentId] = useState('')
   const [marksheet, setMarksheet] = useState(null)
   const [msLoading, setMsLoading] = useState(false)
+  const [editingTotal, setEditingTotal] = useState(false)
+  const [totalInput, setTotalInput] = useState('')
+  const [totalSaving, setTotalSaving] = useState(false)
+  const [totalMsg, setTotalMsg] = useState('')
 
   // Report card (combined multi-exam, class-wise template)
   const [rcStudentId, setRcStudentId] = useState('')
@@ -191,11 +196,40 @@ function Results() {
   async function loadMarksheet() {
     if (!msExamId || !msStudentId) return
     setMsLoading(true); setMarksheet(null)
+    setEditingTotal(false); setTotalMsg('')
     try {
       const ms = await resultsApi.getMarksheet(msExamId, msStudentId)
       setMarksheet(ms)
     } catch (err) { alert(err.message) }
     setMsLoading(false)
+  }
+
+  function startEditTotal() {
+    setTotalInput(String(marksheet.total_obtained))
+    setTotalMsg('')
+    setEditingTotal(true)
+  }
+
+  async function saveTotalOverride() {
+    const value = parseFloat(totalInput)
+    if (Number.isNaN(value)) { setTotalMsg('Enter a valid number'); return }
+    setTotalSaving(true); setTotalMsg('')
+    try {
+      const ms = await resultsApi.setTotalOverride(msExamId, msStudentId, value)
+      setMarksheet(ms)
+      setEditingTotal(false)
+    } catch (err) { setTotalMsg(err.message) }
+    setTotalSaving(false)
+  }
+
+  async function resetTotalOverride() {
+    if (!confirm('Reset this total back to the auto-calculated value?')) return
+    setTotalSaving(true); setTotalMsg('')
+    try {
+      const ms = await resultsApi.clearTotalOverride(msExamId, msStudentId)
+      setMarksheet(ms)
+    } catch (err) { setTotalMsg(err.message) }
+    setTotalSaving(false)
   }
 
   async function downloadMarksheet() {
@@ -562,13 +596,46 @@ function Results() {
                 <tfoot>
                   <tr className="marksheet-total">
                     <td colSpan={3}><strong>Total / Result</strong></td>
-                    <td><strong>{marksheet.total_obtained?.toFixed(1)} / {marksheet.total_max}</strong></td>
+                    <td>
+                      {editingTotal ? (
+                        <div className="marksheet-total-edit">
+                          <input
+                            type="number" min="0" max={marksheet.total_max} step="0.01"
+                            value={totalInput} onChange={e => setTotalInput(e.target.value)}
+                            style={{ width: '80px' }}
+                          />
+                          <span> / {marksheet.total_max}</span>
+                          <button className="btn btn--primary btn--sm" onClick={saveTotalOverride} disabled={totalSaving}>
+                            {totalSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          <button className="btn btn--outline btn--sm" onClick={() => setEditingTotal(false)} disabled={totalSaving}>Cancel</button>
+                        </div>
+                      ) : (
+                        <>
+                          <strong>{marksheet.total_obtained?.toFixed(1)} / {marksheet.total_max}</strong>
+                          {marksheet.is_total_overridden && (
+                            <span className="badge badge--muted" style={{ marginLeft: '6px' }} title={`Auto-calculated: ${marksheet.computed_total_obtained?.toFixed(1)}`}>edited</span>
+                          )}
+                          {isSuperAdmin && (
+                            <button className="btn-icon" title="Edit total" onClick={startEditTotal} style={{ marginLeft: '6px' }}>
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          {isSuperAdmin && marksheet.is_total_overridden && (
+                            <button className="btn-icon" title="Reset to auto-calculated" onClick={resetTotalOverride} disabled={totalSaving}>
+                              <RotateCcw size={13} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </td>
                     <td><strong>{marksheet.percentage?.toFixed(1)}%</strong></td>
                     <td><span className="badge badge--muted">{marksheet.overall_grade}</span></td>
                     <td><span className={`badge badge--${marksheet.result === 'Pass' ? 'success' : 'danger'}`}>{marksheet.result}</span></td>
                   </tr>
                 </tfoot>
               </table>
+              {totalMsg && <p className="marksheet-total-error">{totalMsg}</p>}
               <p className="marksheet-cgpa">CGPA: <strong>{marksheet.cgpa?.toFixed(2)}</strong></p>
             </div>
           )}

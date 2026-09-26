@@ -52,6 +52,11 @@ func (m *Module) Mount(r chi.Router) {
 	r.Route("/marksheets", func(r chi.Router) {
 		r.Get("/", m.GetMarksheet)
 		r.Get("/pdf", m.DownloadMarksheet)
+		// Manually correcting a marksheet's total is a super_admin-only override,
+		// not a general "edit results" permission -- registrars/school admins
+		// still only enter marks through the normal per-subject flow above.
+		r.With(httpx.RequireRole("super_admin")).Put("/total-override", m.SetTotalOverride)
+		r.With(httpx.RequireRole("super_admin")).Delete("/total-override", m.DeleteTotalOverride)
 	})
 	r.Route("/report-cards", func(r chi.Router) {
 		r.Get("/", m.GetReportCard)
@@ -441,6 +446,84 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(pdfBytes)
+}
+
+// SetTotalOverride lets a super_admin manually correct the total shown on a
+// student's marksheet (e.g. a moderation adjustment) without re-entering
+// every subject's marks. The new total must fall within [0, total_max] as
+// already computed from the subjects on record.
+func (m *Module) SetTotalOverride(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ExamID        string  `json:"exam_id"`
+		StudentID     string  `json:"student_id"`
+		TotalObtained float64 `json:"total_obtained"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	examID, err := uuid.Parse(in.ExamID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid exam_id")
+		return
+	}
+	studentID, err := uuid.Parse(in.StudentID)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid student_id")
+		return
+	}
+
+	current, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	// TotalMax is always the auto-computed max regardless of any prior
+	// override -- only TotalObtained is ever replaced.
+	maxTotal := current.TotalMax
+	if in.TotalObtained < 0 || (maxTotal > 0 && in.TotalObtained > float64(maxTotal)) {
+		httpx.Error(w, http.StatusBadRequest, fmt.Sprintf("total_obtained must be between 0 and %d", maxTotal))
+		return
+	}
+
+	var overriddenBy uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		overriddenBy, _ = uuid.Parse(claims.Sub)
+	}
+	if err := m.repo.SetTotalOverride(r.Context(), examID, studentID, in.TotalObtained, overriddenBy); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, ms)
+}
+
+// DeleteTotalOverride reverts a marksheet to its auto-calculated total.
+func (m *Module) DeleteTotalOverride(w http.ResponseWriter, r *http.Request) {
+	examID, err := uuid.Parse(r.URL.Query().Get("exam_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "exam_id required")
+		return
+	}
+	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "student_id required")
+		return
+	}
+	if err := m.repo.DeleteTotalOverride(r.Context(), examID, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, ms)
 }
 
 // ---- Report card handlers (combined multi-exam, class-wise templates) ----

@@ -213,6 +213,14 @@ type StudentMarksheet struct {
 	CGPA           float64        `json:"cgpa"`
 	OverallGrade   string         `json:"overall_grade"`
 	Result         string         `json:"result"` // Pass / Fail
+	// IsTotalOverridden and ComputedTotalObtained let a super_admin manually
+	// correct the total shown on a marksheet (e.g. a moderation adjustment)
+	// without touching the underlying per-subject marks. When overridden,
+	// TotalObtained/Percentage/OverallGrade above reflect the override, and
+	// ComputedTotalObtained preserves what auto-summing the subjects gave,
+	// so the UI can show both and offer a reset back to it.
+	IsTotalOverridden     bool    `json:"is_total_overridden"`
+	ComputedTotalObtained float64 `json:"computed_total_obtained,omitempty"`
 }
 
 func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID uuid.UUID) (*StudentMarksheet, error) {
@@ -305,7 +313,51 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 			break
 		}
 	}
+
+	var overrideTotal float64
+	err = r.pool.QueryRow(ctx,
+		`SELECT total_obtained FROM marksheet_total_overrides WHERE exam_id=$1 AND student_id=$2`,
+		examID, studentID,
+	).Scan(&overrideTotal)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("get total override: %w", err)
+	}
+	if err == nil {
+		ms.ComputedTotalObtained = ms.TotalObtained
+		ms.IsTotalOverridden = true
+		ms.TotalObtained = overrideTotal
+		if ms.TotalMax > 0 {
+			ms.Percentage = (overrideTotal / float64(ms.TotalMax)) * 100
+		}
+		ms.OverallGrade, _ = gradeFromPercent(ms.Percentage)
+	}
+
 	return &ms, nil
+}
+
+// SetTotalOverride records (or replaces) a super_admin's manual correction of
+// a student's marksheet total for one exam. Only the aggregate total is
+// overridden -- individual subject marks, CGPA, and the per-subject-derived
+// Pass/Fail Result are left as entered/computed.
+func (r *Repository) SetTotalOverride(ctx context.Context, examID, studentID uuid.UUID, total float64, overriddenBy uuid.UUID) error {
+	var overriddenByArg interface{}
+	if overriddenBy != uuid.Nil {
+		overriddenByArg = overriddenBy
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO marksheet_total_overrides (exam_id, student_id, total_obtained, overridden_by)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (exam_id, student_id) DO UPDATE
+		SET total_obtained = $3, overridden_by = $4, updated_at = NOW()`,
+		examID, studentID, total, overriddenByArg)
+	return err
+}
+
+// DeleteTotalOverride removes a manual total override, reverting the
+// marksheet to its auto-calculated total.
+func (r *Repository) DeleteTotalOverride(ctx context.Context, examID, studentID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM marksheet_total_overrides WHERE exam_id=$1 AND student_id=$2`, examID, studentID)
+	return err
 }
 
 // ---- Class-teacher scoping ----
