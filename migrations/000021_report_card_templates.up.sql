@@ -10,8 +10,10 @@ UPDATE grade_levels SET report_card_template = 'kg' WHERE name IN ('Nursery', 'L
 UPDATE grade_levels SET report_card_template = 'primary' WHERE name IN ('1st', '2nd', '3rd', '4th');
 UPDATE grade_levels SET report_card_template = 'middle' WHERE name IN ('6th', '7th');
 
+-- IF NOT EXISTS: dice_code was added ahead of this migration to unblock
+-- setting the two schools' real DICE codes before this branch was merged.
 ALTER TABLE schools
-    ADD COLUMN dice_code TEXT;
+    ADD COLUMN IF NOT EXISTS dice_code TEXT;
 
 -- Component-level breakdown (Written/Note Book/Activity/Oral/Test, or
 -- Test/Project/Theory) under an exam_marks row. exam_marks.marks_obtained and
