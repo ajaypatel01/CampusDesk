@@ -267,9 +267,11 @@ function StaffDetail() {
             </p>
           )}
         </div>
-        <button className="btn btn--outline sd-edit-btn" onClick={() => setEditing(true)}>
-          <Edit3 size={15} /> Edit Profile
-        </button>
+        {isAdmin && (
+          <button className="btn btn--outline sd-edit-btn" onClick={() => setEditing(true)}>
+            <Edit3 size={15} /> Edit Profile
+          </button>
+        )}
       </div>
 
       <div className="sd-grid">

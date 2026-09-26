@@ -86,7 +86,11 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.StaffMe
 }
 
 func (r *Repository) UpsertProfile(ctx context.Context, p *domain.StaffProfile) error {
-	if p.CLQuotaPerYear <= 0 {
+	// Only fall back to the default when the caller genuinely didn't set a
+	// quota (negative is never sent by either UI form). An admin explicitly
+	// setting 0 -- e.g. to revoke CL for someone -- must stick, not silently
+	// bounce back to 7.
+	if p.CLQuotaPerYear < 0 {
 		p.CLQuotaPerYear = 7
 	}
 	// Gross salary is derived from the earnings components, not entered directly.
