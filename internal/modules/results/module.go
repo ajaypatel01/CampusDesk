@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
@@ -149,10 +150,39 @@ func (m *Module) DeleteSubject(w http.ResponseWriter, r *http.Request) {
 // ---- Exam handlers ----
 
 func (m *Module) CreateExam(w http.ResponseWriter, r *http.Request) {
-	var e domain.Exam
-	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
+	// exam_date arrives as a bare "YYYY-MM-DD" from an <input type="date">, not
+	// full RFC3339 -- decoding straight into domain.Exam's *time.Time field
+	// fails the whole request the moment a date is picked (Go's time.Time
+	// JSON unmarshaling requires a time+timezone component). Decode the date
+	// as a string here and parse it explicitly instead.
+	var in struct {
+		SchoolID       uuid.UUID `json:"school_id"`
+		AcademicYearID uuid.UUID `json:"academic_year_id"`
+		GradeLevelID   uuid.UUID `json:"grade_level_id"`
+		Name           string    `json:"name"`
+		ExamDate       string    `json:"exam_date"`
+		WeightPercent  int       `json:"weight_percent"`
+		IsPublished    bool      `json:"is_published"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
 		return
+	}
+	e := domain.Exam{
+		SchoolID:       in.SchoolID,
+		AcademicYearID: in.AcademicYearID,
+		GradeLevelID:   in.GradeLevelID,
+		Name:           in.Name,
+		WeightPercent:  in.WeightPercent,
+		IsPublished:    in.IsPublished,
+	}
+	if in.ExamDate != "" {
+		d, err := time.Parse("2006-01-02", in.ExamDate)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid exam_date, expected YYYY-MM-DD")
+			return
+		}
+		e.ExamDate = &d
 	}
 	if e.WeightPercent <= 0 {
 		e.WeightPercent = 100
