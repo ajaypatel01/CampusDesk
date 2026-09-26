@@ -32,6 +32,7 @@ type UpdateInput struct {
 	Phone               string `json:"phone"`
 	Email               string `json:"email"`
 	WorkingDaysPerMonth int    `json:"working_days_per_month"`
+	DiceCode            string `json:"dice_code"`
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.School, error) {
@@ -76,6 +77,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	school.Address = strings.TrimSpace(in.Address)
 	school.Phone = strings.TrimSpace(in.Phone)
 	school.Email = strings.TrimSpace(in.Email)
+	school.DiceCode = strings.TrimSpace(in.DiceCode)
 	if in.WorkingDaysPerMonth > 0 {
 		school.WorkingDaysPerMonth = in.WorkingDaysPerMonth
 	}

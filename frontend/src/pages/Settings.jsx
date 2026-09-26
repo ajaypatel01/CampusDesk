@@ -127,6 +127,13 @@ function Settings() {
     finally { setSaving(false) }
   }
 
+  async function handleChangeReportCardTemplate(grade, template) {
+    try {
+      await academicApi.updateGrade(grade.id, { name: grade.name, sort_order: grade.sort_order, report_card_template: template || null })
+      setGrades(prev => prev.map(g => g.id === grade.id ? { ...g, report_card_template: template || null } : g))
+    } catch (err) { alert(err.message) }
+  }
+
   async function handleCreateSection(e) {
     e.preventDefault()
     setSaving(true)
@@ -318,6 +325,18 @@ function Settings() {
                       <div className="grade-item__header">
                         <strong>{g.name}</strong>
                         <span className="settings-list__meta">Order: {g.sort_order}</span>
+                        <label className="settings-list__meta" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          Report Card:
+                          <select
+                            value={g.report_card_template || ''}
+                            onChange={e => handleChangeReportCardTemplate(g, e.target.value)}
+                          >
+                            <option value="">None (generic marksheet)</option>
+                            <option value="kg">KG (Nursery/LKG/UKG)</option>
+                            <option value="primary">Primary (1st-4th)</option>
+                            <option value="middle">Middle (6th-7th)</option>
+                          </select>
+                        </label>
                       </div>
                       <div className="grade-item__sections">
                         {sections.filter(s => s.grade_level_id === g.id).map(s => (

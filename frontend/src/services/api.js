@@ -101,6 +101,7 @@ export const academicApi = {
   createYear: (body) => request('/academic-years', { method: 'POST', body: JSON.stringify(body) }),
   listGrades: (schoolId) => request(`/grade-levels${qs({ school_id: schoolId })}`),
   createGrade: (body) => request('/grade-levels', { method: 'POST', body: JSON.stringify(body) }),
+  updateGrade: (id, body) => request(`/grade-levels/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   listSections: (params) => request(`/class-sections${qs(params)}`),
   createSection: (body) => request('/class-sections', { method: 'POST', body: JSON.stringify(body) }),
 }
@@ -174,6 +175,15 @@ export const resultsApi = {
     requestBlob(`/marksheets/pdf?exam_id=${examId}&student_id=${studentId}`),
   // Parent portal: published exams for a ward's current class.
   wardExams: (params) => request(`/ward-exams${qs(params)}`),
+
+  // Combined, multi-exam, class-wise-templated report card (kg/primary/middle).
+  getReportCard: (studentId, academicYearId) =>
+    request(`/report-cards${qs({ student_id: studentId, academic_year_id: academicYearId })}`),
+  downloadReportCard: (studentId, academicYearId) =>
+    requestBlob(`/report-cards/pdf${qs({ student_id: studentId, academic_year_id: academicYearId })}`),
+  upsertReportCardDetails: (body) => request('/report-cards/details', { method: 'PUT', body: JSON.stringify(body) }),
+  upsertDisciplineGrades: (body) => request('/report-cards/discipline-grades', { method: 'PUT', body: JSON.stringify(body) }),
+  listDisciplineCriteria: () => request('/discipline-criteria'),
 }
 
 export const homeworkApi = {

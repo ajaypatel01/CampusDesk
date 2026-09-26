@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2 } from 'lucide-react'
+import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
 import './Results.css'
@@ -47,6 +47,21 @@ function Results() {
   const [msStudentId, setMsStudentId] = useState('')
   const [marksheet, setMarksheet] = useState(null)
   const [msLoading, setMsLoading] = useState(false)
+
+  // Report card (combined multi-exam, class-wise template)
+  const [rcStudentId, setRcStudentId] = useState('')
+  const [reportCard, setReportCard] = useState(null)
+  const [rcLoading, setRcLoading] = useState(false)
+  const [rcError, setRcError] = useState('')
+  const [rcDetailsForm, setRcDetailsForm] = useState({ roll_no: '', attendance: '', remark: '', promoted_to: '', moral_remark: '', gk_remark: '' })
+  const [rcSaving, setRcSaving] = useState(false)
+  const [rcMsg, setRcMsg] = useState('')
+  const [disciplineCriteria, setDisciplineCriteria] = useState([])
+  const [disciplineGrades, setDisciplineGrades] = useState({})
+
+  useEffect(() => {
+    resultsApi.listDisciplineCriteria().then(r => setDisciplineCriteria(r.items || [])).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!currentSchool) return
@@ -134,20 +149,39 @@ function Results() {
     } catch (err) { alert(err.message) }
   }
 
+  // The selected exam's component scheme (Written/Note Book/.../Theory), if
+  // its grade has a report-card template -- comes straight off the exam
+  // payload so this page never hardcodes a second copy of it.
+  const selectedExam = exams.find(ex => ex.id === selectedExamId)
+  const markComponents = selectedExam?.mark_components || []
+
+  function componentTotal(subId) {
+    const vals = marks[subId]?.components || {}
+    return markComponents.reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
+  }
+
   async function handleSaveMarks(e) {
     e.preventDefault()
     if (!selectedExamId || !selectedStudentId) return
     setMarkSaving(true); setMarkMsg('')
     try {
-      const marksArr = markSubjects.map(sub => ({
-        exam_id: selectedExamId,
-        student_id: selectedStudentId,
-        subject_id: sub.id,
-        marks_obtained: parseFloat(marks[sub.id]?.marks_obtained || 0),
-        max_marks: sub.max_marks,
-        is_absent: marks[sub.id]?.is_absent || false,
-        remarks: '',
-      }))
+      const marksArr = markSubjects.map(sub => {
+        const entry = marks[sub.id] || {}
+        const base = {
+          exam_id: selectedExamId,
+          student_id: selectedStudentId,
+          subject_id: sub.id,
+          max_marks: sub.max_marks,
+          is_absent: entry.is_absent || false,
+          remarks: '',
+        }
+        if (markComponents.length > 0) {
+          const components = {}
+          markComponents.forEach(c => { components[c.key] = parseFloat(entry.components?.[c.key] || 0) })
+          return { ...base, components }
+        }
+        return { ...base, marks_obtained: parseFloat(entry.marks_obtained || 0) }
+      })
       await resultsApi.bulkUpsertMarks(marksArr)
       setMarkMsg('Marks saved successfully.')
     } catch (err) { setMarkMsg('Error: ' + err.message) }
@@ -172,6 +206,66 @@ function Results() {
     } catch (err) { alert(err.message) }
   }
 
+  async function loadReportCard() {
+    if (!rcStudentId || !currentYear) return
+    setRcLoading(true); setReportCard(null); setRcError(''); setRcMsg('')
+    try {
+      const rc = await resultsApi.getReportCard(rcStudentId, currentYear.id)
+      setReportCard(rc)
+      setRcDetailsForm({
+        roll_no: rc.details?.roll_no || '',
+        attendance: rc.details?.attendance || '',
+        remark: rc.details?.remark || '',
+        promoted_to: rc.details?.promoted_to || '',
+        moral_remark: rc.details?.moral_remark || '',
+        gk_remark: rc.details?.gk_remark || '',
+      })
+      const g = {}
+      ;(rc.discipline_grades || []).forEach(dg => { g[dg.criterion_key] = dg.grade })
+      setDisciplineGrades(g)
+    } catch (err) { setRcError(err.message) }
+    setRcLoading(false)
+  }
+
+  async function downloadReportCardPDF() {
+    if (!rcStudentId || !currentYear) return
+    try {
+      const blob = await resultsApi.downloadReportCard(rcStudentId, currentYear.id)
+      downloadBlob(blob, `report_card.pdf`)
+    } catch (err) { alert(err.message) }
+  }
+
+  async function handleSaveReportCardDetails(e) {
+    e.preventDefault()
+    if (!reportCard) return
+    setRcSaving(true); setRcMsg('')
+    try {
+      await resultsApi.upsertReportCardDetails({
+        school_id: currentSchool.id,
+        academic_year_id: currentYear.id,
+        grade_level_id: reportCard.grade_level_id,
+        student_id: rcStudentId,
+        ...rcDetailsForm,
+      })
+      setRcMsg('Saved.')
+    } catch (err) { setRcMsg('Error: ' + err.message) }
+    setRcSaving(false)
+  }
+
+  async function handleSaveDisciplineGrades() {
+    if (!reportCard) return
+    setRcMsg('')
+    try {
+      await resultsApi.upsertDisciplineGrades({
+        school_id: currentSchool.id,
+        academic_year_id: currentYear.id,
+        student_id: rcStudentId,
+        grades: disciplineGrades,
+      })
+      setRcMsg('Discipline grades saved.')
+    } catch (err) { setRcMsg('Error: ' + err.message) }
+  }
+
   if (!currentSchool || !currentYear) return <p className="empty-text">Select a school and academic year first.</p>
 
   return (
@@ -193,7 +287,7 @@ function Results() {
       </div>
 
       <div className="docs-tabs">
-        {[['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2]].map(([key, label, Icon]) => (
+        {[['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap]].map(([key, label, Icon]) => (
           <button key={key} className={`docs-tab ${tab === key ? 'docs-tab--active' : ''}`} onClick={() => setTab(key)}>
             <Icon size={16} /> {label}
           </button>
@@ -330,24 +424,59 @@ function Results() {
           </div>
           {selectedExamId && selectedStudentId && markSubjects.length > 0 && (
             <form onSubmit={handleSaveMarks}>
-              <div className="table-card">
+              <div className="table-card" style={{ overflowX: 'auto' }}>
                 <table className="data-table">
-                  <thead><tr><th>Subject</th><th>Max Marks</th><th>Passing</th><th>Obtained</th><th>Absent</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      {markComponents.length > 0 ? (
+                        <>
+                          {markComponents.map(c => <th key={c.key}>{c.label} <span className="data-table__muted">/{c.max_marks}</span></th>)}
+                          <th>Total</th>
+                        </>
+                      ) : (
+                        <><th>Max Marks</th><th>Passing</th><th>Obtained</th></>
+                      )}
+                      <th>Absent</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {markSubjects.map(sub => (
                       <tr key={sub.id}>
                         <td>{sub.name}</td>
-                        <td className="data-table__muted">{sub.max_marks}</td>
-                        <td className="data-table__muted">{sub.passing_marks}</td>
-                        <td>
-                          <input
-                            type="number" min="0" max={sub.max_marks} step="0.5"
-                            className="marks-input"
-                            disabled={marks[sub.id]?.is_absent}
-                            value={marks[sub.id]?.marks_obtained || ''}
-                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
-                          />
-                        </td>
+                        {markComponents.length > 0 ? (
+                          <>
+                            {markComponents.map(c => (
+                              <td key={c.key}>
+                                <input
+                                  type="number" min="0" max={c.max_marks} step="0.5"
+                                  className="marks-input"
+                                  disabled={marks[sub.id]?.is_absent}
+                                  value={marks[sub.id]?.components?.[c.key] || ''}
+                                  onChange={e => setMarks(prev => ({
+                                    ...prev,
+                                    [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
+                                  }))}
+                                />
+                              </td>
+                            ))}
+                            <td className="data-table__muted">{componentTotal(sub.id)} / {sub.max_marks}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="data-table__muted">{sub.max_marks}</td>
+                            <td className="data-table__muted">{sub.passing_marks}</td>
+                            <td>
+                              <input
+                                type="number" min="0" max={sub.max_marks} step="0.5"
+                                className="marks-input"
+                                disabled={marks[sub.id]?.is_absent}
+                                value={marks[sub.id]?.marks_obtained || ''}
+                                onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
+                              />
+                            </td>
+                          </>
+                        )}
                         <td>
                           <input
                             type="checkbox"
@@ -441,6 +570,143 @@ function Results() {
                 </tfoot>
               </table>
               <p className="marksheet-cgpa">CGPA: <strong>{marksheet.cgpa?.toFixed(2)}</strong></p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Report Card Tab */}
+      {tab === 'report-card' && (
+        <div className="results-section">
+          <h2>Report Card</h2>
+          <div className="form-row" style={{ marginBottom: '16px' }}>
+            <label className="form-field">
+              <span>Student</span>
+              <select value={rcStudentId} onChange={e => setRcStudentId(e.target.value)}>
+                <option value="">Select student...</option>
+                {students.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.student_code})</option>)}
+              </select>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <button className="btn btn--primary" onClick={loadReportCard} disabled={!rcStudentId || rcLoading}>
+              {rcLoading ? 'Loading...' : 'View Report Card'}
+            </button>
+            {reportCard && (
+              <button className="btn btn--outline" onClick={downloadReportCardPDF}>
+                <Download size={16} /> Download PDF
+              </button>
+            )}
+          </div>
+
+          {rcError && <p className="doc-msg doc-msg--error">{rcError}</p>}
+
+          {reportCard && (
+            <div className="marksheet-preview">
+              <div className="marksheet-header">
+                <h3>{reportCard.school_name}</h3>
+                <p>{reportCard.academic_year} · {reportCard.grade_level_name} ({reportCard.template})</p>
+                <p><strong>{reportCard.student_name}</strong> · {reportCard.student_code}</p>
+              </div>
+
+              <div className="table-card" style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan={2}>Subject</th>
+                      {reportCard.exams.map(ex => (
+                        <th key={ex.exam_id} colSpan={2}>{ex.exam_name} ({['I','II','III'][ex.position - 1] || ex.position})</th>
+                      ))}
+                      <th colSpan={3}>Overall</th>
+                    </tr>
+                    <tr>
+                      {reportCard.exams.map(ex => (
+                        <Fragment key={ex.exam_id}>
+                          <th>Obtained</th>
+                          <th className="data-table__muted">Max</th>
+                        </Fragment>
+                      ))}
+                      <th>Total</th><th>%</th><th>Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportCard.subjects.map(sub => (
+                      <tr key={sub.subject_id}>
+                        <td>
+                          {sub.subject_name}
+                          {sub.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
+                        </td>
+                        {sub.by_exam.map((cell, i) => (
+                          <Fragment key={i}>
+                            <td>{cell.is_absent ? 'Absent' : cell.obtained}</td>
+                            <td className="data-table__muted">{cell.max_marks}</td>
+                          </Fragment>
+                        ))}
+                        <td>{sub.overall_obtained} / {sub.overall_max}</td>
+                        <td className="data-table__muted">{sub.overall_percent?.toFixed(1)}%</td>
+                        <td>{sub.grade ? <span className="badge badge--muted">{sub.grade}</span> : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="marksheet-total">
+                      <td colSpan={1 + reportCard.exams.length * 2}><strong>G.Total / %</strong></td>
+                      <td><strong>{reportCard.overall_obtained} / {reportCard.overall_max}</strong></td>
+                      <td><strong>{reportCard.overall_percent?.toFixed(1)}%</strong></td>
+                      <td>{reportCard.overall_grade && <span className="badge badge--muted">{reportCard.overall_grade}</span>}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <h3 style={{ marginTop: '24px' }}>Report Card Details</h3>
+              <form onSubmit={handleSaveReportCardDetails} className="results-inline-form">
+                <div className="form-row">
+                  <label className="form-field"><span>Roll No.</span><input value={rcDetailsForm.roll_no} onChange={e => setRcDetailsForm({ ...rcDetailsForm, roll_no: e.target.value })} /></label>
+                  <label className="form-field"><span>Attendance</span><input value={rcDetailsForm.attendance} onChange={e => setRcDetailsForm({ ...rcDetailsForm, attendance: e.target.value })} placeholder="e.g. 210/220" /></label>
+                  <label className="form-field"><span>Promoted To</span><input value={rcDetailsForm.promoted_to} onChange={e => setRcDetailsForm({ ...rcDetailsForm, promoted_to: e.target.value })} /></label>
+                </div>
+                <div className="form-row">
+                  <label className="form-field"><span>Remark</span><input value={rcDetailsForm.remark} onChange={e => setRcDetailsForm({ ...rcDetailsForm, remark: e.target.value })} /></label>
+                  {reportCard.template === 'primary' && (
+                    <>
+                      <label className="form-field"><span>Moral</span><input value={rcDetailsForm.moral_remark} onChange={e => setRcDetailsForm({ ...rcDetailsForm, moral_remark: e.target.value })} /></label>
+                      <label className="form-field"><span>G.K.</span><input value={rcDetailsForm.gk_remark} onChange={e => setRcDetailsForm({ ...rcDetailsForm, gk_remark: e.target.value })} /></label>
+                    </>
+                  )}
+                </div>
+                <button type="submit" className="btn btn--primary" disabled={rcSaving}>{rcSaving ? 'Saving...' : 'Save Details'}</button>
+              </form>
+
+              {reportCard.template === 'middle' && (
+                <>
+                  <h3 style={{ marginTop: '24px' }}>Co-Scholastic / Discipline Grades</h3>
+                  <div className="table-card">
+                    <table className="data-table">
+                      <thead><tr><th>Criterion</th><th>Grade</th></tr></thead>
+                      <tbody>
+                        {disciplineCriteria.map(key => (
+                          <tr key={key}>
+                            <td>{key}</td>
+                            <td>
+                              <select
+                                value={disciplineGrades[key] || ''}
+                                onChange={e => setDisciplineGrades(prev => ({ ...prev, [key]: e.target.value }))}
+                              >
+                                <option value="">-</option>
+                                {['A+', 'A', 'B+', 'B', 'C+', 'C'].map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button className="btn btn--primary" style={{ marginTop: '12px' }} onClick={handleSaveDisciplineGrades}>Save Discipline Grades</button>
+                </>
+              )}
+
+              {rcMsg && <p className={`doc-msg ${rcMsg.startsWith('Error') ? 'doc-msg--error' : 'doc-msg--ok'}`} style={{ marginTop: '12px' }}>{rcMsg}</p>}
             </div>
           )}
         </div>
