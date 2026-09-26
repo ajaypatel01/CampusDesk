@@ -9,18 +9,41 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
+// unauthorizedMessage turns a 401 response body into a user-facing message.
+// The backend returns the same status for two very different situations:
+// an already-logged-in session whose token expired/was revoked, and a plain
+// login attempt with the wrong credentials (or a pending/rejected/disabled
+// account). Only the first is really a "session expired" -- callers pass
+// hadToken so we can tell them apart instead of showing "session expired"
+// on someone's very first (failed) login attempt.
+async function unauthorizedMessage(res, hadToken) {
+  if (hadToken) return 'Session expired. Please log in again.'
+  let msg = 'Invalid email or password.'
+  try {
+    const d = await res.json()
+    if (d.error) {
+      // Known account-status cases come back as "unauthorized: <reason>";
+      // a bare "unauthorized" just means the credentials didn't match.
+      msg = d.error === 'unauthorized' ? msg : d.error.replace(/^unauthorized:\s*/, '')
+    }
+  } catch (_) { /* no JSON body */ }
+  return msg
+}
+
 async function request(path, options = {}) {
   const url = `${BASE}${path}`
+  const hadToken = !!getToken()
   const res = await fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...authHeader(), ...options.headers },
   })
   if (res.status === 401) {
+    const msg = await unauthorizedMessage(res, hadToken)
     clearToken()
-    if (window.location.pathname !== '/login') {
+    if (hadToken && window.location.pathname !== '/login') {
       window.location.replace('/login')
     }
-    throw new Error('Session expired. Please log in again.')
+    throw new Error(msg)
   }
   if (res.status === 204) return null
   const data = await res.json()
@@ -30,14 +53,16 @@ async function request(path, options = {}) {
 
 async function requestBlob(path, options = {}) {
   const url = `${BASE}${path}`
+  const hadToken = !!getToken()
   const res = await fetch(url, {
     ...options,
     headers: { ...authHeader(), ...options.headers },
   })
   if (res.status === 401) {
+    const msg = await unauthorizedMessage(res, hadToken)
     clearToken()
-    window.location.href = '/login'
-    throw new Error('Session expired.')
+    if (hadToken) window.location.href = '/login'
+    throw new Error(msg)
   }
   if (!res.ok) {
     let msg = `Request failed: ${res.status}`
