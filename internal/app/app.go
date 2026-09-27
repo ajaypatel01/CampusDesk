@@ -10,6 +10,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/academic"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/books"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/customfields"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/documents"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/enrollment"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/fee"
@@ -144,6 +145,7 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		staff.New(pool),
 		tcvoucher.New(pool),
 		payroll.New(pool),
+		customfields.New(pool),
 	}
 	for _, m := range mods {
 		log.Printf("mount module: %s", m.Name())

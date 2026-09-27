@@ -1,0 +1,45 @@
+.custom-fields {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px dashed var(--gray-300, #d1d5db);
+  border-radius: 10px;
+}
+
+.custom-fields__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.custom-fields__header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.custom-fields__add-form {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--gray-50, #f9fafb);
+  border-radius: 8px;
+}
+
+.custom-fields__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.custom-fields__item {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.custom-fields__item .form-field {
+  flex: 1;
+}
+
+.custom-fields__remove {
+  margin-bottom: 2px;
+}

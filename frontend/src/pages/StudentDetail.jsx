@@ -3,6 +3,7 @@ import { useParams, Link, useOutletContext } from 'react-router-dom'
 import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee } from 'lucide-react'
 import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
+import CustomFieldsSection from '../components/CustomFieldsSection'
 import './StudentDetail.css'
 
 const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
@@ -324,6 +325,8 @@ function StudentDetail() {
           </div>
         )}
       </div>
+
+      <CustomFieldsSection entityType="student" entityId={student.id} schoolId={currentSchool?.id} user={user} />
 
       {showGuardianModal && (
         <div className="modal-overlay" onClick={() => setShowGuardianModal(false)}>
