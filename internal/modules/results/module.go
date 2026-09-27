@@ -38,6 +38,14 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent")).Post("/", m.CreateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent")).Put("/{id}", m.UpdateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent")).Delete("/{id}", m.DeleteSubject)
+		// Adding a graded component ("section") to a subject is entry-time
+		// work, same access as entering marks -- open to teachers, unlike
+		// creating/deleting the subject itself above.
+		r.Route("/{id}/mark-components", func(r chi.Router) {
+			r.With(httpx.BlockRoles("parent")).Get("/", m.ListSubjectComponents)
+			r.With(httpx.BlockRoles("parent")).Post("/", m.AddSubjectComponent)
+			r.With(httpx.BlockRoles("parent")).Delete("/{key}", m.DeleteSubjectComponent)
+		})
 	})
 	r.Route("/exams", func(r chi.Router) {
 		r.With(httpx.BlockRoles("parent")).Get("/", m.ListExams)
@@ -130,7 +138,26 @@ func (m *Module) ListSubjects(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+	// Decorate each subject with its effective mark-component scheme (its
+	// own custom one if it has one, else the grade-template default) so the
+	// marks-entry UI never has to guess or fetch it separately per subject.
+	out := make([]subjectResponse, len(items))
+	for i, s := range items {
+		components, err := m.repo.GetSubjectComponents(r.Context(), s.ID)
+		if err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+		out[i] = subjectResponse{Subject: s, MarkComponents: components}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": out})
+}
+
+// subjectResponse decorates a Subject with its effective mark-component
+// scheme, without persisting either field differently on the subject itself.
+type subjectResponse struct {
+	domain.Subject
+	MarkComponents []MarkComponent `json:"mark_components,omitempty"`
 }
 
 func (m *Module) UpdateSubject(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +186,72 @@ func (m *Module) DeleteSubject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := m.repo.DeleteSubject(r.Context(), id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.NoContent(w)
+}
+
+// ---- Per-subject mark components ("sections") ----
+
+func (m *Module) ListSubjectComponents(w http.ResponseWriter, r *http.Request) {
+	subjectID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	components, err := m.repo.GetSubjectComponents(r.Context(), subjectID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": components})
+}
+
+func (m *Module) AddSubjectComponent(w http.ResponseWriter, r *http.Request) {
+	subjectID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		Label    string `json:"label"`
+		MaxMarks int    `json:"max_marks"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	in.Label = strings.TrimSpace(in.Label)
+	key := slugifyComponentKey(in.Label)
+	if key == "" || in.MaxMarks <= 0 {
+		httpx.Error(w, http.StatusBadRequest, "label and a positive max_marks are required")
+		return
+	}
+	var createdBy uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		createdBy, _ = uuid.Parse(claims.Sub)
+	}
+	components, err := m.repo.AddSubjectComponent(r.Context(), subjectID, key, in.Label, in.MaxMarks, createdBy)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, map[string]interface{}{"items": components})
+}
+
+func (m *Module) DeleteSubjectComponent(w http.ResponseWriter, r *http.Request) {
+	subjectID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	key := chi.URLParam(r, "key")
+	if err := m.repo.DeleteSubjectComponent(r.Context(), subjectID, key); err != nil {
+		if errors.Is(err, apperr.ErrConflict) {
+			httpx.Error(w, http.StatusConflict, "this section already has marks recorded against it and can't be removed")
+			return
+		}
 		httpx.WriteServiceError(w, err)
 		return
 	}
