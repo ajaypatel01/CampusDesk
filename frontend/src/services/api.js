@@ -220,6 +220,18 @@ export const resultsApi = {
   listDisciplineCriteria: () => request('/discipline-criteria'),
 }
 
+// Super-admin-only custom fields (Student Detail, Results, ...). Every call
+// here 403s for anyone else -- CustomFieldsSection never even calls it.
+export const customFieldsApi = {
+  listDefinitions: (schoolId, entityType) => request(`/custom-fields/definitions${qs({ school_id: schoolId, entity_type: entityType })}`),
+  createDefinition: (body) => request('/custom-fields/definitions', { method: 'POST', body: JSON.stringify(body) }),
+  updateDefinition: (id, body) => request(`/custom-fields/definitions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteDefinition: (id) => request(`/custom-fields/definitions/${id}`, { method: 'DELETE' }),
+  listValues: (schoolId, entityType, entityId, scopeId) =>
+    request(`/custom-fields/values${qs({ school_id: schoolId, entity_type: entityType, entity_id: entityId, scope_id: scopeId })}`),
+  upsertValue: (body) => request('/custom-fields/values', { method: 'PUT', body: JSON.stringify(body) }),
+}
+
 export const homeworkApi = {
   list: (params) => request(`/homework${qs(params)}`),
   get: (id) => request(`/homework/${id}`),

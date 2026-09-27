@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap, Pencil, RotateCcw } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
+import CustomFieldsSection from '../components/CustomFieldsSection'
 import './Results.css'
 
 function downloadBlob(blob, filename) {
@@ -774,6 +775,8 @@ function Results() {
               )}
 
               {rcMsg && <p className={`doc-msg ${rcMsg.startsWith('Error') ? 'doc-msg--error' : 'doc-msg--ok'}`} style={{ marginTop: '12px' }}>{rcMsg}</p>}
+
+              <CustomFieldsSection entityType="student_result" entityId={rcStudentId} scopeId={currentYear?.id} schoolId={currentSchool?.id} user={user} title="Extra Result Fields" />
             </div>
           )}
         </div>
