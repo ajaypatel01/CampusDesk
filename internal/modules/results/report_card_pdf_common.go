@@ -15,6 +15,11 @@ import (
 // stacked top to bottom, rather than the source spreadsheet's side-by-side
 // pairing -- same fields, same numbers, same order, just simpler and more
 // robust to lay out than replicating exact Excel cell coordinates.
+//
+// Every function here takes a pdfTheme (see report_card_theme.go): the
+// theme only ever changes fill/text colors, never the content or layout
+// itself -- the school's actual rubric and grading formulas stay identical
+// across every theme.
 
 func formatMarks(v float64) string {
 	if v == math.Trunc(v) {
@@ -46,7 +51,7 @@ func reportCardDetailsFields(rc ReportCard) (rollNo, attendance, remark, promote
 	return d.RollNo, d.Attendance, d.Remark, d.PromotedTo, d.MoralRemark, d.GKRemark
 }
 
-func writeReportCardHeader(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
+func writeReportCardHeader(pdf *fpdf.Fpdf, w float64, rc ReportCard, theme pdfTheme) {
 	pdf.SetFont("Arial", "B", 11)
 	codeLine := fmt.Sprintf("SCHOOL CODE - %s", rc.SchoolCode)
 	if rc.DiceCode != "" {
@@ -91,25 +96,37 @@ func writeReportCardHeader(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
 	pdf.Ln(3)
 }
 
+// writeGradeCell renders one grade value, color-coded per theme.ColorBadges
+// (a plain bordered cell with theme off, exactly as before this feature).
+func writeGradeCell(pdf *fpdf.Fpdf, w, h float64, grade string, theme pdfTheme) {
+	fill, text, shaded := theme.gradeBadge(grade)
+	pdf.SetFillColor(fill[0], fill[1], fill[2])
+	pdf.SetTextColor(text[0], text[1], text[2])
+	pdf.CellFormat(w, h, grade, "1", 1, "C", shaded, 0, "")
+	pdf.SetTextColor(0, 0, 0)
+}
+
 // writeExamComponentTable renders one exam's SUBJECT/MARKING/subjects/
 // G.TOTAL/PERCENTAGE block for the "kg"/"primary" templates.
-func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx int, components []MarkComponent) {
+func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx int, components []MarkComponent, theme pdfTheme) {
 	exam := rc.Exams[examIdx]
 	pdf.SetFont("Arial", "B", 10)
-	pdf.SetFillColor(220, 230, 245)
-	pdf.CellFormat(w, 7, fmt.Sprintf("%s (%s)", exam.ExamName, romanNumeral(exam.Position)), "1", 1, "C", true, 0, "")
+	fill := theme.setSectionStyle(pdf)
+	pdf.CellFormat(w, 7, fmt.Sprintf("%s (%s)", exam.ExamName, romanNumeral(exam.Position)), "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 
 	subjectW := 45.0
 	totalW := 22.0
 	compW := (w - subjectW - totalW) / float64(len(components))
 
 	pdf.SetFont("Arial", "B", 8)
-	pdf.SetFillColor(235, 235, 235)
-	pdf.CellFormat(subjectW, 7, "SUBJECT", "1", 0, "C", true, 0, "")
+	fill = theme.setHeaderStyle(pdf)
+	pdf.CellFormat(subjectW, 7, "SUBJECT", "1", 0, "C", fill, 0, "")
 	for _, c := range components {
-		pdf.CellFormat(compW, 7, c.Label, "1", 0, "C", true, 0, "")
+		pdf.CellFormat(compW, 7, c.Label, "1", 0, "C", fill, 0, "")
 	}
-	pdf.CellFormat(totalW, 7, "TOTAL", "1", 1, "C", true, 0, "")
+	pdf.CellFormat(totalW, 7, "TOTAL", "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 
 	pdf.SetFont("Arial", "", 8)
 	pdf.CellFormat(subjectW, 6, "MARKING", "1", 0, "L", false, 0, "")
@@ -165,7 +182,7 @@ func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx i
 // grade block, using rc's own combined totals rather than re-summing --
 // GetReportCard already excludes co-scholastic subjects the same way the
 // existing single-exam marksheet does.
-func writeOverallTable(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
+func writeOverallTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, theme pdfTheme) {
 	romanSpan := ""
 	for i, e := range rc.Exams {
 		if i > 0 {
@@ -174,32 +191,35 @@ func writeOverallTable(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
 		romanSpan += romanNumeral(e.Position)
 	}
 	pdf.SetFont("Arial", "B", 10)
-	pdf.SetFillColor(220, 230, 245)
-	pdf.CellFormat(w, 7, fmt.Sprintf("OVER ALL (%s)", romanSpan), "1", 1, "C", true, 0, "")
+	fill := theme.setSectionStyle(pdf)
+	pdf.CellFormat(w, 7, fmt.Sprintf("OVER ALL (%s)", romanSpan), "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 
 	subjectW := 60.0
 	otherW := (w - subjectW) / 3
 	pdf.SetFont("Arial", "B", 8)
-	pdf.SetFillColor(235, 235, 235)
-	pdf.CellFormat(subjectW, 7, "SUBJECT", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(otherW, 7, "TOTAL", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(otherW, 7, "%", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(otherW, 7, "GRADE", "1", 1, "C", true, 0, "")
+	fill = theme.setHeaderStyle(pdf)
+	pdf.CellFormat(subjectW, 7, "SUBJECT", "1", 0, "C", fill, 0, "")
+	pdf.CellFormat(otherW, 7, "TOTAL", "1", 0, "C", fill, 0, "")
+	pdf.CellFormat(otherW, 7, "%", "1", 0, "C", fill, 0, "")
+	pdf.CellFormat(otherW, 7, "GRADE", "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 
 	pdf.SetFont("Arial", "", 8)
 	for _, sub := range rc.Subjects {
 		pdf.CellFormat(subjectW, 6, sub.SubjectName, "1", 0, "L", false, 0, "")
 		pdf.CellFormat(otherW, 6, fmt.Sprintf("%s / %d", formatMarks(sub.OverallObtained), sub.OverallMax), "1", 0, "C", false, 0, "")
 		pdf.CellFormat(otherW, 6, fmt.Sprintf("%.1f%%", sub.OverallPercent), "1", 0, "C", false, 0, "")
-		pdf.CellFormat(otherW, 6, sub.Grade, "1", 1, "C", false, 0, "")
+		writeGradeCell(pdf, otherW, 6, sub.Grade, theme)
 	}
 
 	pdf.SetFont("Arial", "B", 9)
-	pdf.SetFillColor(230, 240, 230)
-	pdf.CellFormat(subjectW, 7, fmt.Sprintf("G.TOTAL (%d)", rc.OverallMax), "1", 0, "L", true, 0, "")
-	pdf.CellFormat(otherW, 7, formatMarks(rc.OverallObtained), "1", 0, "C", true, 0, "")
-	pdf.CellFormat(otherW, 7, fmt.Sprintf("%.1f%%", rc.OverallPercent), "1", 0, "C", true, 0, "")
-	pdf.CellFormat(otherW, 7, rc.OverallGrade, "1", 1, "C", true, 0, "")
+	fill = theme.setTotalStyle(pdf)
+	pdf.CellFormat(subjectW, 7, fmt.Sprintf("G.TOTAL (%d)", rc.OverallMax), "1", 0, "L", fill, 0, "")
+	pdf.CellFormat(otherW, 7, formatMarks(rc.OverallObtained), "1", 0, "C", fill, 0, "")
+	pdf.CellFormat(otherW, 7, fmt.Sprintf("%.1f%%", rc.OverallPercent), "1", 0, "C", fill, 0, "")
+	pdf.CellFormat(otherW, 7, rc.OverallGrade, "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 	pdf.Ln(3)
 }
 
@@ -213,9 +233,9 @@ func writeReportCardFooterDetails(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
 	pdf.Ln(2)
 }
 
-func writeReportCardSignatureBlock(pdf *fpdf.Fpdf, w float64) {
+func writeReportCardSignatureBlock(pdf *fpdf.Fpdf, w float64, theme pdfTheme) {
 	pdf.Ln(8)
-	pdf.SetDrawColor(120, 120, 120)
+	pdf.SetDrawColor(theme.RuleColor[0], theme.RuleColor[1], theme.RuleColor[2])
 	pdf.Line(12, pdf.GetY(), 12+w, pdf.GetY())
 	pdf.Ln(2)
 	pdf.SetFont("Arial", "", 9)

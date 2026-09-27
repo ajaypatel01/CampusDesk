@@ -64,6 +64,7 @@ function Results() {
   const [rcMsg, setRcMsg] = useState('')
   const [disciplineCriteria, setDisciplineCriteria] = useState([])
   const [disciplineGrades, setDisciplineGrades] = useState({})
+  const [rcDesign, setRcDesign] = useState('classic')
 
   useEffect(() => {
     resultsApi.listDisciplineCriteria().then(r => setDisciplineCriteria(r.items || [])).catch(() => {})
@@ -265,7 +266,7 @@ function Results() {
   async function downloadReportCardPDF() {
     if (!rcStudentId || !currentYear) return
     try {
-      const blob = await resultsApi.downloadReportCard(rcStudentId, currentYear.id)
+      const blob = await resultsApi.downloadReportCard(rcStudentId, currentYear.id, rcDesign)
       downloadBlob(blob, `report_card.pdf`)
     } catch (err) { alert(err.message) }
   }
@@ -661,9 +662,16 @@ function Results() {
               {rcLoading ? 'Loading...' : 'View Report Card'}
             </button>
             {reportCard && (
-              <button className="btn btn--outline" onClick={downloadReportCardPDF}>
-                <Download size={16} /> Download PDF
-              </button>
+              <>
+                <select value={rcDesign} onChange={e => setRcDesign(e.target.value)} title="PDF design (doesn't change the marks/grades, just the look)">
+                  <option value="classic">Design: Classic</option>
+                  <option value="modern">Design: Modern Color</option>
+                  <option value="minimal">Design: Minimal</option>
+                </select>
+                <button className="btn btn--outline" onClick={downloadReportCardPDF}>
+                  <Download size={16} /> Download PDF
+                </button>
+              </>
             )}
           </div>
 

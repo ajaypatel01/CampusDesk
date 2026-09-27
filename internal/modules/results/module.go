@@ -600,14 +600,15 @@ func (m *Module) DownloadReportCard(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
+	theme := themeByName(r.URL.Query().Get("design"))
 	var pdfBytes []byte
 	switch rc.Template {
 	case "kg":
-		pdfBytes, err = generateKGReportCardPDF(*rc)
+		pdfBytes, err = generateKGReportCardPDF(*rc, theme)
 	case "primary":
-		pdfBytes, err = generatePrimaryReportCardPDF(*rc)
+		pdfBytes, err = generatePrimaryReportCardPDF(*rc, theme)
 	case "middle":
-		pdfBytes, err = generateMiddleReportCardPDF(*rc)
+		pdfBytes, err = generateMiddleReportCardPDF(*rc, theme)
 	default:
 		httpx.Error(w, http.StatusBadRequest, "no report-card template for this grade")
 		return
