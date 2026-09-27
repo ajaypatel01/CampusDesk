@@ -200,7 +200,12 @@ function Settings() {
     return g ? g.name : glId
   }
 
+  // Registrars already have API-level permission to create/edit grades and
+  // sections (POST/PUT /grade-levels only blocks teacher/parent; POST
+  // /class-sections has no role restriction at all) -- they were just never
+  // given a way to reach it from this page.
   const tabs = isRegistrar ? [
+    { id: 'grades', label: 'Grades & Sections', icon: Layers },
     { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
   ] : [
     { id: 'school', label: 'School', icon: Building },
