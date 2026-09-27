@@ -167,6 +167,14 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 	rc.StudentID = studentID
 	rc.AcademicYearID = academicYearID
 
+	// Resolved via the student's fee account for this year (fee_structure ->
+	// grade_level), not via enrollments -> class_sections: class_sections
+	// exist as configuration in this app but enrollments here are never
+	// actually assigned one (confirmed: 0 of ~900 current-year enrollments
+	// across both schools have a class_section_id), so that join always
+	// returned no rows. The fee-account path is the one already relied on
+	// everywhere else a student's current grade is resolved (see
+	// student.Repository.List's grade_level filter).
 	var schoolID uuid.UUID
 	var template *string
 	err := r.pool.QueryRow(ctx, `
@@ -176,10 +184,10 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 			ay.name
 		FROM students s
 		JOIN schools sch ON sch.id = s.school_id
-		JOIN enrollments e ON e.student_id = s.id AND e.academic_year_id = $2
-		JOIN class_sections cs ON cs.id = e.class_section_id
-		JOIN grade_levels gl ON gl.id = cs.grade_level_id
-		JOIN academic_years ay ON ay.id = e.academic_year_id
+		JOIN student_fee_accounts sfa ON sfa.student_id = s.id AND sfa.academic_year_id = $2
+		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
+		JOIN grade_levels gl ON gl.id = fs.grade_level_id
+		JOIN academic_years ay ON ay.id = sfa.academic_year_id
 		WHERE s.id = $1`, studentID, academicYearID,
 	).Scan(&rc.StudentName, &rc.StudentCode, &rc.DateOfBirth, &rc.PenNumber, &rc.AparID,
 		&schoolID, &rc.SchoolName, &rc.SchoolCode, &rc.SchoolAddress, &rc.DiceCode,
