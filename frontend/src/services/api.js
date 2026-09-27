@@ -192,6 +192,13 @@ export const resultsApi = {
   updateSubject: (id, body) => request(`/subjects/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteSubject: (id) => request(`/subjects/${id}`, { method: 'DELETE' }),
 
+  // Per-subject graded "sections" (Oral/Unit Test/Activity/Practical/
+  // Written/...). Teacher/registrar access, same as entering marks --
+  // subjects themselves stay admin-only above.
+  listSubjectComponents: (subjectId) => request(`/subjects/${subjectId}/mark-components`),
+  addSubjectComponent: (subjectId, body) => request(`/subjects/${subjectId}/mark-components`, { method: 'POST', body: JSON.stringify(body) }),
+  deleteSubjectComponent: (subjectId, key) => request(`/subjects/${subjectId}/mark-components/${key}`, { method: 'DELETE' }),
+
   listExams: (params) => request(`/exams${qs(params)}`),
   createExam: (body) => request('/exams', { method: 'POST', body: JSON.stringify(body) }),
   publishExam: (id, publish) => request(`/exams/${id}/publish`, { method: 'POST', body: JSON.stringify({ publish }) }),

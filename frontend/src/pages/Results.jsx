@@ -43,6 +43,9 @@ function Results() {
   const [marks, setMarks] = useState({}) // subjectId → { marks_obtained, is_absent }
   const [markSaving, setMarkSaving] = useState(false)
   const [markMsg, setMarkMsg] = useState('')
+  const [addingComponentFor, setAddingComponentFor] = useState(null) // subject id or null
+  const [newComponentForm, setNewComponentForm] = useState({ label: '', max_marks: '' })
+  const [addingComponentSaving, setAddingComponentSaving] = useState(false)
 
   // Marksheet
   const [msExamId, setMsExamId] = useState('')
@@ -157,14 +160,39 @@ function Results() {
   }
 
   // The selected exam's component scheme (Written/Note Book/.../Theory), if
-  // its grade has a report-card template -- comes straight off the exam
-  // payload so this page never hardcodes a second copy of it.
-  const selectedExam = exams.find(ex => ex.id === selectedExamId)
-  const markComponents = selectedExam?.mark_components || []
+  // Each subject carries its own effective mark-component scheme ("sections"
+  // -- Oral/Unit Test/Activity/Practical/Written/...): its own custom one if
+  // it has one, else its grade-template default -- straight off the subject
+  // payload so this page never hardcodes a second copy of it. Different
+  // subjects can have different sections, unlike the exam-wide scheme this
+  // used to share.
+  function componentTotal(sub) {
+    const vals = marks[sub.id]?.components || {}
+    return (sub.mark_components || []).reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
+  }
 
-  function componentTotal(subId) {
-    const vals = marks[subId]?.components || {}
-    return markComponents.reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
+  function reloadMarkSubjects() {
+    if (!selectedGrade) return
+    resultsApi.listSubjects({ school_id: currentSchool?.id, grade_level_id: selectedGrade })
+      .then(r => setMarkSubjects(r.items || [])).catch(() => {})
+  }
+
+  async function handleAddComponent(sub) {
+    if (!newComponentForm.label.trim() || !newComponentForm.max_marks) return
+    setAddingComponentSaving(true)
+    try {
+      await resultsApi.addSubjectComponent(sub.id, {
+        label: newComponentForm.label.trim(),
+        max_marks: parseInt(newComponentForm.max_marks, 10),
+      })
+      setAddingComponentFor(null)
+      setNewComponentForm({ label: '', max_marks: '' })
+      reloadMarkSubjects()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setAddingComponentSaving(false)
+    }
   }
 
   async function handleSaveMarks(e) {
@@ -182,9 +210,10 @@ function Results() {
           is_absent: entry.is_absent || false,
           remarks: '',
         }
-        if (markComponents.length > 0) {
+        const subComponents = sub.mark_components || []
+        if (subComponents.length > 0) {
           const components = {}
-          markComponents.forEach(c => { components[c.key] = parseFloat(entry.components?.[c.key] || 0) })
+          subComponents.forEach(c => { components[c.key] = parseFloat(entry.components?.[c.key] || 0) })
           return { ...base, components }
         }
         return { ...base, marks_obtained: parseFloat(entry.marks_obtained || 0) }
@@ -464,64 +493,78 @@ function Results() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Subject</th>
-                      {markComponents.length > 0 ? (
-                        <>
-                          {markComponents.map(c => <th key={c.key}>{c.label} <span className="data-table__muted">/{c.max_marks}</span></th>)}
-                          <th>Total</th>
-                        </>
-                      ) : (
-                        <><th>Max Marks</th><th>Passing</th><th>Obtained</th></>
-                      )}
-                      <th>Absent</th>
+                      <th style={{ width: '140px' }}>Subject</th>
+                      <th>Sections / Marks</th>
+                      <th style={{ width: '90px' }}>Total</th>
+                      <th style={{ width: '70px' }}>Absent</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {markSubjects.map(sub => (
-                      <tr key={sub.id}>
-                        <td>{sub.name}</td>
-                        {markComponents.length > 0 ? (
-                          <>
-                            {markComponents.map(c => (
-                              <td key={c.key}>
-                                <input
-                                  type="number" min="0" max={c.max_marks} step="0.5"
-                                  className="marks-input"
-                                  disabled={marks[sub.id]?.is_absent}
-                                  value={marks[sub.id]?.components?.[c.key] || ''}
-                                  onChange={e => setMarks(prev => ({
-                                    ...prev,
-                                    [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
-                                  }))}
-                                />
-                              </td>
-                            ))}
-                            <td className="data-table__muted">{componentTotal(sub.id)} / {sub.max_marks}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="data-table__muted">{sub.max_marks}</td>
-                            <td className="data-table__muted">{sub.passing_marks}</td>
-                            <td>
+                    {markSubjects.map(sub => {
+                      const components = sub.mark_components || []
+                      return (
+                        <tr key={sub.id}>
+                          <td>{sub.name}</td>
+                          <td>
+                            {components.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                {components.map(c => (
+                                  <label key={c.key} className="marks-component-field">
+                                    <span>{c.label} <span className="data-table__muted">/{c.max_marks}</span></span>
+                                    <input
+                                      type="number" min="0" max={c.max_marks} step="0.5"
+                                      className="marks-input"
+                                      disabled={marks[sub.id]?.is_absent}
+                                      value={marks[sub.id]?.components?.[c.key] || ''}
+                                      onChange={e => setMarks(prev => ({
+                                        ...prev,
+                                        [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
+                                      }))}
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
                               <input
                                 type="number" min="0" max={sub.max_marks} step="0.5"
                                 className="marks-input"
                                 disabled={marks[sub.id]?.is_absent}
                                 value={marks[sub.id]?.marks_obtained || ''}
+                                placeholder={`out of ${sub.max_marks}`}
                                 onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
                               />
-                            </td>
-                          </>
-                        )}
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={marks[sub.id]?.is_absent || false}
-                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], is_absent: e.target.checked } }))}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                            )}
+                            {addingComponentFor === sub.id ? (
+                              <div className="marks-add-component" style={{ marginTop: '8px' }}>
+                                <input placeholder="Section name" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
+                                <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
+                                <button type="button" className="btn btn--primary btn--sm" onClick={() => handleAddComponent(sub)} disabled={addingComponentSaving}>
+                                  {addingComponentSaving ? 'Adding...' : 'Add'}
+                                </button>
+                                <button type="button" className="btn btn--outline btn--sm" onClick={() => setAddingComponentFor(null)}>Cancel</button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button" className="btn btn--outline btn--sm" style={{ marginTop: '8px' }}
+                                onClick={() => { setAddingComponentFor(sub.id); setNewComponentForm({ label: '', max_marks: '' }) }}
+                              >
+                                <Plus size={13} /> Add Section
+                              </button>
+                            )}
+                          </td>
+                          <td className="data-table__muted">
+                            {components.length > 0 ? `${componentTotal(sub)} / ${sub.max_marks}` : `/ ${sub.max_marks}`}
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={marks[sub.id]?.is_absent || false}
+                              onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], is_absent: e.target.checked } }))}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
