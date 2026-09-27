@@ -9,21 +9,22 @@ import (
 // generatePrimaryReportCardPDF renders the 1st-4th report card: same
 // structure as generateKGReportCardPDF (the "primary" component scheme/
 // grading scale instead), plus the source workbook's blank MORAL / G.K
-// remark line -- handwritten fields on paper, not scored subjects.
-func generatePrimaryReportCardPDF(rc ReportCard) ([]byte, error) {
+// remark line -- handwritten fields on paper, not scored subjects. theme
+// only changes colors -- see report_card_theme.go.
+func generatePrimaryReportCardPDF(rc ReportCard, theme pdfTheme) ([]byte, error) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetAutoPageBreak(true, 15)
 	pdf.SetMargins(12, 12, 12)
 	pdf.AddPage()
 	w := 186.0
 
-	writeReportCardHeader(pdf, w, rc)
+	writeReportCardHeader(pdf, w, rc, theme)
 
 	components := MarkComponentsForTemplate(&rc.Template)
 	for i := range rc.Exams {
-		writeExamComponentTable(pdf, w, rc, i, components)
+		writeExamComponentTable(pdf, w, rc, i, components, theme)
 	}
-	writeOverallTable(pdf, w, rc)
+	writeOverallTable(pdf, w, rc, theme)
 
 	_, _, _, _, moral, gk := reportCardDetailsFields(rc)
 	pdf.SetFont("Arial", "B", 9)
@@ -33,7 +34,7 @@ func generatePrimaryReportCardPDF(rc ReportCard) ([]byte, error) {
 	pdf.Ln(2)
 
 	writeReportCardFooterDetails(pdf, w, rc)
-	writeReportCardSignatureBlock(pdf, w)
+	writeReportCardSignatureBlock(pdf, w, theme)
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {

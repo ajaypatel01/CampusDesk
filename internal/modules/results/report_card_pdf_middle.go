@@ -10,23 +10,24 @@ import (
 // Theory components (via the shared writeExamComponentTable, same as kg/
 // primary), plus the Co-Scholastic/Discipline grade grid. Deliberately no
 // combined "OVER ALL" block -- the source workbook has none for this
-// template, only a percentage per exam.
-func generateMiddleReportCardPDF(rc ReportCard) ([]byte, error) {
+// template, only a percentage per exam. theme only changes colors -- see
+// report_card_theme.go.
+func generateMiddleReportCardPDF(rc ReportCard, theme pdfTheme) ([]byte, error) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetAutoPageBreak(true, 15)
 	pdf.SetMargins(12, 12, 12)
 	pdf.AddPage()
 	w := 186.0
 
-	writeReportCardHeader(pdf, w, rc)
+	writeReportCardHeader(pdf, w, rc, theme)
 
 	components := MarkComponentsForTemplate(&rc.Template)
 	for i := range rc.Exams {
-		writeExamComponentTable(pdf, w, rc, i, components)
+		writeExamComponentTable(pdf, w, rc, i, components, theme)
 	}
-	writeDisciplineTable(pdf, w, rc)
+	writeDisciplineTable(pdf, w, rc, theme)
 	writeReportCardFooterDetails(pdf, w, rc)
-	writeReportCardSignatureBlock(pdf, w)
+	writeReportCardSignatureBlock(pdf, w, theme)
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
@@ -35,10 +36,11 @@ func generateMiddleReportCardPDF(rc ReportCard) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func writeDisciplineTable(pdf *fpdf.Fpdf, w float64, rc ReportCard) {
+func writeDisciplineTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, theme pdfTheme) {
 	pdf.SetFont("Arial", "B", 10)
-	pdf.SetFillColor(220, 230, 245)
-	pdf.CellFormat(w, 7, "CO-SCHOLASTIC / DISCIPLINE", "1", 1, "C", true, 0, "")
+	fill := theme.setSectionStyle(pdf)
+	pdf.CellFormat(w, 7, "CO-SCHOLASTIC / DISCIPLINE", "1", 1, "C", fill, 0, "")
+	pdf.SetTextColor(0, 0, 0)
 
 	gradeByKey := make(map[string]string, len(rc.DisciplineGrades))
 	for _, g := range rc.DisciplineGrades {

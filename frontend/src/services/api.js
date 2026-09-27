@@ -213,8 +213,10 @@ export const resultsApi = {
   // Combined, multi-exam, class-wise-templated report card (kg/primary/middle).
   getReportCard: (studentId, academicYearId) =>
     request(`/report-cards${qs({ student_id: studentId, academic_year_id: academicYearId })}`),
-  downloadReportCard: (studentId, academicYearId) =>
-    requestBlob(`/report-cards/pdf${qs({ student_id: studentId, academic_year_id: academicYearId })}`),
+  // design: 'classic' | 'modern' | 'minimal' -- a visual skin only, never
+  // changes the school's actual grading rubric/content on the PDF.
+  downloadReportCard: (studentId, academicYearId, design) =>
+    requestBlob(`/report-cards/pdf${qs({ student_id: studentId, academic_year_id: academicYearId, design })}`),
   upsertReportCardDetails: (body) => request('/report-cards/details', { method: 'PUT', body: JSON.stringify(body) }),
   upsertDisciplineGrades: (body) => request('/report-cards/discipline-grades', { method: 'PUT', body: JSON.stringify(body) }),
   listDisciplineCriteria: () => request('/discipline-criteria'),
