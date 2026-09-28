@@ -36,7 +36,7 @@ func (r *Repository) Create(ctx context.Context, u *domain.User) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at FROM users WHERE id=$1`, id)
 }
 
 // FindStudentIDByCode looks up a student by their scholar number (student_code) within
@@ -78,7 +78,7 @@ func (r *Repository) LinkParentToStudent(ctx context.Context, userID, studentID 
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at FROM users WHERE email=$1`, email)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at FROM users WHERE email=$1`, email)
 }
 
 // UpdateStatus transitions a user's approval status (e.g. pending -> approved/rejected)
@@ -148,7 +148,7 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domai
 
 	limitArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err = r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, created_at, updated_at
+		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at
 		FROM users %s ORDER BY is_active DESC, last_name, first_name LIMIT $%d OFFSET $%d`,
 		whereClause, len(args)+1, len(args)+2), limitArgs...,
 	)
@@ -190,8 +190,35 @@ type scannable interface {
 
 func scanRow(row scannable) (*domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.TokenVersion, &u.CreatedAt, &u.UpdatedAt)
 	return &u, err
+}
+
+// ---- Token version (log out everywhere) ----
+
+// GetTokenVersion is the fast, single-column check every authenticated
+// request makes (via the EnforceTokenVersion middleware) against the JWT's
+// own "tv" claim.
+func (r *Repository) GetTokenVersion(ctx context.Context, id uuid.UUID) (int, error) {
+	var v int
+	err := r.pool.QueryRow(ctx, `SELECT token_version FROM users WHERE id=$1`, id).Scan(&v)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, apperr.ErrNotFound
+	}
+	return v, err
+}
+
+// BumpTokenVersion invalidates every JWT issued to this user before now --
+// their next request with an old token gets 401'd by EnforceTokenVersion,
+// and the current device silently logs itself out via ClearToken same as a
+// normal logout, so this is what "log out everywhere" actually does.
+func (r *Repository) BumpTokenVersion(ctx context.Context, id uuid.UUID) (int, error) {
+	var v int
+	err := r.pool.QueryRow(ctx, `UPDATE users SET token_version = token_version + 1, updated_at = NOW() WHERE id=$1 RETURNING token_version`, id).Scan(&v)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, apperr.ErrNotFound
+	}
+	return v, err
 }
 
 // ---- Password reset ----

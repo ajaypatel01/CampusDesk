@@ -105,6 +105,10 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Protected routes — JWT required
 	api.Group(func(r chi.Router) {
 		r.Use(httpx.JWTMiddleware(cfg.Auth.JWTSecret))
+		// Rejects any token minted before the user's last "log out
+		// everywhere" -- must run right after JWT parsing, before anything
+		// else trusts the claims.
+		r.Use(userMod.EnforceTokenVersion())
 		r.Use(httpx.SchoolScopeMiddleware)
 		// Loads each caller's access-control-matrix overrides once per request
 		// so every module's httpx.RequireFeature checks below can read them

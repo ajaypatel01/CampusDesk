@@ -113,6 +113,27 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, resp)
 }
 
+// LogoutEverywhere invalidates every JWT issued to the caller, including
+// the one used for this request -- the frontend clears its own stored
+// token immediately after this call succeeds, exactly like a normal logout.
+func (h *Handler) LogoutEverywhere(w http.ResponseWriter, r *http.Request) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err := h.svc.LogoutEverywhere(r.Context(), userID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.NoContent(w)
+}
+
 // RequestPasswordReset always responds success, whether or not the email
 // belongs to an account -- see Service.RequestPasswordReset.
 func (h *Handler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {

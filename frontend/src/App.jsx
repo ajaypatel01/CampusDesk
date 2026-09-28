@@ -31,7 +31,7 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ParentDashboard from './pages/ParentDashboard'
-import { getToken, clearToken } from './services/api'
+import { getToken, clearToken, usersApi } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
 
@@ -65,6 +65,10 @@ function App() {
   function handleLogin() { setUser(decodeUser(getToken())) }
 
   function handleLogout() {
+    // "Logout" invalidates every session for this account, not just this
+    // device/tab -- fire-and-forget so a slow/offline network never blocks
+    // clearing the local session and returning to the login screen.
+    usersApi.logoutEverywhere().catch(() => {})
     clearToken()
     setUser(null)
   }
