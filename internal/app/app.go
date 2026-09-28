@@ -10,24 +10,25 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/academic"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/books"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/communications"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/customfields"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/documents"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/enrollment"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/fee"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/health"
-	"github.com/ajaypatel01/CampusDesk/internal/modules/communications"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/homework"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/idcard"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/media"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/payroll"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/permissions"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/promotion"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/results"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/rte"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/school"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/staff"
-	"github.com/ajaypatel01/CampusDesk/internal/modules/tcvoucher"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/student"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/tcvoucher"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/user"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/van"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
@@ -115,7 +116,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 				"whatsapp_enabled": waClient.Enabled(),
 			})
 		})
-		userMod.Mount(r) // /users CRUD
+		userMod.Mount(r)  // /users CRUD
 		permsMod.Mount(r) // /permissions/* -- access-control matrix admin API
 		mountProtectedModules(r, schoolMod, pool, emailClient, storageClient, waClient, cfg.Auth.JWTSecret)
 	})
@@ -133,9 +134,18 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 }
 
 func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool.Pool, emailClient *email.Client, storageClient *storage.Client, waClient *whatsapp.Client, jwtSecret string) {
+	// Promotion composes student/academic/fee/enrollment repositories
+	// directly (rather than being its own top-level module) so its routes
+	// can be mounted inside the student module's existing route tree --
+	// see internal/modules/promotion's doc comment for why moving grade is
+	// really a fee-account operation, not a plain student field edit.
+	promotionHandler := promotion.NewHandler(promotion.NewService(
+		student.NewRepository(pool), academic.NewRepository(pool), fee.NewRepository(pool), enrollment.NewRepository(pool),
+	))
+
 	mods := []modules.Module{
 		schoolMod,
-		student.New(pool),
+		student.New(pool, promotionHandler),
 		academic.New(pool),
 		enrollment.New(pool),
 		guardian.New(pool),

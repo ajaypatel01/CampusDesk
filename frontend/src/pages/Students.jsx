@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Filter, ChevronLeft, ChevronRight, X, ArrowUpDown, Download, Upload } from 'lucide-react'
+import { Plus, Search, Filter, ChevronLeft, ChevronRight, X, ArrowUpDown, Download, Upload, ArrowUpRight } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, academicApi } from '../services/api'
 import SortHeader from '../components/SortHeader'
@@ -37,11 +37,27 @@ function Students() {
   const [saving, setSaving] = useState(false)
   const limit = 20
 
+  // Promotion/demotion: select students on the current page, then move them
+  // all to a target grade (and, usually, a target academic year) at once.
+  const [selected, setSelected] = useState(() => new Set())
+  const [allYears, setAllYears] = useState([])
+  const [showPromoteModal, setShowPromoteModal] = useState(false)
+  const [promoteForm, setPromoteForm] = useState({
+    to_academic_year_id: '', to_grade_level_id: '',
+    carry_forward_dues: true, carry_forward_discount: true, carry_forward_van_fee: true,
+  })
+  const [promoting, setPromoting] = useState(false)
+  const [promoteResult, setPromoteResult] = useState(null)
+  const [promoteError, setPromoteError] = useState('')
+
   useEffect(() => {
     if (!currentSchool) return
     academicApi.listGrades(currentSchool.id)
       .then(res => setGrades(res.items || []))
       .catch(() => setGrades([]))
+    academicApi.listYears(currentSchool.id)
+      .then(res => setAllYears(res.items || res || []))
+      .catch(() => setAllYears([]))
   }, [currentSchool])
 
   useEffect(() => {
@@ -150,6 +166,53 @@ function Students() {
     setImportError('')
   }
 
+  function toggleSelected(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelected(prev => prev.size === students.length ? new Set() : new Set(students.map(s => s.id)))
+  }
+
+  function openPromoteModal() {
+    setPromoteError(''); setPromoteResult(null)
+    setPromoteForm({
+      to_academic_year_id: '', to_grade_level_id: '',
+      carry_forward_dues: true, carry_forward_discount: true, carry_forward_van_fee: true,
+    })
+    setShowPromoteModal(true)
+  }
+
+  // Snapshot names at the moment of promotion so the result list can show
+  // who succeeded/failed even after the roster reloads underneath it.
+  const nameById = Object.fromEntries(students.map(s => [s.id, `${s.first_name} ${s.last_name}`]))
+
+  async function handlePromote(e) {
+    e.preventDefault()
+    if (!promoteForm.to_academic_year_id || !promoteForm.to_grade_level_id) return
+    setPromoting(true); setPromoteError(''); setPromoteResult(null)
+    try {
+      const result = await studentsApi.bulkPromote({
+        student_ids: Array.from(selected),
+        from_academic_year_id: currentYear?.id || undefined,
+        ...promoteForm,
+      })
+      setPromoteResult({ ...result, nameById })
+      setSelected(new Set())
+      // Reload so a same-year move shows its new grade immediately.
+      const res = await studentsApi.list({ school_id: currentSchool.id, academic_year_id: currentYear?.id || undefined, limit, offset })
+      setStudents(res.items || []); setTotal(res.total || 0)
+    } catch (err) {
+      setPromoteError(err.message || 'Promotion failed')
+    } finally {
+      setPromoting(false)
+    }
+  }
+
   if (!currentSchool) return <p className="empty-text">Select a school first.</p>
 
   return (
@@ -160,6 +223,11 @@ function Students() {
           <p className="page-subtitle">Manage student records</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {selected.size > 0 && (
+            <button className="btn btn--outline" onClick={openPromoteModal}>
+              <ArrowUpRight size={16} /> Promote/Move Grade ({selected.size})
+            </button>
+          )}
           <button className="btn btn--outline" onClick={handleDownloadTemplate}>
             <Download size={16} /> Download Template
           </button>
@@ -232,6 +300,9 @@ function Students() {
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: '32px' }}>
+                  <input type="checkbox" checked={students.length > 0 && selected.size === students.length} onChange={toggleSelectAll} />
+                </th>
                 <SortHeader label="Code" field="student_code" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <SortHeader label="Name" field="name" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <th>Gender</th>
@@ -243,9 +314,10 @@ function Students() {
             </thead>
             <tbody>
               {students.length === 0 ? (
-                <tr><td colSpan={7} className="data-table__empty">No students found</td></tr>
+                <tr><td colSpan={8} className="data-table__empty">No students found</td></tr>
               ) : students.map(s => (
                 <tr key={s.id}>
+                  <td><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} /></td>
                   <td className="data-table__muted">{s.student_code}</td>
                   <td>
                     <Link to={`/students/${s.id}`} className="data-table__link">
@@ -407,6 +479,92 @@ function Students() {
                 )}
                 <div className="modal__actions">
                   <button type="button" className="btn btn--primary" onClick={closeImportModal}>Done</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showPromoteModal && (
+        <div className="modal-overlay" onClick={() => setShowPromoteModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Promote / Move Grade</h2>
+            <p className="empty-text">
+              Moving {selected.size} student{selected.size === 1 ? '' : 's'} to a grade. If the target academic
+              year is different from {currentYear?.name || 'the current year'}, this is a promotion (or demotion) --
+              a new fee account is created for that year, carrying forward whatever you check below. If it's the
+              same year, this just repoints their existing fee account at the new grade.
+            </p>
+
+            {!promoteResult ? (
+              <form className="modal__form" onSubmit={handlePromote}>
+                {promoteError && <p className="doc-msg doc-msg--error">{promoteError}</p>}
+                <div className="form-row">
+                  <label className="form-field">
+                    <span>Target Academic Year *</span>
+                    <select required value={promoteForm.to_academic_year_id} onChange={e => setPromoteForm(f => ({ ...f, to_academic_year_id: e.target.value }))}>
+                      <option value="">Select...</option>
+                      {allYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="form-field">
+                    <span>Target Grade *</span>
+                    <select required value={promoteForm.to_grade_level_id} onChange={e => setPromoteForm(f => ({ ...f, to_grade_level_id: e.target.value }))}>
+                      <option value="">Select...</option>
+                      {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={promoteForm.carry_forward_discount} onChange={e => setPromoteForm(f => ({ ...f, carry_forward_discount: e.target.checked }))} />
+                  <span>Carry forward any discount</span>
+                </label>
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={promoteForm.carry_forward_van_fee} onChange={e => setPromoteForm(f => ({ ...f, carry_forward_van_fee: e.target.checked }))} />
+                  <span>Carry forward van fee</span>
+                </label>
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={promoteForm.carry_forward_dues} onChange={e => setPromoteForm(f => ({ ...f, carry_forward_dues: e.target.checked }))} />
+                  <span>Carry forward any outstanding balance as previous year dues</span>
+                </label>
+                <p className="empty-text" style={{ marginTop: '-4px' }}>
+                  These only apply when moving to a new academic year -- a same-year grade change just repoints
+                  the existing account, nothing is duplicated.
+                </p>
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--outline" onClick={() => setShowPromoteModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn--primary" disabled={promoting}>
+                    {promoting ? 'Moving...' : `Move ${selected.size} Student${selected.size === 1 ? '' : 's'}`}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <p className={`doc-msg ${promoteResult.failed > 0 ? 'doc-msg--error' : 'doc-msg--ok'}`}>
+                  {promoteResult.succeeded} of {promoteResult.total} student{promoteResult.total === 1 ? '' : 's'} moved successfully
+                  {promoteResult.failed > 0 ? `, ${promoteResult.failed} failed.` : '.'}
+                </p>
+                <div className="table-card" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                  <table className="data-table">
+                    <thead><tr><th>Student</th><th>Status</th><th>Detail</th></tr></thead>
+                    <tbody>
+                      {promoteResult.results.map(r => (
+                        <tr key={r.student_id}>
+                          <td>{promoteResult.nameById[r.student_id] || r.student_id}</td>
+                          <td>
+                            {r.success
+                              ? <span className="badge badge--success">Moved</span>
+                              : <span className="badge badge--danger">Failed</span>}
+                          </td>
+                          <td className="data-table__muted">{r.error || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--primary" onClick={() => setShowPromoteModal(false)}>Done</button>
                 </div>
               </div>
             )}
