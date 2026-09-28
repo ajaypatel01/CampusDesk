@@ -16,21 +16,23 @@ type contextKey string
 const claimsKey contextKey = "jwt_claims"
 
 type Claims struct {
-	Sub      string `json:"sub"`                 // user UUID
-	Role     string `json:"role"`
-	SchoolID string `json:"school_id,omitempty"` // empty for super_admin
-	Exp      int64  `json:"exp"`
-	Iat      int64  `json:"iat"`
+	Sub          string `json:"sub"` // user UUID
+	Role         string `json:"role"`
+	SchoolID     string `json:"school_id,omitempty"` // empty for super_admin
+	TokenVersion int    `json:"tv"`                  // must match users.token_version -- see EnforceTokenVersion
+	Exp          int64  `json:"exp"`
+	Iat          int64  `json:"iat"`
 }
 
-func GenerateToken(userID, role, schoolID, secret string) (string, error) {
+func GenerateToken(userID, role, schoolID string, tokenVersion int, secret string) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		Sub:      userID,
-		Role:     role,
-		SchoolID: schoolID,
-		Exp:      now.Add(24 * time.Hour).Unix(),
-		Iat:      now.Unix(),
+		Sub:          userID,
+		Role:         role,
+		SchoolID:     schoolID,
+		TokenVersion: tokenVersion,
+		Exp:          now.Add(24 * time.Hour).Unix(),
+		Iat:          now.Unix(),
 	}
 
 	header := base64url(mustJSON(map[string]string{"alg": "HS256", "typ": "JWT"}))

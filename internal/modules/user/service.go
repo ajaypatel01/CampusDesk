@@ -251,7 +251,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 	if u.SchoolID != nil {
 		schoolID = u.SchoolID.String()
 	}
-	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), schoolID, s.jwtSecret)
+	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), schoolID, u.TokenVersion, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -325,5 +325,21 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, token, newPassword s
 	if err := s.repo.UpdatePasswordHash(ctx, t.UserID, string(hash)); err != nil {
 		return err
 	}
+	// A password reset is exactly the situation "log out everywhere" exists
+	// for -- if someone else had a session open, a password change should
+	// kick it out, not leave it valid for up to another 24h.
+	if _, err := s.repo.BumpTokenVersion(ctx, t.UserID); err != nil {
+		return err
+	}
 	return s.repo.MarkPasswordResetTokenUsed(ctx, t.ID)
+}
+
+// LogoutEverywhere invalidates every JWT issued to userID before now (see
+// BumpTokenVersion) -- the caller's own current token is included, so the
+// frontend must treat a successful call here exactly like a normal local
+// logout (clear the stored token, redirect to login) rather than expecting
+// to keep using the session that just called this.
+func (s *Service) LogoutEverywhere(ctx context.Context, userID uuid.UUID) error {
+	_, err := s.repo.BumpTokenVersion(ctx, userID)
+	return err
 }

@@ -141,6 +141,10 @@ export const usersApi = {
   listPending: (params = {}) => request(`/users${qs({ ...params, status: 'pending' })}`),
   approve: (id) => request(`/users/${id}/approve`, { method: 'POST' }),
   reject: (id) => request(`/users/${id}/reject`, { method: 'POST' }),
+  // Invalidates every session for the current account, including this one --
+  // the caller must still clear its own stored token and redirect, same as
+  // a normal logout, right after this resolves (or fails/times out).
+  logoutEverywhere: () => request('/auth/logout-everywhere', { method: 'POST' }),
 }
 
 export const academicApi = {

@@ -16,6 +16,10 @@ type User struct {
 	Status       UserStatus `json:"status"`
 	PasswordHash string     `json:"-"`
 	IsActive     bool       `json:"is_active"`
+	// TokenVersion is embedded in every JWT minted for this user at login;
+	// bumping it (LogoutEverywhere) invalidates every previously issued
+	// token immediately, without a server-side session store.
+	TokenVersion int `json:"-"`
 	Timestamps
 }
 
