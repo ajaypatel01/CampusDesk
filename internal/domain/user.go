@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type User struct {
 	ID           uuid.UUID  `json:"id"`
@@ -13,4 +17,17 @@ type User struct {
 	PasswordHash string     `json:"-"`
 	IsActive     bool       `json:"is_active"`
 	Timestamps
+}
+
+// PasswordResetToken is a one-time, expiring self-service password reset
+// link. TokenHash stores a hash of the emailed token, never the raw value --
+// same reasoning as User.PasswordHash, so a DB read alone can't produce a
+// usable reset link.
+type PasswordResetToken struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	TokenHash string     `json:"-"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }

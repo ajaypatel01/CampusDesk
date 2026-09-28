@@ -193,3 +193,53 @@ func scanRow(row scannable) (*domain.User, error) {
 	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
 	return &u, err
 }
+
+// ---- Password reset ----
+
+// UpdatePasswordHash sets a user's password hash directly -- used by the
+// self-service password reset confirm step (and available for a future
+// admin-reset action), bypassing the rest of Update's profile-field editing.
+func (r *Repository) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, hash string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET password_hash=$2, updated_at=NOW() WHERE id=$1`, userID, hash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) CreatePasswordResetToken(ctx context.Context, t *domain.PasswordResetToken) error {
+	row := r.pool.QueryRow(ctx, `
+		INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+		VALUES ($1,$2,$3) RETURNING id, created_at`,
+		t.UserID, t.TokenHash, t.ExpiresAt,
+	)
+	return row.Scan(&t.ID, &t.CreatedAt)
+}
+
+// GetValidPasswordResetToken looks up an unused, unexpired token by its
+// hash. Returns apperr.ErrNotFound for anything else (wrong/reused/expired
+// token) -- the caller shows one generic "invalid or expired link" message
+// either way, never distinguishing which, so a token can't be probed.
+func (r *Repository) GetValidPasswordResetToken(ctx context.Context, tokenHash string) (*domain.PasswordResetToken, error) {
+	var t domain.PasswordResetToken
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, user_id, token_hash, expires_at, used_at, created_at
+		FROM password_reset_tokens
+		WHERE token_hash=$1 AND used_at IS NULL AND expires_at > NOW()`, tokenHash,
+	).Scan(&t.ID, &t.UserID, &t.TokenHash, &t.ExpiresAt, &t.UsedAt, &t.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (r *Repository) MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `UPDATE password_reset_tokens SET used_at=NOW() WHERE id=$1`, id)
+	return err
+}

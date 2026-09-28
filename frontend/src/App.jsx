@@ -28,6 +28,8 @@ import Payroll from './pages/Payroll'
 import FeeReport from './pages/FeeReport'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import ParentDashboard from './pages/ParentDashboard'
 import { getToken, clearToken } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
@@ -72,6 +74,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
@@ -110,6 +114,8 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="register" element={<Navigate to="/" replace />} />
+            <Route path="forgot-password" element={<Navigate to="/" replace />} />
+            <Route path="reset-password" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </SchoolProvider>

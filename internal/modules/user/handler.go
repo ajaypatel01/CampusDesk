@@ -113,6 +113,39 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, resp)
 }
 
+// RequestPasswordReset always responds success, whether or not the email
+// belongs to an account -- see Service.RequestPasswordReset.
+func (h *Handler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.RequestPasswordReset(r.Context(), in.Email); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "if that email is registered, a reset link has been sent"})
+}
+
+func (h *Handler) ConfirmPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.ConfirmPasswordReset(r.Context(), in.Token, in.NewPassword); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "password updated"})
+}
+
 // Register handles public self-registration. The created account is inactive
 // and pending until an admin approves it via Approve.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {

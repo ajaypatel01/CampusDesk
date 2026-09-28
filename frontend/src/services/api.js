@@ -116,6 +116,10 @@ export const usersApi = {
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   // Public self-registration; account is created pending until an admin approves it.
   register: (body) => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  // Self-service password reset. requestPasswordReset always "succeeds" --
+  // the backend never reveals whether the email is actually registered.
+  requestPasswordReset: (email) => request('/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  confirmPasswordReset: (token, newPassword) => request('/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token, new_password: newPassword }) }),
   listPending: (params = {}) => request(`/users${qs({ ...params, status: 'pending' })}`),
   approve: (id) => request(`/users/${id}/approve`, { method: 'POST' }),
   reject: (id) => request(`/users/${id}/reject`, { method: 'POST' }),

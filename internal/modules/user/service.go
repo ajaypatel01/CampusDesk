@@ -2,10 +2,15 @@ package user
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/google/uuid"
@@ -23,12 +28,14 @@ var selfRegisterableRoles = map[domain.UserRole]bool{
 }
 
 type Service struct {
-	repo      *Repository
-	jwtSecret string
+	repo        *Repository
+	jwtSecret   string
+	emailClient *email.Client
+	frontendURL string
 }
 
-func NewService(repo *Repository, jwtSecret string) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret}
+func NewService(repo *Repository, jwtSecret string, emailClient *email.Client, frontendURL string) *Service {
+	return &Service{repo: repo, jwtSecret: jwtSecret, emailClient: emailClient, frontendURL: frontendURL}
 }
 
 type CreateInput struct {
@@ -249,4 +256,74 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 		return nil, err
 	}
 	return &LoginResponse{User: u, Token: token}, nil
+}
+
+// ---- Password reset ----
+
+func hashResetToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// RequestPasswordReset always succeeds from the caller's point of view,
+// whether or not the email belongs to an account -- never revealing which,
+// so this can't be used to probe for registered emails. If it does belong to
+// a real, non-pending/non-rejected account, a reset link is emailed.
+func (s *Service) RequestPasswordReset(ctx context.Context, emailAddr string) error {
+	emailAddr = strings.ToLower(strings.TrimSpace(emailAddr))
+	if emailAddr == "" {
+		return apperr.ErrInvalidInput
+	}
+	u, err := s.repo.GetByEmail(ctx, emailAddr)
+	if err != nil {
+		// Unknown email: report success anyway (see doc comment above).
+		return nil
+	}
+
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	token := hex.EncodeToString(raw)
+
+	t := &domain.PasswordResetToken{
+		UserID:    u.ID,
+		TokenHash: hashResetToken(token),
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
+	if err := s.repo.CreatePasswordResetToken(ctx, t); err != nil {
+		return err
+	}
+
+	if s.emailClient == nil || !s.emailClient.Enabled() {
+		return nil // best-effort: no email configured, token still exists if needed manually
+	}
+	link := fmt.Sprintf("%s/reset-password?token=%s", strings.TrimRight(s.frontendURL, "/"), token)
+	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
+	body := fmt.Sprintf(`<p>Hi %s,</p><p>Click the link below to reset your CampusDesk password. This link expires in 30 minutes and can only be used once.</p><p><a href="%s">%s</a></p><p>If you didn't request this, you can ignore this email.</p>`, name, link, link)
+	if err := s.emailClient.SendText(u.Email, name, "Reset your CampusDesk password", body); err != nil {
+		return fmt.Errorf("send reset email: %w", err)
+	}
+	return nil
+}
+
+// ConfirmPasswordReset validates the token (unused, unexpired) and sets the
+// new password. A single generic error covers a wrong/reused/expired token
+// so a token can't be probed for validity.
+func (s *Service) ConfirmPasswordReset(ctx context.Context, token, newPassword string) error {
+	if strings.TrimSpace(token) == "" || len(newPassword) < 6 {
+		return apperr.ErrInvalidInput
+	}
+	t, err := s.repo.GetValidPasswordResetToken(ctx, hashResetToken(token))
+	if err != nil {
+		return fmt.Errorf("%w: this reset link is invalid or has expired", apperr.ErrInvalidInput)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdatePasswordHash(ctx, t.UserID, string(hash)); err != nil {
+		return err
+	}
+	return s.repo.MarkPasswordResetTokenUsed(ctx, t.ID)
 }

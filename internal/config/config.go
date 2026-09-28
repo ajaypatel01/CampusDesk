@@ -16,6 +16,9 @@ type Config struct {
 	Email    EmailConfig
 	Storage  StorageConfig
 	WhatsApp WhatsAppConfig
+	// FrontendURL is the base URL of the deployed web app, used to build
+	// links that get emailed out (e.g. a password reset link).
+	FrontendURL string
 }
 
 type StorageConfig struct {
@@ -83,7 +86,7 @@ func Load() (*Config, error) {
 			WriteTimeout: time.Duration(writeSec) * time.Second,
 		},
 		Database: DatabaseConfig{URL: dbURL},
-		Auth:  AuthConfig{JWTSecret: jwtSecret},
+		Auth:     AuthConfig{JWTSecret: jwtSecret},
 		Email: EmailConfig{
 			SendGridAPIKey: os.Getenv("SENDGRID_API_KEY"),
 			FromEmail:      getEnv("EMAIL_FROM", "noreply@campusdesk.app"),
@@ -102,6 +105,7 @@ func Load() (*Config, error) {
 			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
 		},
+		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
 	}, nil
 }
 

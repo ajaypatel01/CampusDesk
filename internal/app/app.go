@@ -89,7 +89,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	api := chi.NewRouter()
 	api.Use(middleware.StripSlashes)
 
-	userMod := user.New(pool, cfg.Auth.JWTSecret)
+	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, cfg.FrontendURL)
 	schoolMod := school.New(pool)
 
 	// Public routes (no auth required)
