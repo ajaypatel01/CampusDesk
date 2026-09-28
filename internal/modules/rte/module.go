@@ -1,6 +1,7 @@
 package rte
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -17,16 +18,20 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "rte" }
 
+const feature = "rte"
+
 func (m *Module) Mount(r chi.Router) {
 	h := m.handler
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 
 	r.Route("/rte", func(r chi.Router) {
-		r.Get("/summary", h.GetSummary)
-		r.Get("/students", h.ListRTEStudents)
+		r.With(view).Get("/summary", h.GetSummary)
+		r.With(view).Get("/students", h.ListRTEStudents)
 		r.Route("/quotas", func(r chi.Router) {
-			r.Get("/", h.ListQuotas)
-			r.Post("/", h.UpsertQuota)
-			r.Delete("/{id}", h.DeleteQuota)
+			r.With(view).Get("/", h.ListQuotas)
+			r.With(write).Post("/", h.UpsertQuota)
+			r.With(write).Delete("/{id}", h.DeleteQuota)
 		})
 	})
 }

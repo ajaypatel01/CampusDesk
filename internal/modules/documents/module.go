@@ -20,18 +20,25 @@ func New(pool *pgxpool.Pool, emailClient *email.Client, waClient *whatsapp.Clien
 
 func (m *Module) Name() string { return "documents" }
 
+const feature = "documents"
+
 func (m *Module) Mount(r chi.Router) {
 	h := m.handler
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/documents", func(r chi.Router) {
 		r.Use(httpx.BlockRoles("registrar"))
-		r.Get("/bonafide", h.DownloadBonafide)
-		r.Post("/bonafide/email", h.EmailBonafide)
-		r.Post("/bonafide/whatsapp", h.WhatsAppBonafide)
-		r.Get("/transfer-certificate", h.DownloadTC)
-		r.Post("/transfer-certificate/email", h.EmailTC)
-		r.Post("/transfer-certificate/whatsapp", h.WhatsAppTC)
-		r.Post("/salary-slip", h.DownloadSalarySlip)
-		r.Post("/salary-slip/email", h.EmailSalarySlip)
-		r.Post("/salary-slip/whatsapp", h.WhatsAppSalarySlip)
+		r.With(view).Get("/bonafide", h.DownloadBonafide)
+		r.With(write).Post("/bonafide/email", h.EmailBonafide)
+		r.With(write).Post("/bonafide/whatsapp", h.WhatsAppBonafide)
+		r.With(view).Get("/transfer-certificate", h.DownloadTC)
+		r.With(write).Post("/transfer-certificate/email", h.EmailTC)
+		r.With(write).Post("/transfer-certificate/whatsapp", h.WhatsAppTC)
+		// DownloadSalarySlip is a POST (form-carrying) request but is
+		// conceptually a read -- generating and returning a PDF, no state
+		// change -- so it's gated as "view" like the other Download* routes.
+		r.With(view).Post("/salary-slip", h.DownloadSalarySlip)
+		r.With(write).Post("/salary-slip/email", h.EmailSalarySlip)
+		r.With(write).Post("/salary-slip/whatsapp", h.WhatsAppSalarySlip)
 	})
 }

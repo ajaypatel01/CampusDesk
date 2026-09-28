@@ -363,3 +363,12 @@ export const staffApi = {
   get: (id) => request(`/staff/${id}`),
   upsertProfile: (id, body) => request(`/staff/${id}/profile`, { method: 'PUT', body: JSON.stringify(body) }),
 }
+
+// Access-control matrix: an admin narrowing (or restoring) a specific
+// user's view/write access to a section of the app, on top of their role's
+// default (everything allowed).
+export const permissionsApi = {
+  listFeatures: () => request('/permissions/features'),
+  getMatrix: (userId) => request(`/permissions/users/${userId}`),
+  setMatrix: (userId, overrides) => request(`/permissions/users/${userId}`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
+}

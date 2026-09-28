@@ -25,9 +25,11 @@ func New(pool *pgxpool.Pool, s *storage.Client) *Module {
 
 func (m *Module) Name() string { return "idcard" }
 
+const feature = "id_cards"
+
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/id-cards", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		r.Use(httpx.BlockRoles("registrar"), httpx.RequireFeature(feature, "write"))
 		r.Post("/students", m.StudentCards)
 		r.Post("/teachers", m.TeacherCards)
 	})

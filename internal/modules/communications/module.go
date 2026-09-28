@@ -24,12 +24,16 @@ func New(pool *pgxpool.Pool, wa *whatsapp.Client) *Module {
 
 func (m *Module) Name() string { return "communications" }
 
+const feature = "communications"
+
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/broadcasts", func(r chi.Router) {
 		r.Use(httpx.BlockRoles("registrar"))
-		r.Get("/", m.ListBroadcasts)
-		r.Post("/", m.SendBroadcast)
-		r.Get("/{id}/recipients", m.ListRecipients)
+		r.With(view).Get("/", m.ListBroadcasts)
+		r.With(write).Post("/", m.SendBroadcast)
+		r.With(view).Get("/{id}/recipients", m.ListRecipients)
 	})
 }
 

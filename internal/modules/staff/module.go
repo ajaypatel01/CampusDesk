@@ -18,17 +18,21 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "staff" }
 
+const feature = "staff"
+
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/staff", func(r chi.Router) {
 		r.Use(httpx.BlockRoles("registrar"))
-		r.Get("/", m.handler.List)
+		r.With(view).Get("/", m.handler.List)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", m.handler.Get)
+			r.With(view).Get("/", m.handler.Get)
 			// Editing a staff profile (salary, bank details, CL quota, ...) is
 			// admin-only. Every other non-registrar role could reach this
 			// endpoint before -- a teacher could edit any other staff member's
 			// salary or bank account, not just view it.
-			r.With(httpx.RequireRole("super_admin", "school_admin")).Put("/profile", m.handler.UpsertProfile)
+			r.With(httpx.RequireRole("super_admin", "school_admin"), write).Put("/profile", m.handler.UpsertProfile)
 		})
 	})
 }

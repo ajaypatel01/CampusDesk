@@ -20,23 +20,27 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "customfields" }
 
+const feature = "custom_fields"
+
 // Mount gates every route to super_admin: the whole feature -- defining
 // fields and seeing/entering their values -- is super_admin-only, not just
 // the ability to add a new field.
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/custom-fields", func(r chi.Router) {
 		r.Use(httpx.RequireRole("super_admin"))
 		r.Route("/definitions", func(r chi.Router) {
-			r.Get("/", m.ListDefinitions)
-			r.Post("/", m.CreateDefinition)
+			r.With(view).Get("/", m.ListDefinitions)
+			r.With(write).Post("/", m.CreateDefinition)
 			r.Route("/{id}", func(r chi.Router) {
-				r.Put("/", m.UpdateDefinition)
-				r.Delete("/", m.DeleteDefinition)
+				r.With(write).Put("/", m.UpdateDefinition)
+				r.With(write).Delete("/", m.DeleteDefinition)
 			})
 		})
 		r.Route("/values", func(r chi.Router) {
-			r.Get("/", m.ListValues)
-			r.Put("/", m.UpsertValue)
+			r.With(view).Get("/", m.ListValues)
+			r.With(write).Put("/", m.UpsertValue)
 		})
 	})
 }

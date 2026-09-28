@@ -24,21 +24,25 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "homework" }
 
+const feature = "homework"
+
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/homework", func(r chi.Router) {
-		r.With(httpx.BlockRoles("parent")).Get("/", m.ListAssignments)
-		r.With(httpx.BlockRoles("parent")).Post("/", m.CreateAssignment)
+		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListAssignments)
+		r.With(httpx.BlockRoles("parent"), write).Post("/", m.CreateAssignment)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", m.GetAssignment)
-			r.With(httpx.BlockRoles("parent")).Delete("/", m.DeleteAssignment)
+			r.With(view).Get("/", m.GetAssignment)
+			r.With(httpx.BlockRoles("parent"), write).Delete("/", m.DeleteAssignment)
 			r.Route("/submissions", func(r chi.Router) {
-				r.Get("/", m.ListSubmissions)
-				r.With(httpx.BlockRoles("parent")).Post("/", m.UpsertSubmission)
+				r.With(view).Get("/", m.ListSubmissions)
+				r.With(httpx.BlockRoles("parent"), write).Post("/", m.UpsertSubmission)
 			})
 		})
 	})
-	r.Get("/homework-tracker", m.StudentTracker)
-	r.Get("/ward-homework", m.WardHomework)
+	r.With(view).Get("/homework-tracker", m.StudentTracker)
+	r.With(view).Get("/ward-homework", m.WardHomework)
 }
 
 // isWard reports whether the current request's claims belong to a parent whose

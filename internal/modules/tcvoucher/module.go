@@ -1,6 +1,7 @@
 package tcvoucher
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -16,18 +17,22 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "tcvoucher" }
 
+const feature = "tc_vouchers"
+
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/tc-records", func(r chi.Router) {
-		r.Get("/", m.handler.ListTCRecords)
-		r.Post("/", m.handler.CreateTCRecord)
+		r.With(view).Get("/", m.handler.ListTCRecords)
+		r.With(write).Post("/", m.handler.CreateTCRecord)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", m.handler.GetTCRecord)
-			r.Put("/", m.handler.UpdateTCRecord)
-			r.Delete("/", m.handler.DeleteTCRecord)
+			r.With(view).Get("/", m.handler.GetTCRecord)
+			r.With(write).Put("/", m.handler.UpdateTCRecord)
+			r.With(write).Delete("/", m.handler.DeleteTCRecord)
 		})
 	})
 	r.Route("/vouchers", func(r chi.Router) {
-		r.Get("/", m.handler.ListVouchers)
-		r.Post("/", m.handler.CreateVoucher)
+		r.With(view).Get("/", m.handler.ListVouchers)
+		r.With(write).Post("/", m.handler.CreateVoucher)
 	})
 }
