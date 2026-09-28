@@ -54,6 +54,7 @@ type CreateFeeAccountInput struct {
 	DiscountReason   string    `json:"discount_reason"`
 	PreviousYearDues int       `json:"previous_year_dues"`
 	VanFee           int       `json:"van_fee"`
+	LateFee          int       `json:"late_fee"`
 	IsRTE            bool      `json:"is_rte"`
 }
 
@@ -63,6 +64,7 @@ type UpdateFeeAccountInput struct {
 	DiscountReason   *string    `json:"discount_reason"`
 	PreviousYearDues *int       `json:"previous_year_dues"`
 	VanFee           *int       `json:"van_fee"`
+	LateFee          *int       `json:"late_fee"`
 	IsRTE            *bool      `json:"is_rte"`
 	GradeLevelID     *uuid.UUID `json:"grade_level_id"`
 }
@@ -109,6 +111,7 @@ type FeeAccountSummary struct {
 	DiscountAmount   int       `json:"discount_amount"`
 	VanFee           int       `json:"van_fee"`
 	PreviousYearDues int       `json:"previous_year_dues"`
+	LateFee          int       `json:"late_fee"`
 	IsRTE            bool      `json:"is_rte"`
 	TotalDue         int       `json:"total_due"`
 	TotalPaid        int       `json:"total_paid"`
@@ -144,6 +147,7 @@ type SchoolFeeSummaryResponse struct {
 	TotalTuitionDue  int               `json:"total_tuition_due"`
 	TotalVanDue      int               `json:"total_van_due"`
 	TotalPrevDue     int               `json:"total_prev_due"`
+	TotalLateFee     int               `json:"total_late_fee"`
 	TotalDiscount    int               `json:"total_discount"`
 	GrandTotalDue    int               `json:"grand_total_due"`
 	TotalCollected   int               `json:"total_collected"`
@@ -174,6 +178,7 @@ type StudentFeeSummaryResponse struct {
 	NetTuitionFee    int                 `json:"net_tuition_fee"`
 	VanFee           int                 `json:"van_fee"`
 	PreviousYearDues int                 `json:"previous_year_dues"`
+	LateFee          int                 `json:"late_fee"`
 	IsRTE            bool                `json:"is_rte"`
 	TotalDue         int                 `json:"total_due"`
 	TotalPaid        int                 `json:"total_paid"`
@@ -205,6 +210,7 @@ type ReceiptData struct {
 	DiscountAmount   int
 	VanFee           int
 	PreviousYearDues int
+	LateFee          int
 	TotalDue         int
 	TotalPaidOther   int
 	TotalPaidAfter   int
@@ -336,6 +342,7 @@ func (s *Service) CreateFeeAccount(ctx context.Context, in CreateFeeAccountInput
 		DiscountReason:   in.DiscountReason,
 		PreviousYearDues: in.PreviousYearDues,
 		VanFee:           in.VanFee,
+		LateFee:          in.LateFee,
 		IsRTE:            in.IsRTE,
 	}
 	if fa.IsRTE {
@@ -361,7 +368,7 @@ func (s *Service) GetFeeAccount(ctx context.Context, id uuid.UUID) (*FeeAccountD
 	detail := &FeeAccountDetail{
 		StudentFeeAccount: *fa,
 		Payments:          payments,
-		TotalDue:          fa.TuitionFee - fa.DiscountAmount + fa.VanFee + fa.PreviousYearDues,
+		TotalDue:          fa.TuitionFee - fa.DiscountAmount + fa.VanFee + fa.PreviousYearDues + fa.LateFee,
 	}
 	for _, p := range payments {
 		if p.Voided {
@@ -426,6 +433,9 @@ func (s *Service) UpdateFeeAccount(ctx context.Context, id uuid.UUID, in UpdateF
 	}
 	if in.VanFee != nil {
 		fa.VanFee = *in.VanFee
+	}
+	if in.LateFee != nil {
+		fa.LateFee = *in.LateFee
 	}
 	if in.IsRTE != nil {
 		fa.IsRTE = *in.IsRTE
@@ -574,7 +584,7 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 		gradeLevelID = currentFS.GradeLevelID
 	}
 	netTuition := fa.TuitionFee - fa.DiscountAmount
-	totalDue := netTuition + fa.VanFee + fa.PreviousYearDues
+	totalDue := netTuition + fa.VanFee + fa.PreviousYearDues + fa.LateFee
 	var totalPaid int
 	for _, p := range payments {
 		if !p.Voided {
@@ -596,6 +606,7 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 		NetTuitionFee:    netTuition,
 		VanFee:           fa.VanFee,
 		PreviousYearDues: fa.PreviousYearDues,
+		LateFee:          fa.LateFee,
 		IsRTE:            fa.IsRTE,
 		TotalDue:         totalDue,
 		TotalPaid:        totalPaid,

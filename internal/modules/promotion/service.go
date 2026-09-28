@@ -174,7 +174,7 @@ func (s *Service) outstandingBalance(ctx context.Context, fa *domain.StudentFeeA
 			paid += p.Amount
 		}
 	}
-	total := fa.TuitionFee - fa.DiscountAmount + fa.VanFee + fa.PreviousYearDues
+	total := fa.TuitionFee - fa.DiscountAmount + fa.VanFee + fa.PreviousYearDues + fa.LateFee
 	return total - paid, nil
 }
 

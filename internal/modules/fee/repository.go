@@ -151,10 +151,10 @@ func (r *Repository) ListInstallmentPlans(ctx context.Context, feeStructureID uu
 func (r *Repository) CreateFeeAccount(ctx context.Context, fa *domain.StudentFeeAccount) error {
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO student_fee_accounts (student_id, school_id, academic_year_id, fee_structure_id,
-			tuition_fee, discount_amount, discount_reason, previous_year_dues, van_fee, is_rte)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, created_at, updated_at`,
+			tuition_fee, discount_amount, discount_reason, previous_year_dues, van_fee, late_fee, is_rte)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, created_at, updated_at`,
 		fa.StudentID, fa.SchoolID, fa.AcademicYearID, fa.FeeStructureID,
-		fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.IsRTE,
+		fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.LateFee, fa.IsRTE,
 	)
 	if err := row.Scan(&fa.ID, &fa.CreatedAt, &fa.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -166,11 +166,11 @@ func (r *Repository) GetFeeAccountByID(ctx context.Context, id uuid.UUID) (*doma
 	var fa domain.StudentFeeAccount
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, student_id, school_id, academic_year_id, fee_structure_id,
-			tuition_fee, discount_amount, COALESCE(discount_reason,''), previous_year_dues, van_fee, is_rte,
+			tuition_fee, discount_amount, COALESCE(discount_reason,''), previous_year_dues, van_fee, late_fee, is_rte,
 			created_at, updated_at
 		FROM student_fee_accounts WHERE id=$1`, id,
 	).Scan(&fa.ID, &fa.StudentID, &fa.SchoolID, &fa.AcademicYearID, &fa.FeeStructureID,
-		&fa.TuitionFee, &fa.DiscountAmount, &fa.DiscountReason, &fa.PreviousYearDues, &fa.VanFee, &fa.IsRTE,
+		&fa.TuitionFee, &fa.DiscountAmount, &fa.DiscountReason, &fa.PreviousYearDues, &fa.VanFee, &fa.LateFee, &fa.IsRTE,
 		&fa.CreatedAt, &fa.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
@@ -213,7 +213,7 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 		argN++
 	}
 
-	balanceExpr := "(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0)"
+	balanceExpr := "(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) - COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0)"
 	var havingParts []string
 	switch f.PaymentStatus {
 	case "paid":
@@ -246,7 +246,7 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 
 	var total int
 	countQ := `SELECT COUNT(*) FROM (SELECT sfa.id ` + countBase + where +
-		` GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name, sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues` + having + `) sub`
+		` GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name, sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues, sfa.late_fee` + having + `) sub`
 	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -257,10 +257,10 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 			s.student_code,
 			gl.name AS grade_level_name,
 			sfa.tuition_fee, sfa.discount_amount, sfa.van_fee,
-			sfa.previous_year_dues, sfa.is_rte,
-			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) AS total_due,
+			sfa.previous_year_dues, sfa.late_fee, sfa.is_rte,
+			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) AS total_due,
 			COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) AS total_paid,
-			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues)
+			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee)
 				- COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) AS balance_remaining
 		%s %s
 		GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name
@@ -279,7 +279,7 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 	for rows.Next() {
 		var s FeeAccountSummary
 		if err := rows.Scan(&s.ID, &s.StudentID, &s.StudentName, &s.StudentCode, &s.GradeLevelName,
-			&s.TuitionFee, &s.DiscountAmount, &s.VanFee, &s.PreviousYearDues, &s.IsRTE,
+			&s.TuitionFee, &s.DiscountAmount, &s.VanFee, &s.PreviousYearDues, &s.LateFee, &s.IsRTE,
 			&s.TotalDue, &s.TotalPaid, &s.BalanceRemaining); err != nil {
 			return nil, 0, err
 		}
@@ -291,9 +291,9 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 func (r *Repository) UpdateFeeAccount(ctx context.Context, fa *domain.StudentFeeAccount) error {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE student_fee_accounts SET tuition_fee=$2, discount_amount=$3, discount_reason=$4,
-			previous_year_dues=$5, van_fee=$6, is_rte=$7, fee_structure_id=$8, updated_at=NOW()
+			previous_year_dues=$5, van_fee=$6, is_rte=$7, fee_structure_id=$8, late_fee=$9, updated_at=NOW()
 		WHERE id=$1`,
-		fa.ID, fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.IsRTE, fa.FeeStructureID,
+		fa.ID, fa.TuitionFee, fa.DiscountAmount, fa.DiscountReason, fa.PreviousYearDues, fa.VanFee, fa.IsRTE, fa.FeeStructureID, fa.LateFee,
 	)
 	if err != nil {
 		return err
@@ -411,12 +411,13 @@ func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid
 			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount), 0),
 			COALESCE(SUM(sfa.van_fee), 0),
 			COALESCE(SUM(sfa.previous_year_dues), 0),
+			COALESCE(SUM(sfa.late_fee), 0),
 			COALESCE(SUM(sfa.discount_amount), 0),
-			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues), 0)
+			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee), 0)
 		FROM student_fee_accounts sfa
 		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2`, schoolID, yearID,
 	).Scan(&resp.TotalStudents, &resp.RTEStudents, &resp.TotalTuitionDue, &resp.TotalVanDue,
-		&resp.TotalPrevDue, &resp.TotalDiscount, &resp.GrandTotalDue)
+		&resp.TotalPrevDue, &resp.TotalLateFee, &resp.TotalDiscount, &resp.GrandTotalDue)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +435,7 @@ func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT gl.id, gl.name, COUNT(DISTINCT sfa.id),
-			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues), 0),
+			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee), 0),
 			COALESCE(SUM(paid.total), 0)
 		FROM student_fee_accounts sfa
 		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
@@ -466,11 +467,11 @@ func (r *Repository) GetFeeAccountByStudent(ctx context.Context, studentID, year
 	var fa domain.StudentFeeAccount
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, student_id, school_id, academic_year_id, fee_structure_id,
-			tuition_fee, discount_amount, COALESCE(discount_reason,''), previous_year_dues, van_fee, is_rte,
+			tuition_fee, discount_amount, COALESCE(discount_reason,''), previous_year_dues, van_fee, late_fee, is_rte,
 			created_at, updated_at
 		FROM student_fee_accounts WHERE student_id=$1 AND academic_year_id=$2`, studentID, yearID,
 	).Scan(&fa.ID, &fa.StudentID, &fa.SchoolID, &fa.AcademicYearID, &fa.FeeStructureID,
-		&fa.TuitionFee, &fa.DiscountAmount, &fa.DiscountReason, &fa.PreviousYearDues, &fa.VanFee, &fa.IsRTE,
+		&fa.TuitionFee, &fa.DiscountAmount, &fa.DiscountReason, &fa.PreviousYearDues, &fa.VanFee, &fa.LateFee, &fa.IsRTE,
 		&fa.CreatedAt, &fa.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
@@ -490,7 +491,7 @@ func (r *Repository) GetReceiptData(ctx context.Context, paymentID uuid.UUID) (*
 			s.first_name || ' ' || s.last_name, s.student_code,
 			COALESCE(gl.name, ''),
 			COALESCE(g.first_name || ' ' || g.last_name, ''),
-			sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues,
+			sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues, sfa.late_fee,
 			ay.name,
 			sfa.id
 		FROM fee_payments fp
@@ -508,7 +509,7 @@ func (r *Repository) GetReceiptData(ctx context.Context, paymentID uuid.UUID) (*
 		&d.SchoolName, &d.SchoolAddress, &d.SchoolPhone, &d.SchoolEmail,
 		&d.StudentName, &d.StudentCode,
 		&d.GradeLevelName, &d.FatherName,
-		&d.TuitionFee, &d.DiscountAmount, &d.VanFee, &d.PreviousYearDues,
+		&d.TuitionFee, &d.DiscountAmount, &d.VanFee, &d.PreviousYearDues, &d.LateFee,
 		&d.AcademicYearName, &d.FeeAccountID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
@@ -517,7 +518,7 @@ func (r *Repository) GetReceiptData(ctx context.Context, paymentID uuid.UUID) (*
 		return nil, fmt.Errorf("get receipt data: %w", err)
 	}
 
-	d.TotalDue = d.TuitionFee - d.DiscountAmount + d.VanFee + d.PreviousYearDues
+	d.TotalDue = d.TuitionFee - d.DiscountAmount + d.VanFee + d.PreviousYearDues + d.LateFee
 
 	// Total paid before this payment
 	err = r.pool.QueryRow(ctx, `

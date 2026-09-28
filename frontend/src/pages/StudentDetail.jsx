@@ -63,7 +63,7 @@ function StudentDetail() {
         setFeeForm({
           tuition_fee: fee.tuition_fee, discount_amount: fee.discount_amount,
           discount_reason: fee.discount_reason || '', van_fee: fee.van_fee,
-          previous_year_dues: fee.previous_year_dues, grade_level_id: fee.grade_level_id,
+          previous_year_dues: fee.previous_year_dues, late_fee: fee.late_fee, grade_level_id: fee.grade_level_id,
           is_rte: fee.is_rte || false,
         })
       }
@@ -110,6 +110,7 @@ function StudentDetail() {
         discount_reason: feeForm.discount_reason,
         van_fee: parseInt(feeForm.van_fee, 10) || 0,
         previous_year_dues: parseInt(feeForm.previous_year_dues, 10) || 0,
+        late_fee: parseInt(feeForm.late_fee, 10) || 0,
         is_rte: !!feeForm.is_rte,
       }
       // Only send grade_level_id when it actually changed - the backend re-bases
@@ -124,7 +125,7 @@ function StudentDetail() {
       setFeeForm({
         tuition_fee: updated.tuition_fee, discount_amount: updated.discount_amount,
         discount_reason: updated.discount_reason || '', van_fee: updated.van_fee,
-        previous_year_dues: updated.previous_year_dues, grade_level_id: updated.grade_level_id,
+        previous_year_dues: updated.previous_year_dues, late_fee: updated.late_fee, grade_level_id: updated.grade_level_id,
         is_rte: updated.is_rte || false,
       })
       setFeeEditing(false)
@@ -299,7 +300,7 @@ function StudentDetail() {
               <div className="student-detail__actions">
                 {canEditFees && (feeEditing ? (
                   <>
-                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues, grade_level_id: feeSummary.grade_level_id, is_rte: feeSummary.is_rte || false }) }}><X size={14} /> Cancel</button>
+                    <button className="btn btn--outline btn--sm" onClick={() => { setFeeEditing(false); setFeeForm({ tuition_fee: feeSummary.tuition_fee, discount_amount: feeSummary.discount_amount, discount_reason: feeSummary.discount_reason || '', van_fee: feeSummary.van_fee, previous_year_dues: feeSummary.previous_year_dues, late_fee: feeSummary.late_fee, grade_level_id: feeSummary.grade_level_id, is_rte: feeSummary.is_rte || false }) }}><X size={14} /> Cancel</button>
                     <button className="btn btn--primary btn--sm" onClick={handleSaveFee} disabled={feeSaving}><Save size={14} /> {feeSaving ? 'Saving...' : 'Save'}</button>
                   </>
                 ) : (
@@ -356,6 +357,7 @@ function StudentDetail() {
               <Field label="Net Tuition" value={fmt(feeSummary.net_tuition_fee)} editing={false} />
               <Field label="Van Fee" value={feeEditing ? feeForm.van_fee : fmt(feeSummary.van_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, van_fee: v })} />
               <Field label="Previous Dues" value={feeEditing ? feeForm.previous_year_dues : fmt(feeSummary.previous_year_dues)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, previous_year_dues: v })} />
+              <Field label="Late Fee" value={feeEditing ? feeForm.late_fee : fmt(feeSummary.late_fee)} editing={feeEditing} type="number" onChange={v => setFeeForm({ ...feeForm, late_fee: v })} />
               <Field label="Total Due" value={fmt(feeSummary.total_due)} editing={false} />
               <Field label="Total Paid" value={fmt(feeSummary.total_paid)} editing={false} />
               <Field label="Balance" value={fmt(feeSummary.balance_remaining)} editing={false} />

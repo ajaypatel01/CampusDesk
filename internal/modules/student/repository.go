@@ -140,11 +140,11 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		}
 		switch f.PaymentStatus {
 		case "paid":
-			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int <= 0"
+			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) - paid.total::int <= 0"
 		case "due":
-			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+			where += " AND sfa.id IS NOT NULL AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) - paid.total::int > 0"
 		case "partial":
-			where += " AND sfa.id IS NOT NULL AND paid.total > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int > 0"
+			where += " AND sfa.id IS NOT NULL AND paid.total > 0 AND (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) - paid.total::int > 0"
 		case "unpaid":
 			where += " AND (sfa.id IS NULL OR paid.total = 0)"
 		}
@@ -162,9 +162,9 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 	if hasFeeJoin {
 		feeCols = `,
 		COALESCE(gl.name, '') AS grade_level_name,
-		(CASE WHEN sfa.id IS NOT NULL THEN sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues END) AS total_due,
+		(CASE WHEN sfa.id IS NOT NULL THEN sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee END) AS total_due,
 		(CASE WHEN sfa.id IS NOT NULL THEN paid.total::int END) AS total_paid,
-		(CASE WHEN sfa.id IS NOT NULL THEN (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) - paid.total::int END) AS pending_fees,
+		(CASE WHEN sfa.id IS NOT NULL THEN (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) - paid.total::int END) AS pending_fees,
 		COALESCE(sfa.discount_reason, '') AS fee_remarks`
 	} else {
 		feeCols = `, '' AS grade_level_name, NULL::int AS total_due, NULL::int AS total_paid, NULL::int AS pending_fees, '' AS fee_remarks`
