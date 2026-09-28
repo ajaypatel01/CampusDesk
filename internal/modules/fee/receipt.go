@@ -207,6 +207,9 @@ func generateReceiptPDF(data ReceiptData) ([]byte, error) {
 	if data.PreviousYearDues > 0 {
 		summaryRow("Previous Year Dues", data.PreviousYearDues, false)
 	}
+	if data.LateFee > 0 {
+		summaryRow("Late Fee", data.LateFee, false)
+	}
 
 	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
 	summaryRow("Total Due", data.TotalDue, true)

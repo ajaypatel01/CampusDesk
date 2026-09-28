@@ -103,7 +103,7 @@ func (r *Repository) GetTCData(ctx context.Context, studentID uuid.UUID) (*TCDat
 		),
 		balance AS (
 			SELECT COALESCE(
-				SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues) -
+				SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee) -
 				COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0), 0
 			) AS remaining
 			FROM student_fee_accounts sfa
