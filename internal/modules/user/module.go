@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -10,9 +11,9 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool, jwtSecret string) *Module {
+func New(pool *pgxpool.Pool, jwtSecret string, emailClient *email.Client, frontendURL string) *Module {
 	repo := NewRepository(pool)
-	svc := NewService(repo, jwtSecret)
+	svc := NewService(repo, jwtSecret, emailClient, frontendURL)
 	return &Module{handler: NewHandler(svc)}
 }
 
@@ -22,6 +23,8 @@ func (m *Module) Name() string { return "user" }
 func (m *Module) MountPublic(r chi.Router) {
 	r.Post("/auth/login", m.handler.Login)
 	r.Post("/auth/register", m.handler.Register)
+	r.Post("/auth/password-reset/request", m.handler.RequestPasswordReset)
+	r.Post("/auth/password-reset/confirm", m.handler.ConfirmPasswordReset)
 }
 
 // Mount registers all user management endpoints (auth required).

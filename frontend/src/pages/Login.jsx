@@ -68,6 +68,9 @@ function Login({ onLogin }) {
               </button>
             </div>
           </label>
+          <p style={{ textAlign: 'right', margin: '-8px 0 4px' }}>
+            <Link to="/forgot-password" style={{ fontSize: '13px' }}>Forgot password?</Link>
+          </p>
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
