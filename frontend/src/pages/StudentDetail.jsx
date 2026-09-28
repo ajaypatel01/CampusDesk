@@ -28,6 +28,11 @@ function StudentDetail() {
   const [feeEditing, setFeeEditing] = useState(false)
   const [feeForm, setFeeForm] = useState({})
   const [feeSaving, setFeeSaving] = useState(false)
+  const [sections, setSections] = useState([])
+  const [sectionId, setSectionId] = useState(null)
+  const [sectionEditing, setSectionEditing] = useState(false)
+  const [sectionDraft, setSectionDraft] = useState('')
+  const [sectionSaving, setSectionSaving] = useState(false)
 
   useEffect(() => {
     if (!currentSchool) return
@@ -65,6 +70,35 @@ function StudentDetail() {
     }).catch(() => {})
       .finally(() => setLoading(false))
   }, [id, currentYear])
+
+  useEffect(() => {
+    if (!currentSchool || !currentYear) return
+    academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id })
+      .then(res => setSections(res.items || []))
+      .catch(() => setSections([]))
+    studentsApi.getSection(id, currentYear.id)
+      .then(res => setSectionId(res.class_section_id || null))
+      .catch(() => setSectionId(null))
+  }, [id, currentSchool, currentYear])
+
+  async function handleSaveSection() {
+    setSectionSaving(true)
+    try {
+      await studentsApi.updateSection(id, { academic_year_id: currentYear.id, class_section_id: sectionDraft || null })
+      setSectionId(sectionDraft || null)
+      setSectionEditing(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSectionSaving(false)
+    }
+  }
+
+  // Only the sections that belong to this student's current grade are
+  // offered -- a section from a different grade would be rejected by the
+  // backend (and wouldn't make sense) anyway.
+  const sectionsForGrade = sections.filter(sec => sec.grade_level_id === feeSummary?.grade_level_id)
+  const currentSectionName = sections.find(sec => sec.id === sectionId)?.name
 
   async function handleSaveFee() {
     if (!feeSummary?.account_id) return
@@ -284,6 +318,29 @@ function StudentDetail() {
                 </div>
               ) : (
                 <Field label="Class" value={feeSummary.grade_level_name} editing={false} />
+              )}
+              {sectionEditing ? (
+                <div className="detail-field">
+                  <span className="detail-field__label">Section</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <select className="detail-field__input" value={sectionDraft} onChange={e => setSectionDraft(e.target.value)}>
+                      <option value="">Unassigned</option>
+                      {sectionsForGrade.map(sec => <option key={sec.id} value={sec.id}>{sec.name}</option>)}
+                    </select>
+                    <button className="btn btn--primary btn--sm" onClick={handleSaveSection} disabled={sectionSaving}>{sectionSaving ? '...' : 'Save'}</button>
+                    <button className="btn btn--outline btn--sm" onClick={() => setSectionEditing(false)}><X size={13} /></button>
+                  </div>
+                </div>
+              ) : (
+                <div className="detail-field">
+                  <span className="detail-field__label">Section</span>
+                  <span className="detail-field__value" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {currentSectionName || <span className="sd-field__empty">Unassigned</span>}
+                    {canEditFees && (
+                      <button className="btn btn--outline btn--sm" onClick={() => { setSectionDraft(sectionId || ''); setSectionEditing(true) }}><Edit2 size={12} /></button>
+                    )}
+                  </span>
+                </div>
               )}
               {feeEditing && (
                 <label className="form-field--checkbox" style={{ gridColumn: '1 / -1' }}>

@@ -108,6 +108,14 @@ export const studentsApi = {
       const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Import failed'); return data
     })
   },
+  // Promotion/demotion (or a mid-year class change): points a student's fee
+  // account at a different grade's fee structure and keeps their enrollment
+  // row in sync. moveGrade is one student; bulkPromote is the normal
+  // end-of-year shape (a whole grade/section moving up together).
+  moveGrade: (id, body) => request(`/students/${id}/move-grade`, { method: 'POST', body: JSON.stringify(body) }),
+  bulkPromote: (body) => request('/students/promote-bulk', { method: 'POST', body: JSON.stringify(body) }),
+  getSection: (id, academicYearId) => request(`/students/${id}/section${qs({ academic_year_id: academicYearId })}`),
+  updateSection: (id, body) => request(`/students/${id}/section`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 export const guardiansApi = {

@@ -48,6 +48,24 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Enrollm
 	return &e, nil
 }
 
+// GetByStudentYear finds a student's enrollment row for one academic year
+// (each student has at most one, enforced by the enrollments table's unique
+// constraint), used by the promotion module to upsert rather than duplicate.
+func (r *Repository) GetByStudentYear(ctx context.Context, studentID, yearID uuid.UUID) (*domain.Enrollment, error) {
+	var e domain.Enrollment
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, student_id, school_id, academic_year_id, class_section_id, enrollment_date, status, created_at, updated_at
+		FROM enrollments WHERE student_id=$1 AND academic_year_id=$2`, studentID, yearID,
+	).Scan(&e.ID, &e.StudentID, &e.SchoolID, &e.AcademicYearID, &e.ClassSectionID, &e.EnrollmentDate, &e.Status, &e.CreatedAt, &e.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get enrollment by student/year: %w", err)
+	}
+	return &e, nil
+}
+
 func (r *Repository) ListBySchoolYear(ctx context.Context, schoolID, yearID uuid.UUID, limit, offset int) ([]domain.Enrollment, int, error) {
 	var total int
 	if err := r.pool.QueryRow(ctx,
