@@ -2,6 +2,7 @@ package student
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
@@ -55,6 +56,74 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, st)
+}
+
+// DownloadImportTemplate serves the fillable .xlsx a school fills in and
+// uploads back via Import -- see import.go for the exact columns/rules.
+func (h *Handler) DownloadImportTemplate(w http.ResponseWriter, r *http.Request) {
+	data, err := GenerateImportTemplate()
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "could not generate template")
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", `attachment; filename="student_import_template.xlsx"`)
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+const maxImportFileSize = 10 << 20 // 10MB
+
+// Import accepts an uploaded .xlsx (field name "file") and bulk-creates
+// students from it, one row at a time -- see Service.BulkImport for why a
+// bad row doesn't block the rest of the batch.
+func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxImportFileSize)
+	if err := r.ParseMultipartForm(maxImportFileSize); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "file too large (max 10MB) or not a valid upload")
+		return
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "a \"file\" upload is required")
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "could not read the uploaded file")
+		return
+	}
+
+	rows, err := ParseImportFile(data)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(rows) == 0 {
+		httpx.Error(w, http.StatusBadRequest, "no data rows found -- fill in the template's \"Students\" sheet below the header row")
+		return
+	}
+
+	results := h.svc.BulkImport(r.Context(), schoolID, rows)
+	succeeded := 0
+	for _, res := range results {
+		if res.Success {
+			succeeded++
+		}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{
+		"total":     len(results),
+		"succeeded": succeeded,
+		"failed":    len(results) - succeeded,
+		"results":   results,
+	})
 }
 
 // MyWards returns the student(s) the current logged-in parent has portal access to.
