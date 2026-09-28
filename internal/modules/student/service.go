@@ -153,6 +153,44 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, 
 	return st, nil
 }
 
+// ImportRowResult is one row's outcome from a bulk import -- returned for
+// every row, success or failure, so the uploader gets a complete picture
+// rather than an all-or-nothing result.
+type ImportRowResult struct {
+	RowNumber   int    `json:"row_number"`
+	Success     bool   `json:"success"`
+	StudentCode string `json:"student_code,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
+// BulkImport saves each parsed row through the exact same Create path as
+// the single "Add Student" form -- a bulk-imported row is subject to the
+// same validation as a manually-entered one, nothing looser. A row that
+// fails (a bad value, a duplicate Student Code, ...) doesn't stop the rest
+// of the batch; its outcome is just reported alongside the successful ones.
+func (s *Service) BulkImport(ctx context.Context, schoolID uuid.UUID, rows []ImportRow) []ImportRowResult {
+	results := make([]ImportRowResult, 0, len(rows))
+	for _, row := range rows {
+		if row.ParseErr != "" {
+			results = append(results, ImportRowResult{RowNumber: row.RowNumber, Error: row.ParseErr})
+			continue
+		}
+		in := row.Input
+		in.SchoolID = schoolID
+		st, err := s.Create(ctx, in)
+		if err != nil {
+			msg := err.Error()
+			if apperr.IsConflict(err) {
+				msg = fmt.Sprintf("a student with Student Code %q already exists at this school", in.StudentCode)
+			}
+			results = append(results, ImportRowResult{RowNumber: row.RowNumber, Error: msg})
+			continue
+		}
+		results = append(results, ImportRowResult{RowNumber: row.RowNumber, Success: true, StudentCode: st.StudentCode})
+	}
+	return results
+}
+
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (*domain.Student, error) {
 	return s.repo.GetByID(ctx, id)
 }

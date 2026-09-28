@@ -98,6 +98,16 @@ export const studentsApi = {
   delete: (id) => request(`/students/${id}`, { method: 'DELETE' }),
   // Parent portal: the logged-in parent's own ward(s).
   myWards: () => request('/my-wards'),
+  // Bulk import: a downloadable/fillable .xlsx template, and the matching
+  // upload that bulk-creates students from it (row-by-row result, a bad
+  // row doesn't block the rest of the file).
+  downloadImportTemplate: () => requestBlob('/students/import-template'),
+  importStudents: (schoolId, file) => {
+    const fd = new FormData(); fd.append('file', file)
+    return fetch(`${BASE}/students/import${qs({ school_id: schoolId })}`, { method: 'POST', headers: authHeader(), body: fd }).then(async res => {
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Import failed'); return data
+    })
+  },
 }
 
 export const guardiansApi = {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Filter, ChevronLeft, ChevronRight, X, ArrowUpDown } from 'lucide-react'
+import { Plus, Search, Filter, ChevronLeft, ChevronRight, X, ArrowUpDown, Download, Upload } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, academicApi } from '../services/api'
 import SortHeader from '../components/SortHeader'
@@ -28,6 +28,12 @@ function Students() {
     phone: '', email: '', address: '', admission_date: '', caste: '', category: '',
     aadhar_number: '', status: 'active',
   })
+
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [importError, setImportError] = useState('')
   const [saving, setSaving] = useState(false)
   const limit = 20
 
@@ -108,6 +114,42 @@ function Students() {
     }
   }
 
+  async function handleDownloadTemplate() {
+    try {
+      const blob = await studentsApi.downloadImportTemplate()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'student_import_template.xlsx'; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function handleImport(e) {
+    e.preventDefault()
+    if (!importFile) return
+    setImporting(true); setImportError(''); setImportResult(null)
+    try {
+      const result = await studentsApi.importStudents(currentSchool.id, importFile)
+      setImportResult(result)
+      // Reload the roster so newly-imported students show up right away.
+      const res = await studentsApi.list({ school_id: currentSchool.id, limit, offset: 0 })
+      setStudents(res.items || []); setTotal(res.total || 0); setOffset(0)
+    } catch (err) {
+      setImportError(err.message)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function closeImportModal() {
+    setShowImportModal(false)
+    setImportFile(null)
+    setImportResult(null)
+    setImportError('')
+  }
+
   if (!currentSchool) return <p className="empty-text">Select a school first.</p>
 
   return (
@@ -117,9 +159,17 @@ function Students() {
           <h1>Students</h1>
           <p className="page-subtitle">Manage student records</p>
         </div>
-        <button className="btn btn--primary" onClick={() => setShowModal(true)}>
-          <Plus size={18} /> Add Student
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn--outline" onClick={handleDownloadTemplate}>
+            <Download size={16} /> Download Template
+          </button>
+          <button className="btn btn--outline" onClick={() => setShowImportModal(true)}>
+            <Upload size={16} /> Bulk Import
+          </button>
+          <button className="btn btn--primary" onClick={() => setShowModal(true)}>
+            <Plus size={18} /> Add Student
+          </button>
+        </div>
       </div>
 
       <div className="page-filters">
@@ -298,6 +348,68 @@ function Students() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div className="modal-overlay" onClick={closeImportModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Bulk Import Students</h2>
+            <p className="empty-text">
+              Download the template, fill in one row per student, then upload it here.
+              Each row is validated the same way as adding a student one at a time --
+              a bad row (e.g. a duplicate Student Code) won't block the rest of the file.
+            </p>
+
+            {!importResult ? (
+              <form className="modal__form" onSubmit={handleImport}>
+                {importError && <p className="doc-msg doc-msg--error">{importError}</p>}
+                <label className="form-field">
+                  <span>Filled-in Template (.xlsx) *</span>
+                  <input
+                    type="file" accept=".xlsx" required
+                    onChange={e => setImportFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--outline" onClick={closeImportModal}>Cancel</button>
+                  <button type="submit" className="btn btn--primary" disabled={importing || !importFile}>
+                    {importing ? 'Importing...' : 'Upload & Import'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <p className={`doc-msg ${importResult.failed > 0 ? 'doc-msg--error' : 'doc-msg--ok'}`}>
+                  {importResult.succeeded} of {importResult.total} row{importResult.total === 1 ? '' : 's'} imported successfully
+                  {importResult.failed > 0 ? `, ${importResult.failed} failed.` : '.'}
+                </p>
+                {importResult.failed > 0 && (
+                  <div className="table-card" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                    <table className="data-table">
+                      <thead><tr><th>Row</th><th>Status</th><th>Detail</th></tr></thead>
+                      <tbody>
+                        {importResult.results.map(r => (
+                          <tr key={r.row_number}>
+                            <td>{r.row_number}</td>
+                            <td>
+                              {r.success
+                                ? <span className="badge badge--success">Imported</span>
+                                : <span className="badge badge--danger">Failed</span>}
+                            </td>
+                            <td className="data-table__muted">{r.success ? r.student_code : r.error}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--primary" onClick={closeImportModal}>Done</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
