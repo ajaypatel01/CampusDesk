@@ -1,6 +1,7 @@
 package guardian
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -17,14 +18,18 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "guardian" }
 
+const feature = "guardians"
+
 func (m *Module) Mount(r chi.Router) {
 	h := m.handler
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/guardians", func(r chi.Router) {
-		r.Get("/", h.ListByStudent)
-		r.Post("/", h.Create)
-		r.Post("/link", h.Link)
+		r.With(view).Get("/", h.ListByStudent)
+		r.With(write).Post("/", h.Create)
+		r.With(write).Post("/link", h.Link)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", h.Get)
+			r.With(view).Get("/", h.Get)
 		})
 	})
 }

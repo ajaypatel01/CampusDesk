@@ -21,6 +21,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/idcard"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/media"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/payroll"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/permissions"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/results"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/rte"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/school"
@@ -91,6 +92,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, cfg.FrontendURL)
 	schoolMod := school.New(pool)
+	permsMod := permissions.New(pool)
 
 	// Public routes (no auth required)
 	api.Group(func(r chi.Router) {
@@ -103,6 +105,10 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	api.Group(func(r chi.Router) {
 		r.Use(httpx.JWTMiddleware(cfg.Auth.JWTSecret))
 		r.Use(httpx.SchoolScopeMiddleware)
+		// Loads each caller's access-control-matrix overrides once per request
+		// so every module's httpx.RequireFeature checks below can read them
+		// from context instead of each querying the DB themselves.
+		r.Use(permsMod.LoaderMiddleware())
 		// expose feature flags so frontend can adapt UI
 		r.Get("/config", func(w http.ResponseWriter, r *http.Request) {
 			httpx.JSON(w, http.StatusOK, map[string]bool{
@@ -110,6 +116,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 			})
 		})
 		userMod.Mount(r) // /users CRUD
+		permsMod.Mount(r) // /permissions/* -- access-control matrix admin API
 		mountProtectedModules(r, schoolMod, pool, emailClient, storageClient, waClient, cfg.Auth.JWTSecret)
 	})
 

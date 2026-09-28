@@ -27,18 +27,22 @@ func (m *Module) MountPublic(r chi.Router) {
 	r.Post("/auth/password-reset/confirm", m.handler.ConfirmPasswordReset)
 }
 
+const feature = "user_management"
+
 // Mount registers all user management endpoints (auth required).
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/users", func(r chi.Router) {
 		r.Use(httpx.BlockRoles("registrar"))
-		r.Get("/", m.handler.List)
-		r.Post("/", m.handler.Create)
+		r.With(view).Get("/", m.handler.List)
+		r.With(write).Post("/", m.handler.Create)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", m.handler.Get)
-			r.Put("/", m.handler.Update)
+			r.With(view).Get("/", m.handler.Get)
+			r.With(write).Put("/", m.handler.Update)
 			// Approving/rejecting a registration, and deleting an account, are admin-only actions.
 			r.Group(func(r chi.Router) {
-				r.Use(httpx.RequireRole("super_admin", "school_admin"))
+				r.Use(httpx.RequireRole("super_admin", "school_admin"), write)
 				r.Post("/approve", m.handler.Approve)
 				r.Post("/reject", m.handler.Reject)
 				r.Delete("/", m.handler.Delete)

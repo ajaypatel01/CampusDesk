@@ -20,19 +20,23 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "student" }
 
+const feature = "students"
+
 func (m *Module) Mount(r chi.Router) {
-	r.Get("/my-wards", m.handler.MyWards)
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
+	r.With(view).Get("/my-wards", m.handler.MyWards)
 	r.Route("/students", func(r chi.Router) {
 		// A parent only ever fetches their own ward by id, below — no browsing the roster.
-		r.With(httpx.BlockRoles("parent")).Get("/", m.handler.List)
-		r.With(httpx.BlockRoles("parent")).Post("/", m.handler.Create)
+		r.With(httpx.BlockRoles("parent"), view).Get("/", m.handler.List)
+		r.With(httpx.BlockRoles("parent"), write).Post("/", m.handler.Create)
 		// Bulk import: same access as adding a student one at a time above.
-		r.With(httpx.BlockRoles("parent")).Get("/import-template", m.handler.DownloadImportTemplate)
-		r.With(httpx.BlockRoles("parent")).Post("/import", m.handler.Import)
+		r.With(httpx.BlockRoles("parent"), view).Get("/import-template", m.handler.DownloadImportTemplate)
+		r.With(httpx.BlockRoles("parent"), write).Post("/import", m.handler.Import)
 		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", m.handler.Get)
-			r.With(httpx.BlockRoles("parent")).Put("/", m.handler.Update)
-			r.With(httpx.BlockRoles("parent")).Delete("/", m.handler.Delete)
+			r.With(view).Get("/", m.handler.Get)
+			r.With(httpx.BlockRoles("parent"), write).Put("/", m.handler.Update)
+			r.With(httpx.BlockRoles("parent"), write).Delete("/", m.handler.Delete)
 		})
 	})
 }

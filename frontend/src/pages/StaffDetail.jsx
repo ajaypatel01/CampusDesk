@@ -3,9 +3,9 @@ import { useParams, Link, useOutletContext } from 'react-router-dom'
 import {
   ArrowLeft, Mail, Phone, ShieldCheck, Briefcase, User,
   Building2, CreditCard, GraduationCap, Edit3, X, Save, Loader,
-  Wallet, Download, Plus, Trash2,
+  Wallet, Download, Plus, Trash2, Lock, RotateCcw,
 } from 'lucide-react'
-import { staffApi, payrollApi } from '../services/api'
+import { staffApi, payrollApi, permissionsApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import './StaffDetail.css'
 
@@ -57,6 +57,11 @@ function StaffDetail() {
   const isOwnProfile = user?.id === id
   const canViewPayroll = isAdmin || isOwnProfile
   const [member, setMember] = useState(null)
+  const [permRows, setPermRows] = useState(null)
+  const [permLoading, setPermLoading] = useState(false)
+  const [permSaving, setPermSaving] = useState(false)
+  const [permErr, setPermErr] = useState('')
+  const [permSaved, setPermSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -150,6 +155,53 @@ function StaffDetail() {
 
   useEffect(loadPayrollRow, [canViewPayroll, currentSchool, currentYear, payYear, payMonth, id])
   useEffect(loadLeaves, [canViewPayroll, currentYear, id])
+
+  // A super_admin's access is always full (nothing to restrict); a
+  // school_admin may only manage teacher/registrar/parent accounts, never
+  // another admin's -- mirrors the backend's canManage rule exactly.
+  const canManagePermissions = isAdmin && member?.role
+    && member.role !== 'super_admin'
+    && !(user?.role === 'school_admin' && member.role === 'school_admin')
+
+  useEffect(() => {
+    if (!canManagePermissions) return
+    setPermLoading(true)
+    permissionsApi.getMatrix(id)
+      .then(r => setPermRows(r.items || []))
+      .catch(err => setPermErr(err.message || 'Failed to load access control matrix'))
+      .finally(() => setPermLoading(false))
+  }, [canManagePermissions, id])
+
+  function togglePerm(featureKey, field) {
+    setPermSaved(false)
+    setPermRows(rows => rows.map(row => {
+      if (row.feature_key !== featureKey) return row
+      const next = { ...row, [field]: !row[field] }
+      // Write implies view -- can't grant write without view, doesn't make sense.
+      if (field === 'can_view' && !next.can_view) next.can_write = false
+      if (field === 'can_write' && next.can_write) next.can_view = true
+      return next
+    }))
+  }
+
+  function resetPermRow(featureKey) {
+    setPermSaved(false)
+    setPermRows(rows => rows.map(row => row.feature_key === featureKey ? { ...row, can_view: true, can_write: true, is_override: false } : row))
+  }
+
+  async function handleSavePermissions() {
+    setPermSaving(true); setPermErr(''); setPermSaved(false)
+    try {
+      const overrides = permRows.map(({ feature_key, can_view, can_write }) => ({ feature_key, can_view, can_write }))
+      const r = await permissionsApi.setMatrix(id, overrides)
+      setPermRows(r.items || [])
+      setPermSaved(true)
+    } catch (err) {
+      setPermErr(err.message || 'Failed to save access control matrix')
+    } finally {
+      setPermSaving(false)
+    }
+  }
 
   async function handleAddLeave(e) {
     e.preventDefault()
@@ -436,6 +488,59 @@ function StaffDetail() {
                   ))}
                 </tbody>
               </table>
+            </>
+          )}
+        </div>
+      )}
+
+      {canManagePermissions && (
+        <div className="sd-card" style={{ marginTop: '20px' }}>
+          <div className="sd-card__header">
+            <Lock size={16} />
+            <h3>Access Control</h3>
+          </div>
+          <p className="empty-text" style={{ marginTop: '-4px' }}>
+            By default {member.first_name} can view and edit every section their role normally allows.
+            Uncheck a box below to restrict just this account, without changing their role.
+          </p>
+          {permLoading ? (
+            <p className="empty-text">Loading...</p>
+          ) : !permRows ? (
+            <p className="empty-text">Could not load access control settings.</p>
+          ) : (
+            <>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Section</th><th style={{ textAlign: 'center' }}>View</th><th style={{ textAlign: 'center' }}>Write</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {permRows.map(row => (
+                    <tr key={row.feature_key}>
+                      <td>{row.label}{row.is_override && <span className="badge badge--warning" style={{ marginLeft: '8px' }}>Restricted</span>}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" checked={row.can_view} onChange={() => togglePerm(row.feature_key, 'can_view')} />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" checked={row.can_write} onChange={() => togglePerm(row.feature_key, 'can_write')} />
+                      </td>
+                      <td>
+                        {row.is_override && (
+                          <button className="btn btn--outline btn--sm" title="Reset to default (full access)" onClick={() => resetPermRow(row.feature_key)}>
+                            <RotateCcw size={13} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {permErr && <p className="sd-modal__err">{permErr}</p>}
+              {permSaved && <p className="empty-text" style={{ color: 'var(--success)' }}>Access control settings saved.</p>}
+              <div className="modal__actions" style={{ justifyContent: 'flex-start', marginTop: '12px' }}>
+                <button className="btn btn--primary" onClick={handleSavePermissions} disabled={permSaving}>
+                  {permSaving ? 'Saving...' : 'Save Access Control'}
+                </button>
+              </div>
             </>
           )}
         </div>

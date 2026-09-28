@@ -30,52 +30,56 @@ func New(pool *pgxpool.Pool) *Module {
 
 func (m *Module) Name() string { return "results" }
 
+const feature = "results"
+
 func (m *Module) Mount(r chi.Router) {
+	view := httpx.RequireFeature(feature, "view")
+	write := httpx.RequireFeature(feature, "write")
 	r.Route("/subjects", func(r chi.Router) {
-		r.With(httpx.BlockRoles("parent")).Get("/", m.ListSubjects)
+		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListSubjects)
 		// Subject/exam setup is admin work; class teachers only view and enter marks.
 		// Parents never manage results data, only view their own ward's marksheet below.
-		r.With(httpx.BlockRoles("teacher", "parent")).Post("/", m.CreateSubject)
-		r.With(httpx.BlockRoles("teacher", "parent")).Put("/{id}", m.UpdateSubject)
-		r.With(httpx.BlockRoles("teacher", "parent")).Delete("/{id}", m.DeleteSubject)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateSubject)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", m.UpdateSubject)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteSubject)
 		// Adding a graded component ("section") to a subject is entry-time
 		// work, same access as entering marks -- open to teachers, unlike
 		// creating/deleting the subject itself above.
 		r.Route("/{id}/mark-components", func(r chi.Router) {
-			r.With(httpx.BlockRoles("parent")).Get("/", m.ListSubjectComponents)
-			r.With(httpx.BlockRoles("parent")).Post("/", m.AddSubjectComponent)
-			r.With(httpx.BlockRoles("parent")).Delete("/{key}", m.DeleteSubjectComponent)
+			r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListSubjectComponents)
+			r.With(httpx.BlockRoles("parent"), write).Post("/", m.AddSubjectComponent)
+			r.With(httpx.BlockRoles("parent"), write).Delete("/{key}", m.DeleteSubjectComponent)
 		})
 	})
 	r.Route("/exams", func(r chi.Router) {
-		r.With(httpx.BlockRoles("parent")).Get("/", m.ListExams)
-		r.With(httpx.BlockRoles("teacher", "parent")).Post("/", m.CreateExam)
-		r.With(httpx.BlockRoles("teacher", "parent")).Post("/{id}/publish", m.PublishExam)
+		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListExams)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateExam)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/{id}/publish", m.PublishExam)
 	})
 	r.Route("/exam-marks", func(r chi.Router) {
-		r.With(httpx.BlockRoles("parent")).Post("/", m.UpsertMark)
-		r.With(httpx.BlockRoles("parent")).Post("/bulk", m.BulkUpsertMarks)
+		r.With(httpx.BlockRoles("parent"), write).Post("/", m.UpsertMark)
+		r.With(httpx.BlockRoles("parent"), write).Post("/bulk", m.BulkUpsertMarks)
 	})
-	r.Get("/ward-exams", m.WardExams)
+	r.With(view).Get("/ward-exams", m.WardExams)
 	r.Route("/marksheets", func(r chi.Router) {
-		r.Get("/", m.GetMarksheet)
-		r.Get("/pdf", m.DownloadMarksheet)
+		r.With(view).Get("/", m.GetMarksheet)
+		r.With(view).Get("/pdf", m.DownloadMarksheet)
 		// Manually correcting a marksheet's total is a super_admin-only override,
 		// not a general "edit results" permission -- registrars/school admins
 		// still only enter marks through the normal per-subject flow above.
-		r.With(httpx.RequireRole("super_admin")).Put("/total-override", m.SetTotalOverride)
-		r.With(httpx.RequireRole("super_admin")).Delete("/total-override", m.DeleteTotalOverride)
+		r.With(httpx.RequireRole("super_admin"), write).Put("/total-override", m.SetTotalOverride)
+		r.With(httpx.RequireRole("super_admin"), write).Delete("/total-override", m.DeleteTotalOverride)
 	})
 	r.Route("/report-cards", func(r chi.Router) {
-		r.Get("/", m.GetReportCard)
-		r.Get("/pdf", m.DownloadReportCard)
+		r.With(view).Get("/", m.GetReportCard)
+		r.With(view).Get("/pdf", m.DownloadReportCard)
 		// Attendance/remark/promoted-to and discipline grades are filled in
 		// by the class teacher, same access as entering marks -- open to
 		// teacher/admin, never parent.
-		r.With(httpx.BlockRoles("parent")).Put("/details", m.UpsertReportCardDetails)
-		r.With(httpx.BlockRoles("parent")).Put("/discipline-grades", m.UpsertDisciplineGrades)
+		r.With(httpx.BlockRoles("parent"), write).Put("/details", m.UpsertReportCardDetails)
+		r.With(httpx.BlockRoles("parent"), write).Put("/discipline-grades", m.UpsertDisciplineGrades)
 	})
-	r.Get("/discipline-criteria", m.ListDisciplineCriteria)
+	r.With(view).Get("/discipline-criteria", m.ListDisciplineCriteria)
 }
 
 // ---- Subject handlers ----
