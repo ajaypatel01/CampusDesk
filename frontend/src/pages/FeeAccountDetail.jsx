@@ -161,6 +161,12 @@ function FeeAccountDetail() {
           <span>Previous Dues</span>
           <strong>{fmt(account.previous_year_dues)}</strong>
         </div>
+        {account.late_fee > 0 && (
+          <div className="fee-detail__summary-item fee-detail__summary-item--red">
+            <span>Late Fee</span>
+            <strong>{fmt(account.late_fee)}</strong>
+          </div>
+        )}
         <div className="fee-detail__summary-item fee-detail__summary-item--highlight">
           <span>Total Due</span>
           <strong>{fmt(account.total_due)}</strong>

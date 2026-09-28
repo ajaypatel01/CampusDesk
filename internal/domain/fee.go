@@ -38,7 +38,12 @@ type StudentFeeAccount struct {
 	DiscountReason   string    `json:"discount_reason,omitempty"`
 	PreviousYearDues int       `json:"previous_year_dues"`
 	VanFee           int       `json:"van_fee"`
-	IsRTE            bool      `json:"is_rte"`
+	// LateFee is a separate, additive charge -- it adds to total_due/balance
+	// exactly like PreviousYearDues, but never touches TuitionFee itself, so
+	// the grade's actual tuition amount stays accurate regardless of any
+	// penalty layered on top of it.
+	LateFee int  `json:"late_fee"`
+	IsRTE   bool `json:"is_rte"`
 	Timestamps
 }
 

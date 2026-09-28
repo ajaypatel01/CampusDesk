@@ -50,6 +50,7 @@ type installmentAccountRow struct {
 	discountAmount   int
 	vanFee           int
 	previousYearDues int
+	lateFee          int
 	feeStructureID   uuid.UUID
 	numInstallments  int
 }
@@ -57,7 +58,7 @@ type installmentAccountRow struct {
 func (r *Repository) listInstallmentAccounts(ctx context.Context, schoolID, yearID uuid.UUID, gradeLevelID *uuid.UUID) ([]installmentAccountRow, error) {
 	q := `
 		SELECT s.id, s.first_name, s.last_name, s.student_code, gl.name,
-			sfa.id, sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues,
+			sfa.id, sfa.tuition_fee, sfa.discount_amount, sfa.van_fee, sfa.previous_year_dues, sfa.late_fee,
 			fs.id, fs.num_installments
 		FROM student_fee_accounts sfa
 		JOIN students s ON s.id = sfa.student_id
@@ -81,7 +82,7 @@ func (r *Repository) listInstallmentAccounts(ctx context.Context, schoolID, year
 	for rows.Next() {
 		var a installmentAccountRow
 		if err := rows.Scan(&a.studentID, &a.firstName, &a.lastName, &a.studentCode, &a.gradeLevelName,
-			&a.accountID, &a.tuitionFee, &a.discountAmount, &a.vanFee, &a.previousYearDues,
+			&a.accountID, &a.tuitionFee, &a.discountAmount, &a.vanFee, &a.previousYearDues, &a.lateFee,
 			&a.feeStructureID, &a.numInstallments); err != nil {
 			return nil, err
 		}
@@ -232,7 +233,7 @@ func (s *Service) InstallmentSheet(ctx context.Context, schoolID, yearID uuid.UU
 	resp := &InstallmentSheetResponse{}
 	maxInstallments := 0
 	for _, a := range accounts {
-		totalDue := a.tuitionFee - a.discountAmount + a.vanFee + a.previousYearDues
+		totalDue := a.tuitionFee - a.discountAmount + a.vanFee + a.previousYearDues + a.lateFee
 		accountPaid := paidByAccount[a.accountID]
 
 		cells := make([]InstallmentCell, 0, a.numInstallments)

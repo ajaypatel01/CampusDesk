@@ -104,7 +104,7 @@ function Fees() {
       const rows = res.items || []
       const headers = [
         'Student Name', 'Student Code', 'Grade',
-        'Tuition Fee', 'Discount', 'Van Fee', 'Previous Dues',
+        'Tuition Fee', 'Discount', 'Van Fee', 'Previous Dues', 'Late Fee',
         'Total Due', 'Total Paid', 'Balance', 'RTE', 'Status',
       ]
       const csvRows = rows.map(a => {
@@ -117,6 +117,7 @@ function Fees() {
           a.discount_amount,
           a.van_fee,
           a.previous_year_dues,
+          a.late_fee,
           a.total_due,
           a.total_paid,
           a.balance_remaining,
@@ -177,6 +178,12 @@ function Fees() {
             <span className="fee-summary-card__label">Total Discount</span>
             <span className="fee-summary-card__value">{fmt(summary.total_discount)}</span>
           </div>
+          {summary.total_late_fee > 0 && (
+            <div className="fee-summary-card fee-summary-card--red">
+              <span className="fee-summary-card__label">Total Late Fee</span>
+              <span className="fee-summary-card__value">{fmt(summary.total_late_fee)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -237,6 +244,7 @@ function Fees() {
                 <th>Discount</th>
                 <th>Van Fee</th>
                 <th>Prev Dues</th>
+                <th>Late Fee</th>
                 <SortHeader label="Total Due" field="total_due" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <SortHeader label="Paid" field="total_paid" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
                 <SortHeader label="Balance" field="balance_remaining" sortField={sortBy} sortDir={sortOrder} onSort={handleSort} />
@@ -245,7 +253,7 @@ function Fees() {
             </thead>
             <tbody>
               {accounts.length === 0 ? (
-                <tr><td colSpan={11} className="data-table__empty">No fee accounts found</td></tr>
+                <tr><td colSpan={12} className="data-table__empty">No fee accounts found</td></tr>
               ) : accounts.map(a => (
                 <tr key={a.id}>
                   <td>
@@ -257,6 +265,7 @@ function Fees() {
                   <td className="data-table__muted">{a.discount_amount ? fmt(a.discount_amount) : '-'}</td>
                   <td>{a.van_fee ? fmt(a.van_fee) : '-'}</td>
                   <td>{a.previous_year_dues ? fmt(a.previous_year_dues) : '-'}</td>
+                  <td>{a.late_fee ? fmt(a.late_fee) : '-'}</td>
                   <td className="fees-page__amount">{fmt(a.total_due)}</td>
                   <td className="fees-page__paid">{fmt(a.total_paid)}</td>
                   <td className={`fees-page__balance ${a.balance_remaining > 0 ? 'fees-page__balance--due' : ''}`}>
