@@ -276,7 +276,15 @@ function Results() {
     setRcLoading(true); setReportCard(null); setRcError(''); setRcMsg('')
     try {
       const rc = await resultsApi.getReportCard(rcStudentId, currentYear.id)
-      setReportCard(rc)
+      // The backend returns null (not []) for exams/subjects when there's no
+      // published exam data yet for this student -- normalize here so the
+      // table below can always safely .map() over them instead of crashing
+      // the whole page with an uncaught TypeError.
+      setReportCard({
+        ...rc,
+        exams: rc.exams || [],
+        subjects: (rc.subjects || []).map(sub => ({ ...sub, by_exam: sub.by_exam || [] })),
+      })
       setRcDetailsForm({
         roll_no: rc.details?.roll_no || '',
         attendance: rc.details?.attendance || '',
@@ -728,6 +736,11 @@ function Results() {
                 <p><strong>{reportCard.student_name}</strong> · {reportCard.student_code}</p>
               </div>
 
+              {reportCard.exams.length === 0 ? (
+                <p className="empty-text">
+                  No published exam results yet for this student -- publish an exam under the Exams tab once marks are entered.
+                </p>
+              ) : (
               <div className="table-card" style={{ overflowX: 'auto' }}>
                 <table className="data-table">
                   <thead>
@@ -777,6 +790,7 @@ function Results() {
                   </tfoot>
                 </table>
               </div>
+              )}
 
               <h3 style={{ marginTop: '24px' }}>Report Card Details</h3>
               <form onSubmit={handleSaveReportCardDetails} className="results-inline-form">
