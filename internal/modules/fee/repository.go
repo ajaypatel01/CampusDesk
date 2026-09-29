@@ -555,6 +555,15 @@ func (r *Repository) GetPaymentContactPhone(ctx context.Context, paymentID uuid.
 	return phone, nil
 }
 
+// GetStudentInfo returns a student's name/code, plus a best-effort gradeName
+// that callers should NOT rely on: it joins through the student's first
+// enrollment row (any year) to fee_structures by (school_id, academic_year_id)
+// alone, with no grade_level_id correlation and no deterministic ordering --
+// if that year has more than one grade's fee structure (every real school
+// does), which one comes back is arbitrary. Prefer resolving the grade from
+// the specific fee account you already have (GetFeeStructureByID on its
+// FeeStructureID, then GetGradeLevelName) -- that's the account's actual,
+// unambiguous grade, not a guess.
 func (r *Repository) GetStudentInfo(ctx context.Context, studentID uuid.UUID) (name, code, gradeName string, err error) {
 	err = r.pool.QueryRow(ctx, `
 		SELECT s.first_name || ' ' || s.last_name, s.student_code, COALESCE(gl.name, '')
@@ -569,4 +578,16 @@ func (r *Repository) GetStudentInfo(ctx context.Context, studentID uuid.UUID) (n
 		return "", "", "", apperr.ErrNotFound
 	}
 	return
+}
+
+// GetGradeLevelName resolves a grade's name by id -- the reliable way to
+// display a fee account's current grade, via its FeeStructureID's
+// GradeLevelID, rather than GetStudentInfo's ambiguous gradeName.
+func (r *Repository) GetGradeLevelName(ctx context.Context, id uuid.UUID) (string, error) {
+	var name string
+	err := r.pool.QueryRow(ctx, `SELECT name FROM grade_levels WHERE id=$1`, id).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apperr.ErrNotFound
+	}
+	return name, err
 }

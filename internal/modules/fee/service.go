@@ -386,11 +386,18 @@ func (s *Service) GetFeeAccount(ctx context.Context, id uuid.UUID) (*FeeAccountD
 	}
 	detail.BalanceRemaining = detail.TotalDue - detail.TotalPaid
 
-	name, code, grade, err := s.repo.GetStudentInfo(ctx, fa.StudentID)
+	name, code, _, err := s.repo.GetStudentInfo(ctx, fa.StudentID)
 	if err == nil {
 		detail.StudentName = name
 		detail.StudentCode = code
-		detail.GradeLevelName = grade
+	}
+	// Resolve the grade from this account's own fee structure -- not
+	// GetStudentInfo's gradeName, which can't tell one grade's fee
+	// structure from another's (see its doc comment).
+	if fs, err := s.repo.GetFeeStructureByID(ctx, fa.FeeStructureID); err == nil {
+		if gradeName, err := s.repo.GetGradeLevelName(ctx, fs.GradeLevelID); err == nil {
+			detail.GradeLevelName = gradeName
+		}
 	}
 
 	return detail, nil
@@ -578,10 +585,17 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 		return nil, err
 	}
 
-	name, code, grade, _ := s.repo.GetStudentInfo(ctx, studentID)
+	name, code, _, _ := s.repo.GetStudentInfo(ctx, studentID)
 	var gradeLevelID uuid.UUID
+	var grade string
+	// Resolve the grade from this account's own fee structure -- not
+	// GetStudentInfo's gradeName, which can't tell one grade's fee
+	// structure from another's (see its doc comment).
 	if currentFS, err := s.repo.GetFeeStructureByID(ctx, fa.FeeStructureID); err == nil {
 		gradeLevelID = currentFS.GradeLevelID
+		if gradeName, err := s.repo.GetGradeLevelName(ctx, gradeLevelID); err == nil {
+			grade = gradeName
+		}
 	}
 	netTuition := fa.TuitionFee - fa.DiscountAmount
 	totalDue := netTuition + fa.VanFee + fa.PreviousYearDues + fa.LateFee
