@@ -1,0 +1,2 @@
+ALTER TABLE students DROP COLUMN IF EXISTS tc_date;
+ALTER TABLE students DROP COLUMN IF EXISTS tc_year;

@@ -34,5 +34,10 @@ type Student struct {
 	BankHolderName    string        `json:"bank_holder_name,omitempty"`
 	BankBranch        string        `json:"bank_branch,omitempty"`
 	Status            StudentStatus `json:"status"`
+	// TCDate/TCYear record when a Transfer Certificate was issued -- required
+	// whenever Status transitions to "inactive" (see Service.Update), since
+	// that's what a TC is actually issued for.
+	TCDate *time.Time `json:"tc_date,omitempty"`
+	TCYear string     `json:"tc_year,omitempty"`
 	Timestamps
 }

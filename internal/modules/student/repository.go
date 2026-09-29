@@ -21,7 +21,7 @@ const studentCols = `s.id, s.school_id, s.student_code, s.first_name, s.last_nam
 	COALESCE(s.enrollment_number,''), COALESCE(s.admission_class,''), COALESCE(s.admission_year,''),
 	COALESCE(s.previous_school,''), COALESCE(s.bank_name,''), COALESCE(s.bank_ifsc,''),
 	COALESCE(s.bank_account_number,''), COALESCE(s.bank_holder_name,''), COALESCE(s.bank_branch,''),
-	s.status, s.created_at, s.updated_at`
+	s.status, s.tc_date, COALESCE(s.tc_year,''), s.created_at, s.updated_at`
 
 const studentColsSingle = `id, school_id, student_code, first_name, last_name, date_of_birth,
 	COALESCE(gender,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(address,''),
@@ -30,7 +30,7 @@ const studentColsSingle = `id, school_id, student_code, first_name, last_name, d
 	COALESCE(enrollment_number,''), COALESCE(admission_class,''), COALESCE(admission_year,''),
 	COALESCE(previous_school,''), COALESCE(bank_name,''), COALESCE(bank_ifsc,''),
 	COALESCE(bank_account_number,''), COALESCE(bank_holder_name,''), COALESCE(bank_branch,''),
-	status, created_at, updated_at`
+	status, tc_date, COALESCE(tc_year,''), created_at, updated_at`
 
 var sortColumns = map[string]string{
 	"name":           "s.last_name %s, s.first_name %s",
@@ -216,12 +216,13 @@ func (r *Repository) Update(ctx context.Context, s *domain.Student) error {
 			category=$12, aadhar_number=$13, samagra_id=$14, pen_number=$15, apar_id=$16,
 			enrollment_number=$17, admission_class=$18, admission_year=$19,
 			previous_school=$20, bank_name=$21, bank_ifsc=$22, bank_account_number=$23,
-			bank_holder_name=$24, bank_branch=$25, status=$26, updated_at=NOW()
+			bank_holder_name=$24, bank_branch=$25, status=$26, tc_date=$27, tc_year=$28, updated_at=NOW()
 		WHERE id=$1`,
 		s.ID, s.StudentCode, s.FirstName, s.LastName, s.DateOfBirth,
 		nullIfEmpty(s.Gender), s.Email, s.Phone, s.Address, s.AdmissionDate, s.Caste, s.Category,
 		s.AadharNumber, s.SamagraID, s.PenNumber, s.AparID, s.EnrollmentNumber, s.AdmissionClass, s.AdmissionYear,
 		s.PreviousSchool, s.BankName, s.BankIFSC, s.BankAccountNumber, s.BankHolderName, s.BankBranch, s.Status,
+		s.TCDate, nullIfEmpty(s.TCYear),
 	)
 	if err != nil {
 		return database.MapError(err)
@@ -266,7 +267,7 @@ func scanRow(row scannable) (*domain.Student, error) {
 		&s.EnrollmentNumber, &s.AdmissionClass, &s.AdmissionYear,
 		&s.PreviousSchool, &s.BankName, &s.BankIFSC,
 		&s.BankAccountNumber, &s.BankHolderName, &s.BankBranch,
-		&s.Status, &s.CreatedAt, &s.UpdatedAt,
+		&s.Status, &s.TCDate, &s.TCYear, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -284,7 +285,7 @@ func scanListRow(row scannable) (*StudentListItem, error) {
 		&item.EnrollmentNumber, &item.AdmissionClass, &item.AdmissionYear,
 		&item.PreviousSchool, &item.BankName, &item.BankIFSC,
 		&item.BankAccountNumber, &item.BankHolderName, &item.BankBranch,
-		&item.Status, &item.CreatedAt, &item.UpdatedAt,
+		&item.Status, &item.TCDate, &item.TCYear, &item.CreatedAt, &item.UpdatedAt,
 		&item.GradeLevelName,
 		&item.TotalDue, &item.TotalPaid, &item.PendingFees,
 		&item.FeeRemarks,

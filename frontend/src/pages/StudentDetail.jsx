@@ -11,7 +11,7 @@ const SCHOLAR_NO_EDITOR_ROLES = ['registrar', 'super_admin']
 
 function StudentDetail() {
   const { id } = useParams()
-  const { currentYear, currentSchool } = useSchool()
+  const { currentYear, currentSchool, academicYears } = useSchool()
   const { user } = useOutletContext() || {}
   const canEditFees = FEE_EDITOR_ROLES.includes(user?.role)
   const canEditScholarNo = SCHOLAR_NO_EDITOR_ROLES.includes(user?.role)
@@ -142,6 +142,10 @@ function StudentDetail() {
   }
 
   async function handleSave() {
+    if (form.status === 'inactive' && (!form.tc_date || !form.tc_year)) {
+      alert('TC Date and TC Year are required to mark a student inactive.')
+      return
+    }
     setSaving(true)
     try {
       const updated = await studentsApi.update(id, {
@@ -160,6 +164,7 @@ function StudentDetail() {
         bank_account_number: form.bank_account_number,
         bank_holder_name: form.bank_holder_name, bank_branch: form.bank_branch,
         status: form.status,
+        tc_date: toISODate(form.tc_date), tc_year: form.tc_year,
       })
       setStudent(updated)
       setEditing(false)
@@ -236,6 +241,28 @@ function StudentDetail() {
             <Field label="Caste" value={f.caste} editing={editing} onChange={v => setForm({ ...form, caste: v })} />
             <Field label="Category" value={f.category} editing={editing} onChange={v => setForm({ ...form, category: v })} />
             <Field label="Status" value={f.status} editing={editing} onChange={v => setForm({ ...form, status: v })} type="select" options={['active', 'inactive', 'graduated', 'transferred']} />
+            {f.status === 'inactive' && (
+              editing ? (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-field__label">TC Date *</span>
+                    <input className="detail-field__input" type="date" value={f.tc_date?.split('T')[0] || ''} onChange={e => setForm({ ...form, tc_date: e.target.value })} />
+                  </div>
+                  <div className="detail-field">
+                    <span className="detail-field__label">TC Year *</span>
+                    <select className="detail-field__input" value={f.tc_year || ''} onChange={e => setForm({ ...form, tc_year: e.target.value })}>
+                      <option value="">Select...</option>
+                      {(academicYears || []).map(y => <option key={y.id} value={y.name}>{y.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Field label="TC Date" value={f.tc_date ? new Date(f.tc_date).toLocaleDateString('en-IN') : '-'} editing={false} />
+                  <Field label="TC Year" value={f.tc_year || '-'} editing={false} />
+                </>
+              )
+            )}
           </div>
         </div>
 

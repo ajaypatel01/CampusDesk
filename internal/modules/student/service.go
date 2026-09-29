@@ -91,6 +91,9 @@ type UpdateInput struct {
 	BankHolderName    string     `json:"bank_holder_name"`
 	BankBranch        string     `json:"bank_branch"`
 	Status            string     `json:"status"`
+	// TCDate/TCYear are required whenever Status is "inactive" -- see Update.
+	TCDate *time.Time `json:"tc_date"`
+	TCYear string     `json:"tc_year"`
 }
 
 var validSorts = map[string]bool{"name": true, "student_code": true, "admission_date": true, "class": true}
@@ -257,6 +260,17 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	if in.Status != "" {
 		st.Status = domain.StudentStatus(in.Status)
 	}
+	// Marking a student inactive is what a Transfer Certificate is actually
+	// issued for -- require both fields whenever that's the resulting
+	// status, not just on the transition into it, so they can't be dropped
+	// by a later edit either.
+	if st.Status == domain.StudentStatusInactive {
+		if in.TCDate == nil || strings.TrimSpace(in.TCYear) == "" {
+			return nil, fmt.Errorf("%w: TC date and year are required to mark a student inactive", apperr.ErrInvalidInput)
+		}
+	}
+	st.TCDate = in.TCDate
+	st.TCYear = strings.TrimSpace(in.TCYear)
 	if err := s.repo.Update(ctx, st); err != nil {
 		return nil, err
 	}
