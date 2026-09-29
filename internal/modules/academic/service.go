@@ -36,9 +36,11 @@ type GradeUpdateInput struct {
 	Name               string  `json:"name"`
 	SortOrder          int     `json:"sort_order"`
 	ReportCardTemplate *string `json:"report_card_template"`
+	ReportCardDesign   *string `json:"report_card_design"`
 }
 
 var validReportCardTemplates = map[string]bool{"kg": true, "primary": true, "middle": true}
+var validReportCardDesigns = map[string]bool{"classic": true, "modern": true, "minimal": true}
 
 type SectionInput struct {
 	SchoolID          uuid.UUID  `json:"school_id"`
@@ -95,12 +97,19 @@ func (s *Service) UpdateGrade(ctx context.Context, id uuid.UUID, in GradeUpdateI
 	if in.ReportCardTemplate != nil && *in.ReportCardTemplate != "" && !validReportCardTemplates[*in.ReportCardTemplate] {
 		return nil, apperr.ErrInvalidInput
 	}
+	if in.ReportCardDesign != nil && *in.ReportCardDesign != "" && !validReportCardDesigns[*in.ReportCardDesign] {
+		return nil, apperr.ErrInvalidInput
+	}
 	// An empty string from a UI "None" option means "clear it", same as nil.
 	template := in.ReportCardTemplate
 	if template != nil && *template == "" {
 		template = nil
 	}
-	g := &domain.GradeLevel{ID: id, Name: strings.TrimSpace(in.Name), SortOrder: in.SortOrder, ReportCardTemplate: template}
+	design := in.ReportCardDesign
+	if design != nil && *design == "" {
+		design = nil
+	}
+	g := &domain.GradeLevel{ID: id, Name: strings.TrimSpace(in.Name), SortOrder: in.SortOrder, ReportCardTemplate: template, ReportCardDesign: design}
 	if err := s.repo.UpdateGrade(ctx, g); err != nil {
 		return nil, err
 	}

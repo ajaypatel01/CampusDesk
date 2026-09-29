@@ -25,6 +25,11 @@ type GradeLevel struct {
 	// grade prints ("kg", "primary", "middle"), or nil for grades that still
 	// use the generic single-exam marksheet.
 	ReportCardTemplate *string `json:"report_card_template,omitempty"`
+	// ReportCardDesign locks the visual skin ("classic", "modern", "minimal")
+	// every student in this grade sees/downloads their report card in, or nil
+	// if it hasn't been locked yet (falls back to an ad-hoc per-download
+	// choice, same as before this field existed).
+	ReportCardDesign *string `json:"report_card_design,omitempty"`
 	Timestamps
 }
 

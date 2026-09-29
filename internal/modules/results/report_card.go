@@ -72,8 +72,13 @@ type ReportCard struct {
 	GradeLevelID   uuid.UUID  `json:"grade_level_id"`
 	GradeLevelName string     `json:"grade_level_name"`
 	Template       string     `json:"template"`
-	AcademicYearID uuid.UUID  `json:"academic_year_id"`
-	AcademicYear   string     `json:"academic_year"`
+	// Design is the grade's locked report-card look ("classic"/"modern"/
+	// "minimal"), or "" if the grade hasn't locked one yet -- in which case
+	// the PDF download still accepts an ad-hoc ?design= choice, same as
+	// before this field existed.
+	Design         string    `json:"design,omitempty"`
+	AcademicYearID uuid.UUID `json:"academic_year_id"`
+	AcademicYear   string    `json:"academic_year"`
 
 	Exams    []ReportCardExam       `json:"exams"`
 	Subjects []ReportCardSubjectRow `json:"subjects"`
@@ -176,11 +181,11 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 	// everywhere else a student's current grade is resolved (see
 	// student.Repository.List's grade_level filter).
 	var schoolID uuid.UUID
-	var template *string
+	var template, design *string
 	err := r.pool.QueryRow(ctx, `
 		SELECT s.first_name||' '||s.last_name, s.student_code, s.date_of_birth, COALESCE(s.pen_number,''), COALESCE(s.apar_id,''),
 			sch.id, sch.name, sch.code, COALESCE(sch.address,''), COALESCE(sch.dice_code,''),
-			gl.id, gl.name, gl.report_card_template,
+			gl.id, gl.name, gl.report_card_template, gl.report_card_design,
 			ay.name
 		FROM students s
 		JOIN schools sch ON sch.id = s.school_id
@@ -191,7 +196,7 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		WHERE s.id = $1`, studentID, academicYearID,
 	).Scan(&rc.StudentName, &rc.StudentCode, &rc.DateOfBirth, &rc.PenNumber, &rc.AparID,
 		&schoolID, &rc.SchoolName, &rc.SchoolCode, &rc.SchoolAddress, &rc.DiceCode,
-		&rc.GradeLevelID, &rc.GradeLevelName, &template, &rc.AcademicYear)
+		&rc.GradeLevelID, &rc.GradeLevelName, &template, &design, &rc.AcademicYear)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -202,6 +207,9 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		return nil, fmt.Errorf("%s has no report-card template set", rc.GradeLevelName)
 	}
 	rc.Template = *template
+	if design != nil {
+		rc.Design = *design
+	}
 	components := MarkComponentsForTemplate(template)
 
 	examRows, err := r.pool.Query(ctx, `

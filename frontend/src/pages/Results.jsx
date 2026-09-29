@@ -6,6 +6,8 @@ import { resultsApi, academicApi, studentsApi } from '../services/api'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import './Results.css'
 
+const DESIGN_LABELS = { classic: 'Classic', modern: 'Modern Color', minimal: 'Minimal' }
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -302,8 +304,12 @@ function Results() {
 
   async function downloadReportCardPDF() {
     if (!rcStudentId || !currentYear) return
+    // The backend enforces the grade's locked design regardless of what's
+    // sent, but pass it explicitly too so there's no mismatch between what
+    // this button visibly says and what comes out.
+    const design = reportCard?.design || rcDesign
     try {
-      const blob = await resultsApi.downloadReportCard(rcStudentId, currentYear.id, rcDesign)
+      const blob = await resultsApi.downloadReportCard(rcStudentId, currentYear.id, design)
       downloadBlob(blob, `report_card.pdf`)
     } catch (err) { alert(err.message) }
   }
@@ -714,11 +720,17 @@ function Results() {
             </button>
             {reportCard && (
               <>
-                <select value={rcDesign} onChange={e => setRcDesign(e.target.value)} title="PDF design (doesn't change the marks/grades, just the look)">
-                  <option value="classic">Design: Classic</option>
-                  <option value="modern">Design: Modern Color</option>
-                  <option value="minimal">Design: Minimal</option>
-                </select>
+                {reportCard.design ? (
+                  <span className="doc-msg" title="This grade's report card design is locked under Settings -> Grade Levels -- every student in it prints in this same look.">
+                    Design: {DESIGN_LABELS[reportCard.design] || reportCard.design} (locked for this grade)
+                  </span>
+                ) : (
+                  <select value={rcDesign} onChange={e => setRcDesign(e.target.value)} title="Not locked for this grade yet -- pick a design to preview/download with. Lock one under Settings -> Grade Levels to make it permanent for every student.">
+                    <option value="classic">Design: Classic</option>
+                    <option value="modern">Design: Modern Color</option>
+                    <option value="minimal">Design: Minimal</option>
+                  </select>
+                )}
                 <button className="btn btn--outline" onClick={downloadReportCardPDF}>
                   <Download size={16} /> Download PDF
                 </button>

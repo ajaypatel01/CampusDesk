@@ -171,10 +171,26 @@ function Settings() {
     finally { setSaving(false) }
   }
 
+  // Both handlers always send report_card_template AND report_card_design
+  // together (one held at its current value) -- UpdateGrade writes every
+  // column on every call, so omitting one here would silently clear it.
   async function handleChangeReportCardTemplate(grade, template) {
     try {
-      await academicApi.updateGrade(grade.id, { name: grade.name, sort_order: grade.sort_order, report_card_template: template || null })
+      await academicApi.updateGrade(grade.id, {
+        name: grade.name, sort_order: grade.sort_order,
+        report_card_template: template || null, report_card_design: grade.report_card_design || null,
+      })
       setGrades(prev => prev.map(g => g.id === grade.id ? { ...g, report_card_template: template || null } : g))
+    } catch (err) { alert(err.message) }
+  }
+
+  async function handleChangeReportCardDesign(grade, design) {
+    try {
+      await academicApi.updateGrade(grade.id, {
+        name: grade.name, sort_order: grade.sort_order,
+        report_card_template: grade.report_card_template || null, report_card_design: design || null,
+      })
+      setGrades(prev => prev.map(g => g.id === grade.id ? { ...g, report_card_design: design || null } : g))
     } catch (err) { alert(err.message) }
   }
 
@@ -435,6 +451,18 @@ function Settings() {
                             <option value="kg">KG (Nursery/LKG/UKG)</option>
                             <option value="primary">Primary (1st-4th)</option>
                             <option value="middle">Middle (6th-7th)</option>
+                          </select>
+                        </label>
+                        <label className="settings-list__meta" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Locks the report card's look for every student in this grade -- they won't be able to pick a different one.">
+                          Design:
+                          <select
+                            value={g.report_card_design || ''}
+                            onChange={e => handleChangeReportCardDesign(g, e.target.value)}
+                          >
+                            <option value="">Not locked (default: Classic)</option>
+                            <option value="classic">Classic</option>
+                            <option value="modern">Modern Color</option>
+                            <option value="minimal">Minimal</option>
                           </select>
                         </label>
                       </div>

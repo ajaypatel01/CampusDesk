@@ -70,7 +70,7 @@ func (r *Repository) CreateGrade(ctx context.Context, g *domain.GradeLevel) erro
 
 func (r *Repository) ListGrades(ctx context.Context, schoolID uuid.UUID) ([]domain.GradeLevel, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, school_id, name, sort_order, report_card_template, created_at, updated_at
+		SELECT id, school_id, name, sort_order, report_card_template, report_card_design, created_at, updated_at
 		FROM grade_levels WHERE school_id=$1 ORDER BY sort_order, name`, schoolID,
 	)
 	if err != nil {
@@ -80,7 +80,7 @@ func (r *Repository) ListGrades(ctx context.Context, schoolID uuid.UUID) ([]doma
 	var items []domain.GradeLevel
 	for rows.Next() {
 		var g domain.GradeLevel
-		if err := rows.Scan(&g.ID, &g.SchoolID, &g.Name, &g.SortOrder, &g.ReportCardTemplate, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.SchoolID, &g.Name, &g.SortOrder, &g.ReportCardTemplate, &g.ReportCardDesign, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, g)
@@ -88,12 +88,12 @@ func (r *Repository) ListGrades(ctx context.Context, schoolID uuid.UUID) ([]doma
 	return items, rows.Err()
 }
 
-// UpdateGrade updates a grade level's name, sort order, and report-card
-// template. Name/sort order were previously create-only.
+// UpdateGrade updates a grade level's name, sort order, report-card
+// template, and locked design. Name/sort order were previously create-only.
 func (r *Repository) UpdateGrade(ctx context.Context, g *domain.GradeLevel) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE grade_levels SET name=$2, sort_order=$3, report_card_template=$4, updated_at=NOW()
-		WHERE id=$1`, g.ID, g.Name, g.SortOrder, g.ReportCardTemplate)
+		UPDATE grade_levels SET name=$2, sort_order=$3, report_card_template=$4, report_card_design=$5, updated_at=NOW()
+		WHERE id=$1`, g.ID, g.Name, g.SortOrder, g.ReportCardTemplate, g.ReportCardDesign)
 	if err != nil {
 		return database.MapError(err)
 	}
@@ -107,9 +107,9 @@ func (r *Repository) UpdateGrade(ctx context.Context, g *domain.GradeLevel) erro
 func (r *Repository) GetGrade(ctx context.Context, id uuid.UUID) (*domain.GradeLevel, error) {
 	var g domain.GradeLevel
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, school_id, name, sort_order, report_card_template, created_at, updated_at
+		SELECT id, school_id, name, sort_order, report_card_template, report_card_design, created_at, updated_at
 		FROM grade_levels WHERE id=$1`, id,
-	).Scan(&g.ID, &g.SchoolID, &g.Name, &g.SortOrder, &g.ReportCardTemplate, &g.CreatedAt, &g.UpdatedAt)
+	).Scan(&g.ID, &g.SchoolID, &g.Name, &g.SortOrder, &g.ReportCardTemplate, &g.ReportCardDesign, &g.CreatedAt, &g.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}

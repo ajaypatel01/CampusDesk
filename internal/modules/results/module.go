@@ -697,7 +697,14 @@ func (m *Module) DownloadReportCard(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	theme := themeByName(r.URL.Query().Get("design"))
+	// A grade with a locked design always wins over whatever the caller
+	// asked for -- that's the whole point of locking one -- so an ad-hoc
+	// ?design= only still matters for grades that haven't locked one yet.
+	designChoice := r.URL.Query().Get("design")
+	if rc.Design != "" {
+		designChoice = rc.Design
+	}
+	theme := themeByName(designChoice)
 	var pdfBytes []byte
 	switch rc.Template {
 	case "kg":
