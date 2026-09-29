@@ -36,7 +36,7 @@ func (r *Repository) Create(ctx context.Context, u *domain.User) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at FROM users WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, created_at, updated_at FROM users WHERE id=$1`, id)
 }
 
 // FindStudentIDByCode looks up a student by their scholar number (student_code) within
@@ -78,7 +78,30 @@ func (r *Repository) LinkParentToStudent(ctx context.Context, userID, studentID 
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at FROM users WHERE email=$1`, email)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, created_at, updated_at FROM users WHERE email=$1`, email)
+}
+
+// GetByPhone looks up a user by their OTP-verified phone number -- used by
+// OTP login and phone-based password reset. Unverified numbers (e.g. one
+// copied from a staff/guardian profile) never land here, only ones that
+// went through ConfirmPhoneVerification.
+func (r *Repository) GetByPhone(ctx context.Context, phone string) (*domain.User, error) {
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, created_at, updated_at FROM users WHERE phone_number=$1`, phone)
+}
+
+// SetPhoneNumber records a user's OTP-verified phone number. Returns
+// apperr.ErrConflict if another account already has it (the partial unique
+// index on users.phone_number) -- the caller should show a generic "that
+// number is already in use" rather than which account has it.
+func (r *Repository) SetPhoneNumber(ctx context.Context, userID uuid.UUID, phone string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET phone_number=$2, updated_at=NOW() WHERE id=$1`, userID, phone)
+	if err != nil {
+		return database.MapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
 }
 
 // UpdateStatus transitions a user's approval status (e.g. pending -> approved/rejected)
@@ -148,7 +171,7 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domai
 
 	limitArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err = r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, created_at, updated_at
+		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, created_at, updated_at
 		FROM users %s ORDER BY is_active DESC, last_name, first_name LIMIT $%d OFFSET $%d`,
 		whereClause, len(args)+1, len(args)+2), limitArgs...,
 	)
@@ -190,7 +213,7 @@ type scannable interface {
 
 func scanRow(row scannable) (*domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.TokenVersion, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.TokenVersion, &u.PhoneNumber, &u.CreatedAt, &u.UpdatedAt)
 	return &u, err
 }
 

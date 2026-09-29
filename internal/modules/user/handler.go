@@ -215,3 +215,144 @@ func (h *Handler) Reject(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, u)
 }
+
+// Me returns the caller's own profile -- unlike Get, it's not gated by the
+// user_management feature or BlockRoles("registrar"), since it only ever
+// returns the caller's own record regardless of role.
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	u, err := h.svc.Get(r.Context(), userID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, u)
+}
+
+// RequestPhoneVerification sends an OTP to a phone number the caller wants
+// to attach to their own account -- it isn't saved until ConfirmPhoneVerification.
+func (h *Handler) RequestPhoneVerification(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.RequestPhoneVerification(r.Context(), in.Phone); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+// ConfirmPhoneVerification checks the OTP and, on success, attaches phone to
+// the caller's own account (never someone else's).
+func (h *Handler) ConfirmPhoneVerification(w http.ResponseWriter, r *http.Request) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var in struct {
+		Phone string `json:"phone"`
+		OTP   string `json:"otp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.ConfirmPhoneVerification(r.Context(), userID, in.Phone, in.OTP); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	u, err := h.svc.Get(r.Context(), userID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, u)
+}
+
+// RequestOTPLogin sends a login OTP to phone (must already be a verified,
+// usable account -- see Service.RequestOTPLogin for why this can't hide
+// whether a number is registered the way the email reset flow does).
+func (h *Handler) RequestOTPLogin(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.RequestOTPLogin(r.Context(), in.Phone); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+		OTP   string `json:"otp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	resp, err := h.svc.VerifyOTPLogin(r.Context(), in.Phone, in.OTP)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, resp)
+}
+
+// RequestPasswordResetOTP always responds success, whether or not the
+// phone belongs to an account -- see Service.RequestPasswordResetOTP.
+func (h *Handler) RequestPasswordResetOTP(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.RequestPasswordResetOTP(r.Context(), in.Phone); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+func (h *Handler) ConfirmPasswordResetOTP(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Phone       string `json:"phone"`
+		OTP         string `json:"otp"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.ConfirmPasswordResetOTP(r.Context(), in.Phone, in.OTP, in.NewPassword); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "reset"})
+}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/smsotp"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -15,9 +16,9 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool, jwtSecret string, emailClient *email.Client, frontendURL string) *Module {
+func New(pool *pgxpool.Pool, jwtSecret string, emailClient *email.Client, smsClient *smsotp.Client, frontendURL string) *Module {
 	repo := NewRepository(pool)
-	svc := NewService(repo, jwtSecret, emailClient, frontendURL)
+	svc := NewService(repo, jwtSecret, emailClient, smsClient, frontendURL)
 	return &Module{repo: repo, handler: NewHandler(svc)}
 }
 
@@ -64,6 +65,13 @@ func (m *Module) MountPublic(r chi.Router) {
 	r.Post("/auth/register", m.handler.Register)
 	r.Post("/auth/password-reset/request", m.handler.RequestPasswordReset)
 	r.Post("/auth/password-reset/confirm", m.handler.ConfirmPasswordReset)
+	// OTP login and phone-based password reset -- both return a clear
+	// "not configured" error until MSG91_AUTH_KEY/MSG91_OTP_TEMPLATE_ID are
+	// set (see internal/platform/smsotp).
+	r.Post("/auth/otp/send", m.handler.RequestOTPLogin)
+	r.Post("/auth/otp/verify", m.handler.VerifyOTPLogin)
+	r.Post("/auth/password-reset/otp-request", m.handler.RequestPasswordResetOTP)
+	r.Post("/auth/password-reset/otp-confirm", m.handler.ConfirmPasswordResetOTP)
 }
 
 const feature = "user_management"
@@ -72,10 +80,15 @@ const feature = "user_management"
 func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
-	// Any authenticated user may log themselves out everywhere -- not
+	// Any authenticated user may log themselves out everywhere, fetch their
+	// own profile, or verify their own phone number -- none of these are
 	// gated by the user_management feature, which is about administering
-	// OTHER accounts.
+	// OTHER accounts. /auth/me exists so every role (including registrar,
+	// blocked from /users/{id} below) can read their own record.
 	r.Post("/auth/logout-everywhere", m.handler.LogoutEverywhere)
+	r.Get("/auth/me", m.handler.Me)
+	r.Post("/auth/phone/verify/request", m.handler.RequestPhoneVerification)
+	r.Post("/auth/phone/verify/confirm", m.handler.ConfirmPhoneVerification)
 	r.Route("/users", func(r chi.Router) {
 		r.Use(httpx.BlockRoles("registrar"))
 		r.With(view).Get("/", m.handler.List)

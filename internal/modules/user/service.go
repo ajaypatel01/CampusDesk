@@ -13,6 +13,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/smsotp"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,11 +32,12 @@ type Service struct {
 	repo        *Repository
 	jwtSecret   string
 	emailClient *email.Client
+	smsClient   *smsotp.Client
 	frontendURL string
 }
 
-func NewService(repo *Repository, jwtSecret string, emailClient *email.Client, frontendURL string) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret, emailClient: emailClient, frontendURL: frontendURL}
+func NewService(repo *Repository, jwtSecret string, emailClient *email.Client, smsClient *smsotp.Client, frontendURL string) *Service {
+	return &Service{repo: repo, jwtSecret: jwtSecret, emailClient: emailClient, smsClient: smsClient, frontendURL: frontendURL}
 }
 
 type CreateInput struct {
@@ -237,14 +239,8 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
 		return nil, apperr.ErrUnauthorized
 	}
-	switch u.Status {
-	case domain.UserStatusPending:
-		return nil, fmt.Errorf("%w: your registration is pending admin approval", apperr.ErrUnauthorized)
-	case domain.UserStatusRejected:
-		return nil, fmt.Errorf("%w: your registration was rejected", apperr.ErrUnauthorized)
-	}
-	if !u.IsActive {
-		return nil, fmt.Errorf("%w: account is disabled", apperr.ErrUnauthorized)
+	if err := checkLoginable(u); err != nil {
+		return nil, err
 	}
 	u.PasswordHash = ""
 	schoolID := ""
@@ -341,5 +337,162 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, token, newPassword s
 // to keep using the session that just called this.
 func (s *Service) LogoutEverywhere(ctx context.Context, userID uuid.UUID) error {
 	_, err := s.repo.BumpTokenVersion(ctx, userID)
+	return err
+}
+
+// ---- Phone verification (self-service, logged in) ----
+//
+// A phone number is never copied in from a staff/guardian profile -- OTP
+// verification is what actually establishes it belongs to the account
+// owner, not just someone associated with the student/school.
+
+// RequestPhoneVerification sends an OTP to phone via MSG91. The number
+// isn't saved yet -- only ConfirmPhoneVerification, after a correct OTP,
+// actually sets users.phone_number.
+func (s *Service) RequestPhoneVerification(ctx context.Context, phone string) error {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return apperr.ErrInvalidInput
+	}
+	if existing, err := s.repo.GetByPhone(ctx, phone); err == nil && existing != nil {
+		return fmt.Errorf("%w: that phone number is already in use on another account", apperr.ErrConflict)
+	}
+	return s.smsClient.SendOTP(phone)
+}
+
+// ConfirmPhoneVerification checks the OTP and, if correct, sets
+// userID's phone_number.
+func (s *Service) ConfirmPhoneVerification(ctx context.Context, userID uuid.UUID, phone, otp string) error {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	phone = strings.TrimSpace(phone)
+	ok, err := s.smsClient.VerifyOTP(phone, otp)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%w: invalid or expired OTP", apperr.ErrInvalidInput)
+	}
+	return s.repo.SetPhoneNumber(ctx, userID, phone)
+}
+
+// ---- OTP login ----
+
+// RequestOTPLogin sends a login OTP if phone belongs to a real, usable
+// account -- unlike RequestPasswordReset's email flow, this deliberately
+// does NOT report uniform success for an unknown number, since sending a
+// real SMS costs money per attempt; the tradeoff is a phone number can be
+// probed for whether it's registered, same as the plain-password login
+// endpoint already allows today via its error message.
+func (s *Service) RequestOTPLogin(ctx context.Context, phone string) error {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	phone = strings.TrimSpace(phone)
+	u, err := s.repo.GetByPhone(ctx, phone)
+	if err != nil {
+		return fmt.Errorf("%w: no account found for that phone number", apperr.ErrUnauthorized)
+	}
+	if err := checkLoginable(u); err != nil {
+		return err
+	}
+	return s.smsClient.SendOTP(phone)
+}
+
+// VerifyOTPLogin mints a JWT exactly like Login, after checking the OTP --
+// same pending/rejected/disabled account checks apply.
+func (s *Service) VerifyOTPLogin(ctx context.Context, phone, otp string) (*LoginResponse, error) {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return nil, fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	phone = strings.TrimSpace(phone)
+	u, err := s.repo.GetByPhone(ctx, phone)
+	if err != nil {
+		return nil, apperr.ErrUnauthorized
+	}
+	if err := checkLoginable(u); err != nil {
+		return nil, err
+	}
+	ok, err := s.smsClient.VerifyOTP(phone, otp)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("%w: invalid or expired OTP", apperr.ErrUnauthorized)
+	}
+	u.PasswordHash = ""
+	schoolID := ""
+	if u.SchoolID != nil {
+		schoolID = u.SchoolID.String()
+	}
+	token, err := httpx.GenerateToken(u.ID.String(), string(u.Role), schoolID, u.TokenVersion, s.jwtSecret)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginResponse{User: u, Token: token}, nil
+}
+
+// checkLoginable applies the same pending/rejected/disabled checks Login
+// uses, factored out so OTP login enforces them identically.
+func checkLoginable(u *domain.User) error {
+	switch u.Status {
+	case domain.UserStatusPending:
+		return fmt.Errorf("%w: your registration is pending admin approval", apperr.ErrUnauthorized)
+	case domain.UserStatusRejected:
+		return fmt.Errorf("%w: your registration was rejected", apperr.ErrUnauthorized)
+	}
+	if !u.IsActive {
+		return fmt.Errorf("%w: account is disabled", apperr.ErrUnauthorized)
+	}
+	return nil
+}
+
+// ---- Phone-OTP password reset ----
+//
+// An alternative to the email-link flow for an account with a verified
+// phone number -- not a replacement for it.
+
+func (s *Service) RequestPasswordResetOTP(ctx context.Context, phone string) error {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	phone = strings.TrimSpace(phone)
+	if _, err := s.repo.GetByPhone(ctx, phone); err != nil {
+		return nil // unknown number: report success anyway, same reasoning as the email flow
+	}
+	return s.smsClient.SendOTP(phone)
+}
+
+func (s *Service) ConfirmPasswordResetOTP(ctx context.Context, phone, otp, newPassword string) error {
+	if s.smsClient == nil || !s.smsClient.Enabled() {
+		return fmt.Errorf("%w: SMS OTP is not configured yet", apperr.ErrInvalidInput)
+	}
+	if len(newPassword) < 6 {
+		return apperr.ErrInvalidInput
+	}
+	phone = strings.TrimSpace(phone)
+	u, err := s.repo.GetByPhone(ctx, phone)
+	if err != nil {
+		return fmt.Errorf("%w: this OTP is invalid or has expired", apperr.ErrInvalidInput)
+	}
+	ok, err := s.smsClient.VerifyOTP(phone, otp)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%w: this OTP is invalid or has expired", apperr.ErrInvalidInput)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdatePasswordHash(ctx, u.ID, string(hash)); err != nil {
+		return err
+	}
+	_, err = s.repo.BumpTokenVersion(ctx, u.ID)
 	return err
 }
