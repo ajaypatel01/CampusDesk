@@ -16,9 +16,19 @@ type Config struct {
 	Email    EmailConfig
 	Storage  StorageConfig
 	WhatsApp WhatsAppConfig
+	SMSOTP   SMSOTPConfig
 	// FrontendURL is the base URL of the deployed web app, used to build
 	// links that get emailed out (e.g. a password reset link).
 	FrontendURL string
+}
+
+// SMSOTPConfig configures MSG91 OTP delivery (see internal/platform/smsotp).
+// Until AuthKey/TemplateID are set, that client's Enabled() is false and
+// every OTP endpoint returns a clear "not configured" error.
+type SMSOTPConfig struct {
+	AuthKey    string
+	SenderID   string
+	TemplateID string
 }
 
 type StorageConfig struct {
@@ -104,6 +114,11 @@ func Load() (*Config, error) {
 			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
 			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
+		},
+		SMSOTP: SMSOTPConfig{
+			AuthKey:    os.Getenv("MSG91_AUTH_KEY"),
+			SenderID:   os.Getenv("MSG91_SENDER_ID"),
+			TemplateID: os.Getenv("MSG91_OTP_TEMPLATE_ID"),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
 	}, nil

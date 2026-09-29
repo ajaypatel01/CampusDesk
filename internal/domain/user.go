@@ -20,6 +20,11 @@ type User struct {
 	// bumping it (LogoutEverywhere) invalidates every previously issued
 	// token immediately, without a server-side session store.
 	TokenVersion int `json:"-"`
+	// PhoneNumber is set only once OTP-verified (see the user module's
+	// RequestPhoneVerification/ConfirmPhoneVerification) -- never copied in
+	// from a guardian/staff profile's contact number, since that isn't
+	// necessarily the account owner's own phone.
+	PhoneNumber *string `json:"phone_number,omitempty"`
 	Timestamps
 }
 

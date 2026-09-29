@@ -34,6 +34,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/smsotp"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/storage"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/go-chi/chi/v5"
@@ -70,6 +71,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	}
 
 	waClient := whatsapp.New(cfg.WhatsApp.PhoneNumberID, cfg.WhatsApp.AccessToken, cfg.WhatsApp.APIVersion)
+	smsClient := smsotp.New(cfg.SMSOTP.AuthKey, cfg.SMSOTP.SenderID, cfg.SMSOTP.TemplateID)
 
 	router := chi.NewRouter()
 	router.Use(httpx.CommonMiddleware()...)
@@ -91,7 +93,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	api := chi.NewRouter()
 	api.Use(middleware.StripSlashes)
 
-	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, cfg.FrontendURL)
+	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, smsClient, cfg.FrontendURL)
 	schoolMod := school.New(pool)
 	permsMod := permissions.New(pool)
 

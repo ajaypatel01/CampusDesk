@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, Check, X } from 'lucide-react'
+import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, Check, X, UserCircle, Smartphone } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { schoolsApi, academicApi, feesApi, usersApi } from '../services/api'
 import './Settings.css'
@@ -19,6 +19,14 @@ function Settings() {
   const isAdmin = user?.role === 'super_admin' || user?.role === 'school_admin'
   const isRegistrar = user?.role === 'registrar'
   const [activeTab, setActiveTab] = useState(isRegistrar ? 'fees' : 'school')
+  const [me, setMe] = useState(null)
+  const [phoneInput, setPhoneInput] = useState('')
+  const [otpInput, setOtpInput] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [phoneSending, setPhoneSending] = useState(false)
+  const [phoneVerifying, setPhoneVerifying] = useState(false)
+  const [phoneErr, setPhoneErr] = useState('')
+  const [phoneMsg, setPhoneMsg] = useState('')
   const [grades, setGrades] = useState([])
   const [sections, setSections] = useState([])
   const [feeStructures, setFeeStructures] = useState([])
@@ -43,6 +51,42 @@ function Settings() {
   const [sectionForm, setSectionForm] = useState({ grade_level_id: '', name: '', capacity: '30' })
 
   const [saving, setSaving] = useState(false)
+
+  function loadMe() {
+    usersApi.me().then(setMe).catch(() => setMe(null))
+  }
+
+  useEffect(loadMe, [])
+
+  async function handleSendPhoneOtp(e) {
+    e.preventDefault()
+    setPhoneErr(''); setPhoneMsg(''); setPhoneSending(true)
+    try {
+      await usersApi.requestPhoneVerification(phoneInput)
+      setOtpSent(true)
+    } catch (err) {
+      setPhoneErr(err.message || 'Could not send OTP')
+    } finally {
+      setPhoneSending(false)
+    }
+  }
+
+  async function handleVerifyPhoneOtp(e) {
+    e.preventDefault()
+    setPhoneErr(''); setPhoneMsg(''); setPhoneVerifying(true)
+    try {
+      const updated = await usersApi.confirmPhoneVerification(phoneInput, otpInput)
+      setMe(updated)
+      setOtpSent(false)
+      setPhoneInput('')
+      setOtpInput('')
+      setPhoneMsg('Phone number verified.')
+    } catch (err) {
+      setPhoneErr(err.message || 'Invalid or expired OTP')
+    } finally {
+      setPhoneVerifying(false)
+    }
+  }
 
   useEffect(() => {
     if (!currentSchool) return
@@ -204,15 +248,18 @@ function Settings() {
   // sections (POST/PUT /grade-levels only blocks teacher/parent; POST
   // /class-sections has no role restriction at all) -- they were just never
   // given a way to reach it from this page.
-  const tabs = isRegistrar ? [
-    { id: 'grades', label: 'Grades & Sections', icon: Layers },
-    { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
-  ] : [
-    { id: 'school', label: 'School', icon: Building },
-    { id: 'academic', label: 'Academic Years', icon: CalendarDays },
-    { id: 'grades', label: 'Grades & Sections', icon: Layers },
-    { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
-    ...(isAdmin ? [{ id: 'approvals', label: 'User Approvals', icon: UserCheck }] : []),
+  const tabs = [
+    { id: 'account', label: 'My Account', icon: UserCircle },
+    ...(isRegistrar ? [
+      { id: 'grades', label: 'Grades & Sections', icon: Layers },
+      { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
+    ] : [
+      { id: 'school', label: 'School', icon: Building },
+      { id: 'academic', label: 'Academic Years', icon: CalendarDays },
+      { id: 'grades', label: 'Grades & Sections', icon: Layers },
+      { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
+      ...(isAdmin ? [{ id: 'approvals', label: 'User Approvals', icon: UserCheck }] : []),
+    ]),
   ]
 
   return (
@@ -232,6 +279,54 @@ function Settings() {
         </div>
 
         <div className="settings-page__content">
+          {activeTab === 'account' && (
+            <div className="settings-section">
+              <div className="settings-section__header">
+                <div>
+                  <h2>My Account</h2>
+                  <p className="empty-text">{me?.email} &middot; {roleLabel[me?.role] || me?.role}</p>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', marginBottom: '8px' }}><Smartphone size={16} /> Phone Number</h3>
+                {me?.phone_number ? (
+                  <p className="empty-text">
+                    Verified: <strong>{me.phone_number}</strong>. This number can be used to log in with an OTP instead of your password.
+                  </p>
+                ) : (
+                  <>
+                    <p className="empty-text">
+                      Verify a phone number to enable OTP login as an alternative to your password.
+                    </p>
+                    <form className="modal__form" style={{ maxWidth: '360px' }} onSubmit={otpSent ? handleVerifyPhoneOtp : handleSendPhoneOtp}>
+                      {phoneErr && <p className="sd-modal__err">{phoneErr}</p>}
+                      {phoneMsg && <p className="empty-text" style={{ color: 'var(--success)' }}>{phoneMsg}</p>}
+                      <label className="form-field">
+                        <span>Phone Number</span>
+                        <input type="tel" required disabled={otpSent} value={phoneInput} onChange={e => setPhoneInput(e.target.value)} placeholder="+91 99999 99999" />
+                      </label>
+                      {otpSent && (
+                        <label className="form-field">
+                          <span>OTP</span>
+                          <input type="text" inputMode="numeric" required autoFocus value={otpInput} onChange={e => setOtpInput(e.target.value)} placeholder="6-digit code" />
+                        </label>
+                      )}
+                      <div className="modal__actions" style={{ justifyContent: 'flex-start' }}>
+                        {otpSent && (
+                          <button type="button" className="btn btn--outline" onClick={() => { setOtpSent(false); setOtpInput('') }}>Use a different number</button>
+                        )}
+                        <button type="submit" className="btn btn--primary" disabled={phoneSending || phoneVerifying}>
+                          {otpSent ? (phoneVerifying ? 'Verifying...' : 'Verify') : (phoneSending ? 'Sending...' : 'Send OTP')}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'school' && (
             <div className="settings-section">
               <div className="settings-section__header">

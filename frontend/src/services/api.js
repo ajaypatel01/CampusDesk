@@ -145,6 +145,20 @@ export const usersApi = {
   // the caller must still clear its own stored token and redirect, same as
   // a normal logout, right after this resolves (or fails/times out).
   logoutEverywhere: () => request('/auth/logout-everywhere', { method: 'POST' }),
+  // The caller's own profile -- works for every role, unlike get(id) above
+  // which registrars can't use on themselves.
+  me: () => request('/auth/me'),
+  // Self-service phone verification: request sends an OTP to a number not
+  // yet saved anywhere; confirm attaches it to the caller's own account.
+  requestPhoneVerification: (phone) => request('/auth/phone/verify/request', { method: 'POST', body: JSON.stringify({ phone }) }),
+  confirmPhoneVerification: (phone, otp) => request('/auth/phone/verify/confirm', { method: 'POST', body: JSON.stringify({ phone, otp }) }),
+  // OTP login -- only works once a number has been verified via the above.
+  requestOTPLogin: (phone) => request('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) }),
+  verifyOTPLogin: (phone, otp) => request('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, otp }) }),
+  // Phone-based password reset, an alternative to the emailed-link flow for
+  // an account with a verified number.
+  requestPasswordResetOTP: (phone) => request('/auth/password-reset/otp-request', { method: 'POST', body: JSON.stringify({ phone }) }),
+  confirmPasswordResetOTP: (phone, otp, newPassword) => request('/auth/password-reset/otp-confirm', { method: 'POST', body: JSON.stringify({ phone, otp, new_password: newPassword }) }),
 }
 
 export const academicApi = {

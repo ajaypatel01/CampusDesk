@@ -1,17 +1,24 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { GraduationCap, Eye, EyeOff } from 'lucide-react'
+import { GraduationCap, Eye, EyeOff, Smartphone, KeyRound } from 'lucide-react'
 import { usersApi } from '../services/api'
 import { setToken } from '../services/api'
 import './Login.css'
 
 function Login({ onLogin }) {
+  const [mode, setMode] = useState('password') // 'password' | 'otp'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+
+  // OTP login state
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpSending, setOtpSending] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -29,6 +36,43 @@ function Login({ onLogin }) {
     }
   }
 
+  function switchMode(next) {
+    setMode(next)
+    setError('')
+    setOtpSent(false)
+    setOtp('')
+  }
+
+  async function handleSendOtp(e) {
+    e.preventDefault()
+    setError('')
+    setOtpSending(true)
+    try {
+      await usersApi.requestOTPLogin(phone)
+      setOtpSent(true)
+    } catch (err) {
+      setError(err.message || 'Could not send OTP')
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  async function handleVerifyOtp(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await usersApi.verifyOTPLogin(phone, otp)
+      setToken(res.token)
+      onLogin()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err.message || 'Invalid or expired OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="login-page">
       <div className="login-card">
@@ -41,40 +85,93 @@ function Login({ onLogin }) {
 
         {error && <div className="login-error">{error}</div>}
 
-        <form className="login-form" onSubmit={handleSubmit}>
-          <label className="login-field">
-            <span>Email</span>
-            <input
-              type="email"
-              required
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@school.com"
-            />
-          </label>
-          <label className="login-field">
-            <span>Password</span>
-            <div className="login-field__password">
+        {mode === 'password' ? (
+          <form className="login-form" onSubmit={handleSubmit}>
+            <label className="login-field">
+              <span>Email</span>
               <input
-                type={showPassword ? 'text' : 'password'}
+                type="email"
                 required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
+                autoFocus
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="admin@school.com"
               />
-              <button type="button" className="login-field__eye" onClick={() => setShowPassword(p => !p)}>
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </label>
-          <p style={{ textAlign: 'right', margin: '-8px 0 4px' }}>
-            <Link to="/forgot-password" style={{ fontSize: '13px' }}>Forgot password?</Link>
-          </p>
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+            </label>
+            <label className="login-field">
+              <span>Password</span>
+              <div className="login-field__password">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+                <button type="button" className="login-field__eye" onClick={() => setShowPassword(p => !p)}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </label>
+            <p style={{ textAlign: 'right', margin: '-8px 0 4px' }}>
+              <Link to="/forgot-password" style={{ fontSize: '13px' }}>Forgot password?</Link>
+            </p>
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+        ) : (
+          <form className="login-form" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+            <label className="login-field">
+              <span>Phone Number</span>
+              <input
+                type="tel"
+                required
+                autoFocus
+                disabled={otpSent}
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+91 99999 99999"
+              />
+            </label>
+            {otpSent && (
+              <label className="login-field">
+                <span>OTP</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  autoFocus
+                  value={otp}
+                  onChange={e => setOtp(e.target.value)}
+                  placeholder="6-digit code"
+                />
+              </label>
+            )}
+            {otpSent && (
+              <p style={{ textAlign: 'right', margin: '-8px 0 4px' }}>
+                <button type="button" className="login-field__eye" style={{ position: 'static', fontSize: '13px' }} onClick={() => { setOtpSent(false); setOtp('') }}>
+                  Use a different number
+                </button>
+              </p>
+            )}
+            <button type="submit" className="login-btn" disabled={loading || otpSending}>
+              {otpSent ? (loading ? 'Verifying...' : 'Verify & Sign In') : (otpSending ? 'Sending...' : 'Send OTP')}
+            </button>
+          </form>
+        )}
+
+        <p className="login-switch" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          {mode === 'password' ? (
+            <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('otp')}>
+              <Smartphone size={14} /> Login with OTP instead
+            </button>
+          ) : (
+            <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('password')}>
+              <KeyRound size={14} /> Login with password instead
+            </button>
+          )}
+        </p>
 
         <p className="login-switch">
           New here? <Link to="/register">Create an account</Link>
