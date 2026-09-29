@@ -398,3 +398,17 @@ export const permissionsApi = {
   getMatrix: (userId) => request(`/permissions/users/${userId}`),
   setMatrix: (userId, overrides) => request(`/permissions/users/${userId}`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
 }
+
+// CampusDesk's own SaaS subscription billing (what a school pays CampusDesk
+// to use the app) via Razorpay -- separate from feesApi, which is a school
+// collecting tuition fees from its own students/parents.
+export const billingApi = {
+  listPlans: () => request('/billing/plans'),
+  listAllPlans: () => request('/billing/plans/all'),
+  createPlan: (body) => request('/billing/plans', { method: 'POST', body: JSON.stringify(body) }),
+  updatePlan: (id, body) => request(`/billing/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  getSubscription: (schoolId) => request(`/billing/subscription${qs({ school_id: schoolId })}`),
+  subscribe: (body) => request('/billing/subscribe', { method: 'POST', body: JSON.stringify(body) }),
+  confirmCheckout: (body) => request('/billing/confirm', { method: 'POST', body: JSON.stringify(body) }),
+  cancel: (body) => request('/billing/cancel', { method: 'POST', body: JSON.stringify(body) }),
+}

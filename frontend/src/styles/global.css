@@ -259,6 +259,20 @@ html[data-theme="dark"] textarea {
 .btn-secondary { background: var(--gray-100); color: var(--gray-700); }
 .btn-secondary:hover { background: var(--gray-200); }
 
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.badge--info { background: var(--info-light); color: var(--info); }
+.badge--success { background: var(--success-light); color: var(--success); }
+.badge--warning { background: var(--warning-light); color: var(--warning); }
+.badge--danger { background: var(--danger-light); color: var(--danger); }
+.badge--muted { background: var(--gray-100); color: var(--gray-500); }
+
 @media (max-width: 640px) {
   .page-header {
     flex-direction: column;

@@ -23,6 +23,7 @@ import {
   Wallet,
   PieChart,
   ClipboardCheck,
+  CircleDollarSign,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -48,6 +49,7 @@ const navItems = [
   { to: '/books', icon: Library, label: 'Books', deny: ['registrar', 'parent'] },
   { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar', 'parent'] },
   { to: '/payroll', icon: Wallet, label: 'Payroll', only: ['super_admin'] },
+  { to: '/billing', icon: CircleDollarSign, label: 'Billing', only: ['super_admin', 'school_admin'] },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

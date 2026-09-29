@@ -1,0 +1,101 @@
+.billing-page { padding: 24px; }
+
+.billing-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 8px;
+}
+
+.billing-card--current { border-left: 3px solid var(--primary); }
+
+.billing-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.billing-card__plan-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-right: 10px;
+}
+
+.billing-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+.billing-status--active { background: var(--success-light); color: var(--success); }
+.billing-status--halted, .billing-status--cancelled, .billing-status--expired { background: var(--danger-light); color: var(--danger); }
+.billing-status--created, .billing-status--authenticated, .billing-status--pending { background: var(--warning-light); color: var(--warning); }
+
+.billing-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+}
+
+.billing-plan-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.billing-plan-card h3 { font-size: 1.05rem; margin-bottom: 4px; }
+
+.billing-plan-card__features {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  flex: 1;
+}
+.billing-plan-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  padding: 4px 0;
+}
+.billing-plan-card__features li svg { color: var(--success); flex-shrink: 0; }
+
+.billing-plan-card__prices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gray-100);
+}
+.billing-plan-card__prices > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.billing-plan-card__prices strong { font-size: 1.05rem; color: var(--gray-900); }
+
+@media (max-width: 640px) {
+  .billing-page { padding: 16px; }
+  .billing-plan-card__prices > div { flex-direction: column; align-items: stretch; gap: 6px; }
+}

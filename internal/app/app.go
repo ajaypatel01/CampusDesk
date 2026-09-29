@@ -9,6 +9,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/config"
 	"github.com/ajaypatel01/CampusDesk/internal/modules"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/academic"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/billing"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/books"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/communications"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/customfields"
@@ -34,6 +35,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/razorpay"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/smsotp"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/storage"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
@@ -72,6 +74,8 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	waClient := whatsapp.New(cfg.WhatsApp.PhoneNumberID, cfg.WhatsApp.AccessToken, cfg.WhatsApp.APIVersion)
 	smsClient := smsotp.New(cfg.SMSOTP.AuthKey, cfg.SMSOTP.SenderID, cfg.SMSOTP.TemplateID)
+	rzpClient := razorpay.New(cfg.Razorpay.KeyID, cfg.Razorpay.KeySecret, cfg.Razorpay.WebhookSecret)
+	billingMod := billing.New(pool, rzpClient, cfg.Razorpay.KeyID)
 
 	router := chi.NewRouter()
 	router.Use(httpx.CommonMiddleware()...)
@@ -100,8 +104,9 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Public routes (no auth required)
 	api.Group(func(r chi.Router) {
 		health.New(pool).Mount(r)
-		userMod.MountPublic(r)   // /auth/login, /auth/register
-		schoolMod.MountPublic(r) // /schools/public — school picker for registration
+		userMod.MountPublic(r)    // /auth/login, /auth/register
+		schoolMod.MountPublic(r)  // /schools/public — school picker for registration
+		billingMod.MountPublic(r) // /billing/webhook — Razorpay calls this directly, never a logged-in browser
 	})
 
 	// Protected routes — JWT required
@@ -124,7 +129,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		})
 		userMod.Mount(r)  // /users CRUD
 		permsMod.Mount(r) // /permissions/* -- access-control matrix admin API
-		mountProtectedModules(r, schoolMod, pool, emailClient, storageClient, waClient, cfg.Auth.JWTSecret)
+		mountProtectedModules(r, schoolMod, pool, emailClient, storageClient, waClient, billingMod, cfg.Auth.JWTSecret)
 	})
 
 	router.Mount("/api/v1", api)
@@ -139,7 +144,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	return &App{cfg: cfg, pool: pool, server: srv}, nil
 }
 
-func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool.Pool, emailClient *email.Client, storageClient *storage.Client, waClient *whatsapp.Client, jwtSecret string) {
+func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool.Pool, emailClient *email.Client, storageClient *storage.Client, waClient *whatsapp.Client, billingMod *billing.Module, jwtSecret string) {
 	// Promotion composes student/academic/fee/enrollment repositories
 	// directly (rather than being its own top-level module) so its routes
 	// can be mounted inside the student module's existing route tree --
@@ -169,6 +174,7 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		tcvoucher.New(pool),
 		payroll.New(pool),
 		customfields.New(pool),
+		billingMod,
 	}
 	for _, m := range mods {
 		log.Printf("mount module: %s", m.Name())

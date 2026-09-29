@@ -17,6 +17,7 @@ type Config struct {
 	Storage  StorageConfig
 	WhatsApp WhatsAppConfig
 	SMSOTP   SMSOTPConfig
+	Razorpay RazorpayConfig
 	// FrontendURL is the base URL of the deployed web app, used to build
 	// links that get emailed out (e.g. a password reset link).
 	FrontendURL string
@@ -29,6 +30,17 @@ type SMSOTPConfig struct {
 	AuthKey    string
 	SenderID   string
 	TemplateID string
+}
+
+// RazorpayConfig configures CampusDesk's own SaaS subscription billing (see
+// internal/platform/razorpay and internal/modules/billing). Until KeyID/
+// KeySecret are set, that client's Enabled() is false and subscribe/cancel
+// return a clear "not configured" error; WebhookSecret is checked
+// separately since it's registered in a later step on Razorpay's dashboard.
+type RazorpayConfig struct {
+	KeyID         string
+	KeySecret     string
+	WebhookSecret string
 }
 
 type StorageConfig struct {
@@ -119,6 +131,11 @@ func Load() (*Config, error) {
 			AuthKey:    os.Getenv("MSG91_AUTH_KEY"),
 			SenderID:   os.Getenv("MSG91_SENDER_ID"),
 			TemplateID: os.Getenv("MSG91_OTP_TEMPLATE_ID"),
+		},
+		Razorpay: RazorpayConfig{
+			KeyID:         os.Getenv("RAZORPAY_KEY_ID"),
+			KeySecret:     os.Getenv("RAZORPAY_KEY_SECRET"),
+			WebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
 	}, nil

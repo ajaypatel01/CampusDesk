@@ -25,6 +25,7 @@ import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
 import Payroll from './pages/Payroll'
+import Billing from './pages/Billing'
 import FeeReport from './pages/FeeReport'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -40,6 +41,9 @@ import { ConfigProvider } from './services/ConfigContext'
 const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/fee-report']
 // Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
 const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
+// Pages only school_admin/super_admin may open — mirrors the backend's
+// BlockRoles("teacher", "registrar", "parent") check on billing routes.
+const ADMIN_ONLY_PATHS = ['/billing']
 
 function RegistrarGuard({ user, children }) {
   const location = useLocation()
@@ -47,7 +51,9 @@ function RegistrarGuard({ user, children }) {
     REGISTRAR_BLOCKED_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
   const isSuperAdminOnly = user?.role !== 'super_admin' &&
     SUPER_ADMIN_ONLY_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
-  if (isRegistrarBlocked || isSuperAdminOnly) return <Navigate to="/" replace />
+  const isAdminOnlyBlocked = ['teacher', 'registrar', 'parent'].includes(user?.role) &&
+    ADMIN_ONLY_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
+  if (isRegistrarBlocked || isSuperAdminOnly || isAdminOnlyBlocked) return <Navigate to="/" replace />
   return children
 }
 
@@ -105,6 +111,7 @@ function App() {
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="ledger" element={<Ledger />} />
             <Route path="payroll" element={<Payroll />} />
+            <Route path="billing" element={<Billing />} />
             <Route path="fee-report" element={<FeeReport />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />
