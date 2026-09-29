@@ -1,17 +1,24 @@
-import { Menu, Sun, Moon } from 'lucide-react'
+import { Menu, X, Sun, Moon } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { useTheme } from '../services/ThemeContext'
 import './Header.css'
 
-function Header({ onToggleSidebar }) {
+function Header({ onToggleSidebar, sidebarOpen }) {
   const { schools, currentSchool, setCurrentSchool, academicYears, currentYear, setCurrentYear, isSuperAdmin } = useSchool()
   const { theme, toggleTheme } = useTheme()
 
   return (
     <header className="header">
       <div className="header__left">
-        <button className="header__menu-btn" onClick={onToggleSidebar}>
-          <Menu size={20} />
+        <button
+          className={`header__menu-btn ${sidebarOpen ? 'header__menu-btn--open' : ''}`}
+          onClick={onToggleSidebar}
+          aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+        >
+          {/* Desktop always shows the hamburger (it expands/collapses the rail);
+              on mobile CSS swaps it to an X while the drawer is open. */}
+          <Menu size={20} className="header__menu-icon" />
+          <X size={20} className="header__close-icon" />
         </button>
         <div className="header__selectors">
           {isSuperAdmin && schools.length > 1 ? (

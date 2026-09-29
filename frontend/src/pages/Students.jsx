@@ -222,7 +222,7 @@ function Students() {
           <h1>Students</h1>
           <p className="page-subtitle">Manage student records</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {selected.size > 0 && (
             <button className="btn btn--outline" onClick={openPromoteModal}>
               <ArrowUpRight size={16} /> Promote/Move Grade ({selected.size})

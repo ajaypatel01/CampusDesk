@@ -24,6 +24,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
   border-radius: var(--radius-sm);
   color: var(--gray-500);
   transition: all var(--transition);
@@ -34,9 +35,14 @@
   color: var(--gray-700);
 }
 
+.header__close-icon {
+  display: none;
+}
+
 .header__selectors {
   display: flex;
   gap: 10px;
+  min-width: 0;
 }
 
 .header__select {
@@ -87,3 +93,56 @@
   color: var(--gray-700);
 }
 .header__school-name { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .header__left {
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .header__menu-btn--open .header__menu-icon {
+    display: none;
+  }
+
+  .header__menu-btn--open .header__close-icon {
+    display: block;
+  }
+
+  .header__selectors {
+    flex: 1;
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .header__select {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    min-width: 0;
+    flex-shrink: 0;
+    max-width: 42vw;
+  }
+
+  .header__right {
+    flex-shrink: 0;
+  }
+
+  .header__school-name {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header__school-code {
+    display: none;
+  }
+}

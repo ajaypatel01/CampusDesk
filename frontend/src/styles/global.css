@@ -136,3 +136,144 @@ html[data-theme="dark"] textarea {
   border-color: var(--gray-200);
   color-scheme: dark;
 }
+
+/* ---------------------------------------------------------------------
+   Shared page patterns (baseline)
+   Many pages reuse these same class names (.table-card, .data-table,
+   .modal-overlay, .page-header, .form-row, ...) but only some pages
+   define them locally -- others rely on whichever page happened to load
+   its CSS first. Defining a complete baseline here (loaded once, at app
+   start, before any page-level CSS) means every page gets a correct,
+   mobile-safe version even if it never defines its own, while a page
+   that DOES define its own still wins the cascade (loaded after this).
+   --------------------------------------------------------------------- */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.page-header h1 { font-size: 1.6rem; }
+.page-subtitle { color: var(--gray-500); font-size: 0.9rem; margin-top: 4px; }
+
+.page-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.empty-text { color: var(--gray-400); font-size: 14px; padding: 20px 0; text-align: center; }
+
+.table-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0;
+}
+
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--gray-200);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 12px;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--gray-50);
+}
+.data-table tr:hover td { background: var(--gray-50); }
+.data-table__empty { text-align: center; color: var(--gray-400); padding: 40px 0 !important; }
+.data-table__muted { color: var(--gray-400); font-size: 0.8rem; }
+.data-table__link { color: var(--gray-800); font-weight: 500; }
+.data-table__link:hover { color: var(--primary); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: var(--shadow-lg);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal h2 { font-size: 1.15rem; margin-bottom: 20px; }
+.modal__form { display: flex; flex-direction: column; gap: 14px; }
+.modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field span { font-size: 0.8rem; font-weight: 500; color: var(--gray-600); }
+.form-field input, .form-field select, .form-field textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  outline: none;
+  color: var(--gray-800);
+  background: var(--surface);
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--primary-50);
+}
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 12px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+.btn-secondary:hover { background: var(--gray-200); }
+
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-filters > select,
+  .page-filters > input {
+    width: 100%;
+  }
+
+  .modal { padding: 20px; }
+}

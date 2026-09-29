@@ -139,7 +139,7 @@ function Homework() {
             <label className="form-field"><span>Assigned Date</span><input type="date" value={form.assigned_date} onChange={e => setForm({ ...form, assigned_date: e.target.value })} /></label>
             <label className="form-field"><span>Due Date *</span><input type="date" required value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} /></label>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button type="submit" className="btn btn--primary">Create</button>
             <button type="button" className="btn btn--outline" onClick={() => setShowForm(false)}>Cancel</button>
           </div>
