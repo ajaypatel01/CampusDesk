@@ -41,9 +41,10 @@ function Students() {
   // all to a target grade (and, usually, a target academic year) at once.
   const [selected, setSelected] = useState(() => new Set())
   const [allYears, setAllYears] = useState([])
+  const [sections, setSections] = useState([])
   const [showPromoteModal, setShowPromoteModal] = useState(false)
   const [promoteForm, setPromoteForm] = useState({
-    to_academic_year_id: '', to_grade_level_id: '',
+    to_academic_year_id: '', to_grade_level_id: '', class_section_id: '',
     carry_forward_dues: true, carry_forward_discount: true, carry_forward_van_fee: true,
   })
   const [promoting, setPromoting] = useState(false)
@@ -181,11 +182,22 @@ function Students() {
   function openPromoteModal() {
     setPromoteError(''); setPromoteResult(null)
     setPromoteForm({
-      to_academic_year_id: '', to_grade_level_id: '',
+      to_academic_year_id: '', to_grade_level_id: '', class_section_id: '',
       carry_forward_dues: true, carry_forward_discount: true, carry_forward_van_fee: true,
     })
     setShowPromoteModal(true)
   }
+
+  // Sections are per academic-year, so refetch whenever the target year
+  // changes; the dropdown below filters these down to the target grade.
+  useEffect(() => {
+    if (!currentSchool || !promoteForm.to_academic_year_id) { setSections([]); return }
+    academicApi.listSections({ school_id: currentSchool.id, academic_year_id: promoteForm.to_academic_year_id })
+      .then(res => setSections(res.items || []))
+      .catch(() => setSections([]))
+  }, [currentSchool, promoteForm.to_academic_year_id])
+
+  const sectionsForTargetGrade = sections.filter(s => s.grade_level_id === promoteForm.to_grade_level_id)
 
   // Snapshot names at the moment of promotion so the result list can show
   // who succeeded/failed even after the roster reloads underneath it.
@@ -510,12 +522,28 @@ function Students() {
                   </label>
                   <label className="form-field">
                     <span>Target Grade *</span>
-                    <select required value={promoteForm.to_grade_level_id} onChange={e => setPromoteForm(f => ({ ...f, to_grade_level_id: e.target.value }))}>
+                    <select required value={promoteForm.to_grade_level_id} onChange={e => setPromoteForm(f => ({ ...f, to_grade_level_id: e.target.value, class_section_id: '' }))}>
                       <option value="">Select...</option>
                       {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </label>
                 </div>
+                <label className="form-field">
+                  <span>Section (optional)</span>
+                  <select
+                    value={promoteForm.class_section_id}
+                    onChange={e => setPromoteForm(f => ({ ...f, class_section_id: e.target.value }))}
+                    disabled={!promoteForm.to_grade_level_id}
+                  >
+                    <option value="">Don&apos;t assign a section yet</option>
+                    {sectionsForTargetGrade.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  {promoteForm.to_grade_level_id && sectionsForTargetGrade.length === 0 && (
+                    <span className="doc-msg" style={{ marginTop: '4px' }}>
+                      No sections set up yet for this grade/year -- add one under Settings first if you want to assign one now.
+                    </span>
+                  )}
+                </label>
                 <label className="form-field--checkbox">
                   <input type="checkbox" checked={promoteForm.carry_forward_discount} onChange={e => setPromoteForm(f => ({ ...f, carry_forward_discount: e.target.checked }))} />
                   <span>Carry forward any discount</span>
