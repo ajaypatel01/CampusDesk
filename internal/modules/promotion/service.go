@@ -195,12 +195,17 @@ func (s *Service) upsertEnrollment(ctx context.Context, schoolID, studentID, yea
 
 // BulkMoveInput applies the same grade move to many students at once -- the
 // normal shape of an actual promotion (a whole grade/section moving up
-// together at year end).
+// together at year end). ClassSectionID is optional: leave nil to move
+// students to the new grade without assigning a section yet (e.g. sections
+// haven't been split for the new year), or set it to land the whole batch
+// directly in one section -- the same "add a section, then move students
+// into it" step MoveGrade already does for a single student.
 type BulkMoveInput struct {
 	StudentIDs           []uuid.UUID
 	FromAcademicYearID   uuid.UUID
 	ToAcademicYearID     uuid.UUID
 	ToGradeLevelID       uuid.UUID
+	ClassSectionID       *uuid.UUID
 	CarryForwardDues     bool
 	CarryForwardDiscount bool
 	CarryForwardVanFee   bool
@@ -220,7 +225,7 @@ func (s *Service) BulkMoveGrade(ctx context.Context, in BulkMoveInput) []BulkMov
 	for _, sid := range in.StudentIDs {
 		_, err := s.MoveGrade(ctx, MoveGradeInput{
 			StudentID: sid, FromAcademicYearID: in.FromAcademicYearID, ToAcademicYearID: in.ToAcademicYearID,
-			ToGradeLevelID: in.ToGradeLevelID, CarryForwardDues: in.CarryForwardDues,
+			ToGradeLevelID: in.ToGradeLevelID, ClassSectionID: in.ClassSectionID, CarryForwardDues: in.CarryForwardDues,
 			CarryForwardDiscount: in.CarryForwardDiscount, CarryForwardVanFee: in.CarryForwardVanFee,
 		})
 		if err != nil {

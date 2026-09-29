@@ -80,6 +80,7 @@ type bulkMoveBody struct {
 	FromAcademicYearID   string   `json:"from_academic_year_id"`
 	ToAcademicYearID     string   `json:"to_academic_year_id"`
 	ToGradeLevelID       string   `json:"to_grade_level_id"`
+	ClassSectionID       string   `json:"class_section_id"`
 	CarryForwardDues     bool     `json:"carry_forward_dues"`
 	CarryForwardDiscount bool     `json:"carry_forward_discount"`
 	CarryForwardVanFee   bool     `json:"carry_forward_van_fee"`
@@ -114,6 +115,9 @@ func (h *Handler) BulkMoveGrade(w http.ResponseWriter, r *http.Request) {
 	}
 	if fromYearID, err := uuid.Parse(body.FromAcademicYearID); err == nil {
 		in.FromAcademicYearID = fromYearID
+	}
+	if sectionID, err := uuid.Parse(body.ClassSectionID); err == nil && sectionID != uuid.Nil {
+		in.ClassSectionID = &sectionID
 	}
 	for _, s := range body.StudentIDs {
 		if id, err := uuid.Parse(s); err == nil {
