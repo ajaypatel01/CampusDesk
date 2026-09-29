@@ -1,0 +1,97 @@
+name: Deploy
+
+# Automatic on push to main (only the job whose paths actually changed runs),
+# or manual via the "Run workflow" button for a targeted redeploy/re-run.
+#
+# Auth is via GitHub's OIDC -> AWS IAM role assumption, not static keys --
+# see deploy/README.md for the one-time AWS setup this depends on.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "go.mod"
+      - "go.sum"
+      - "frontend/**"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to deploy"
+        required: true
+        default: both
+        type: choice
+        options: [both, backend, frontend]
+
+permissions:
+  id-token: write # required to mint the OIDC token for AWS
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  INSTANCE_ID: i-058bf81226520c730
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+            frontend:
+              - 'frontend/**'
+
+  deploy-backend:
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.target == 'backend' || github.event.inputs.target == 'both')) ||
+      (github.event_name == 'push' && needs.changes.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy backend via SSM
+        run: bash deploy/run-via-ssm.sh deploy/backend-deploy.sh "$INSTANCE_ID" "backend deploy ${{ github.sha }}"
+
+  deploy-frontend:
+    # Depends on deploy-backend purely to serialize them on the shared
+    # /opt/campusdesk-build checkout on the instance -- if only frontend
+    # changed, deploy-backend above is skipped (not failed), so this still
+    # runs immediately.
+    needs: [changes, deploy-backend]
+    if: |
+      always() && !failure() && !cancelled() &&
+      ((github.event_name == 'workflow_dispatch' &&
+          (github.event.inputs.target == 'frontend' || github.event.inputs.target == 'both')) ||
+       (github.event_name == 'push' && needs.changes.outputs.frontend == 'true'))
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy frontend via SSM
+        run: bash deploy/run-via-ssm.sh deploy/frontend-deploy.sh "$INSTANCE_ID" "frontend deploy ${{ github.sha }}"
