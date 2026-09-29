@@ -90,6 +90,44 @@ func (r *Repository) ListByStudent(ctx context.Context, studentID uuid.UUID) ([]
 	return items, rows.Err()
 }
 
+// FindStudentIDsByPhone returns every student linked to a guardian whose
+// phone number matches, for the WhatsApp self-service bot's inbound
+// lookup: it identifies the sender purely by phone number, with no login
+// involved, so this is the only place in the app phone matching alone
+// grants access to a student's data.
+//
+// Matches on the last 10 digits rather than an exact string: guardian.phone
+// was entered by hand across two schools with no enforced format (some with
+// a country code, some without, some with spaces/dashes already stripped
+// elsewhere), while WhatsApp's webhook always sends the sender's number in
+// full international form with no "+" (e.g. "919876543210"). Comparing only
+// the last 10 digits -- the actual Indian mobile number -- sidesteps all of
+// that inconsistency at the one cost of theoretically colliding across
+// country codes, which doesn't arise for this school's userbase.
+func (r *Repository) FindStudentIDsByPhone(ctx context.Context, phone string) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT sg.student_id
+		FROM guardians g
+		JOIN student_guardians sg ON sg.guardian_id = g.id
+		WHERE g.phone IS NOT NULL AND length(g.phone) >= 10
+			AND right(regexp_replace(g.phone, '\D', '', 'g'), 10) = right(regexp_replace($1, '\D', '', 'g'), 10)`,
+		phone,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Guardian, error) {
 	var g domain.Guardian
 	err := r.pool.QueryRow(ctx, `

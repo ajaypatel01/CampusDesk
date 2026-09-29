@@ -21,6 +21,19 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
+// GetCurrentYear returns the school's academic year flagged is_current.
+func (r *Repository) GetCurrentYear(ctx context.Context, schoolID uuid.UUID) (*domain.AcademicYear, error) {
+	var y domain.AcademicYear
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, school_id, name, start_date, end_date, is_current, created_at, updated_at
+		FROM academic_years WHERE school_id=$1 AND is_current=true LIMIT 1`, schoolID,
+	).Scan(&y.ID, &y.SchoolID, &y.Name, &y.StartDate, &y.EndDate, &y.IsCurrent, &y.CreatedAt, &y.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apperr.ErrNotFound
+	}
+	return &y, err
+}
+
 // Academic years
 
 func (r *Repository) CreateYear(ctx context.Context, y *domain.AcademicYear) error {

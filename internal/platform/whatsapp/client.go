@@ -2,6 +2,9 @@ package whatsapp
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,23 +18,57 @@ type Client struct {
 	phoneNumberID string
 	accessToken   string
 	apiVersion    string
-	httpClient    *http.Client
+	// appSecret and webhookVerifyToken are only needed for the *inbound*
+	// webhook (Meta calling this app), never for sending -- see
+	// VerifyWebhookSignature and MatchesVerifyToken.
+	appSecret          string
+	webhookVerifyToken string
+	httpClient         *http.Client
 }
 
-func New(phoneNumberID, accessToken, apiVersion string) *Client {
+func New(phoneNumberID, accessToken, apiVersion, appSecret, webhookVerifyToken string) *Client {
 	if apiVersion == "" {
 		apiVersion = "v19.0"
 	}
 	return &Client{
-		phoneNumberID: phoneNumberID,
-		accessToken:   accessToken,
-		apiVersion:    apiVersion,
-		httpClient:    &http.Client{Timeout: 30 * time.Second},
+		phoneNumberID:      phoneNumberID,
+		accessToken:        accessToken,
+		apiVersion:         apiVersion,
+		appSecret:          appSecret,
+		webhookVerifyToken: webhookVerifyToken,
+		httpClient:         &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
 func (c *Client) Enabled() bool {
 	return c != nil && c.phoneNumberID != "" && c.accessToken != ""
+}
+
+// WebhookEnabled reports whether inbound-webhook verification is configured
+// -- separate from Enabled() since a deployment could plausibly send
+// broadcasts without ever having set up the inbound bot, or vice versa.
+func (c *Client) WebhookEnabled() bool {
+	return c != nil && c.appSecret != "" && c.webhookVerifyToken != ""
+}
+
+// MatchesVerifyToken checks the hub.verify_token Meta sends on the one-time
+// GET handshake when a webhook URL is registered/changed on the app dashboard.
+func (c *Client) MatchesVerifyToken(token string) bool {
+	return c.WebhookEnabled() && hmac.Equal([]byte(c.webhookVerifyToken), []byte(token))
+}
+
+// VerifyWebhookSignature checks the X-Hub-Signature-256 header (a
+// "sha256=<hex>"-prefixed HMAC over the raw body, keyed with the Meta app's
+// App Secret -- not the access token) on every subsequent inbound call.
+func (c *Client) VerifyWebhookSignature(rawBody []byte, signatureHeader string) bool {
+	if !c.WebhookEnabled() {
+		return false
+	}
+	sig := strings.TrimPrefix(signatureHeader, "sha256=")
+	mac := hmac.New(sha256.New, []byte(c.appSecret))
+	mac.Write(rawBody)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(sig))
 }
 
 func (c *Client) baseURL() string {

@@ -31,6 +31,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/tcvoucher"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/user"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/van"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/whatsappbot"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
@@ -70,7 +71,8 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		storageClient = nil
 	}
 
-	waClient := whatsapp.New(cfg.WhatsApp.PhoneNumberID, cfg.WhatsApp.AccessToken, cfg.WhatsApp.APIVersion)
+	waClient := whatsapp.New(cfg.WhatsApp.PhoneNumberID, cfg.WhatsApp.AccessToken, cfg.WhatsApp.APIVersion, cfg.WhatsApp.AppSecret, cfg.WhatsApp.WebhookVerifyToken)
+	waBotMod := whatsappbot.New(pool, waClient)
 	smsClient := smsotp.New(cfg.SMSOTP.AuthKey, cfg.SMSOTP.SenderID, cfg.SMSOTP.TemplateID)
 
 	router := chi.NewRouter()
@@ -102,6 +104,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		health.New(pool).Mount(r)
 		userMod.MountPublic(r)   // /auth/login, /auth/register
 		schoolMod.MountPublic(r) // /schools/public — school picker for registration
+		waBotMod.MountPublic(r)  // /whatsapp/webhook — Meta calls this directly, never a logged-in browser
 	})
 
 	// Protected routes — JWT required
@@ -119,7 +122,8 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		// expose feature flags so frontend can adapt UI
 		r.Get("/config", func(w http.ResponseWriter, r *http.Request) {
 			httpx.JSON(w, http.StatusOK, map[string]bool{
-				"whatsapp_enabled": waClient.Enabled(),
+				"whatsapp_enabled":     waClient.Enabled(),
+				"whatsapp_bot_enabled": waClient.WebhookEnabled(),
 			})
 		})
 		userMod.Mount(r)  // /users CRUD

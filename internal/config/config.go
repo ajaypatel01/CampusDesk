@@ -44,6 +44,12 @@ type WhatsAppConfig struct {
 	PhoneNumberID string
 	AccessToken   string
 	APIVersion    string
+	// AppSecret and WebhookVerifyToken are only needed for the inbound
+	// self-service bot (a parent messaging in and getting their ward's fee/
+	// result back) -- see internal/modules/whatsappbot. Broadcasts (the
+	// existing outbound-only feature) work without either of these.
+	AppSecret          string
+	WebhookVerifyToken string
 }
 
 type EmailConfig struct {
@@ -111,9 +117,11 @@ func Load() (*Config, error) {
 			UseSSL:          getEnv("S3_USE_SSL", "true") == "true",
 		},
 		WhatsApp: WhatsAppConfig{
-			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
-			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
-			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
+			PhoneNumberID:      os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
+			AccessToken:        os.Getenv("WHATSAPP_ACCESS_TOKEN"),
+			APIVersion:         getEnv("WHATSAPP_API_VERSION", "v19.0"),
+			AppSecret:          os.Getenv("WHATSAPP_APP_SECRET"),
+			WebhookVerifyToken: os.Getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN"),
 		},
 		SMSOTP: SMSOTPConfig{
 			AuthKey:    os.Getenv("MSG91_AUTH_KEY"),
