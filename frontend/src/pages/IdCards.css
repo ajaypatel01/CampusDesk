@@ -27,8 +27,14 @@
 
 .idcards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .idcards-page { padding: 16px; }
+  .idcards-search { width: 100%; }
+  .idcards-count { margin-left: 0; width: 100%; }
 }
 
 .idcard-chip {

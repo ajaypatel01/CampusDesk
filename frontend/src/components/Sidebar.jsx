@@ -59,7 +59,7 @@ const roleLabel = {
   parent: 'Parent',
 }
 
-function Sidebar({ open, user, onLogout }) {
+function Sidebar({ open, user, onLogout, onNavigate }) {
   const initials = user?.role ? user.role[0].toUpperCase() : 'A'
 
   return (
@@ -82,6 +82,7 @@ function Sidebar({ open, user, onLogout }) {
             className={({ isActive }) =>
               `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
             }
+            onClick={onNavigate}
           >
             <Icon size={20} />
             {open && <span>{label}</span>}

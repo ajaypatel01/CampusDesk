@@ -387,7 +387,7 @@ function Results() {
                   <span>Co-Scholastic / Grading subject (graded, but not counted in the overall total)</span>
                 </label>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button type="submit" className="btn btn--primary">Save</button>
                 <button type="button" className="btn btn--outline" onClick={() => setShowSubjectForm(false)}>Cancel</button>
               </div>
@@ -441,7 +441,7 @@ function Results() {
                 <label className="form-field"><span>Exam Date</span><input type="date" value={examForm.exam_date} onChange={e => setExamForm({ ...examForm, exam_date: e.target.value })} /></label>
                 <label className="form-field"><span>Weight %</span><input type="number" min="1" max="100" value={examForm.weight_percent} onChange={e => setExamForm({ ...examForm, weight_percent: e.target.value })} /></label>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button type="submit" className="btn btn--primary">Save</button>
                 <button type="button" className="btn btn--outline" onClick={() => setShowExamForm(false)}>Cancel</button>
               </div>
@@ -598,7 +598,7 @@ function Results() {
               </select>
             </label>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <button className="btn btn--primary" onClick={loadMarksheet} disabled={!msExamId || !msStudentId || msLoading}>
               {msLoading ? 'Loading...' : 'View Marksheet'}
             </button>
@@ -700,7 +700,7 @@ function Results() {
               </select>
             </label>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <button className="btn btn--primary" onClick={loadReportCard} disabled={!rcStudentId || rcLoading}>
               {rcLoading ? 'Loading...' : 'View Report Card'}
             </button>

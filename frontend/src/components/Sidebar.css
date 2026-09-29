@@ -151,8 +151,33 @@
   margin-top: 4px;
 }
 
+.layout__backdrop {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .sidebar {
+    width: min(var(--sidebar-width), 82vw);
     transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--transition);
+  }
+
+  /* On mobile the sidebar is either fully hidden or a full drawer --
+     the desktop icon-only 72px rail makes no sense as a touch target. */
+  .sidebar--collapsed {
+    width: min(var(--sidebar-width), 82vw);
+  }
+
+  .sidebar:not(.sidebar--collapsed) {
+    transform: translateX(0);
+  }
+
+  .layout:not(.layout--collapsed) .layout__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 99;
   }
 }

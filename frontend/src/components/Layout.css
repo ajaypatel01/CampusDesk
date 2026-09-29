@@ -5,6 +5,7 @@
 
 .layout__main {
   flex: 1;
+  min-width: 0;
   margin-left: var(--sidebar-width);
   transition: margin-left var(--transition);
   display: flex;
@@ -23,7 +24,12 @@
 }
 
 @media (max-width: 768px) {
-  .layout__main {
+  /* On mobile the sidebar is an overlay drawer, not a layout-affecting
+     rail -- .layout--collapsed here just means "drawer closed", so content
+     never shifts, regardless of which state it starts in. Matches
+     .layout--collapsed .layout__main's specificity so this actually wins. */
+  .layout__main,
+  .layout--collapsed .layout__main {
     margin-left: 0;
   }
 

@@ -285,7 +285,7 @@ function Books() {
                         <h2>{listDetail.name}</h2>
                         <p className="page-subtitle">{listDetail.grade_level_name} · {listDetail.academic_year_name}</p>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button className="btn btn--outline btn--sm" onClick={() => handleDownloadPDF(selectedList.id)}>
                           <Download size={14} /> PDF
                         </button>
