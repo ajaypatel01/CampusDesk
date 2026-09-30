@@ -74,8 +74,12 @@
   gap: 3px;
   min-width: 120px;
 }
+/* Fixed light background in both themes, so the label needs a fixed dark
+   color too -- --text-muted resolves near-white in dark mode, unreadable
+   on this card (same bug/fix as Payroll's stat card variants). */
 .lsumm--green { border-color: #86efac; background: #f0fdf4; }
 .lsumm--green .lsumm__val { color: #16a34a; }
+.lsumm--green .lsumm__lbl { color: #166534; }
 
 .lsumm__val { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
 .lsumm__lbl { font-size: 0.72rem; color: var(--text-muted); }

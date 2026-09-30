@@ -19,8 +19,12 @@
   min-width: 160px;
 }
 
+/* Fixed light background in both themes, so the label needs a fixed dark
+   color too -- --text-muted resolves near-white in dark mode, unreadable
+   on this card (same bug/fix as Payroll's stat card variants). */
 .vsumm-card--red { border-color: #fca5a5; background: #fef2f2; }
 .vsumm-card--red .vsumm-value { color: #dc2626; }
+.vsumm-card--red .vsumm-label { color: #991b1b; }
 
 .vsumm-label { font-size: 0.75rem; color: var(--text-muted); }
 .vsumm-value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
