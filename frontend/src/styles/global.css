@@ -37,6 +37,19 @@
   --surface: #ffffff;
   --surface-2: #f9fafb;
 
+  /* Text tokens -- referenced as var(--text-primary)/var(--text-muted) by
+     nine page/component CSS files (Payroll, Vouchers, TCRecords, FeeReport,
+     Admissions, StaffDetail, Staff, Ledger, Header) that were never
+     actually defining them either, same gap as --space-N above. An
+     undefined custom property makes `color` compute to `inherit` rather
+     than erroring, so e.g. My Salary's "Total Deductions"/"Net Payable"
+     labels were inheriting the page's near-white dark-mode text color
+     onto their own light pastel red/green card backgrounds -- readable in
+     neither theme, worse in dark mode. Defined in terms of the existing
+     --gray-* scale so both pick up its light/dark inversion for free. */
+  --text-primary: var(--gray-900);
+  --text-muted: var(--gray-500);
+
   --sidebar-width: 260px;
   --header-height: 64px;
   --radius: 12px;

@@ -27,10 +27,16 @@
 }
 .payroll-stat span { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
 .payroll-stat label { font-size: 0.72rem; color: var(--text-muted); }
+/* These two variants keep a fixed light background in both themes (a red/
+   green tint reads oddly inverted to a dark one), so their label needs a
+   fixed dark color too rather than the theme-relative --text-muted --
+   in dark mode that resolves near-white, unreadable on a light card. */
 .payroll-stat--danger { border-color: #fecaca; background: #fef2f2; }
 .payroll-stat--danger span { color: #dc2626; }
+.payroll-stat--danger label { color: #991b1b; }
 .payroll-stat--green { border-color: #86efac; background: #f0fdf4; }
 .payroll-stat--green span { color: #16a34a; }
+.payroll-stat--green label { color: #166534; }
 
 .payroll-negative { color: #dc2626; font-weight: 500; }
 .payroll-net { font-weight: 700; color: #16a34a; }
