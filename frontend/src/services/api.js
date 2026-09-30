@@ -169,6 +169,7 @@ export const academicApi = {
   updateGrade: (id, body) => request(`/grade-levels/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   listSections: (params) => request(`/class-sections${qs(params)}`),
   createSection: (body) => request('/class-sections', { method: 'POST', body: JSON.stringify(body) }),
+  updateSection: (id, body) => request(`/class-sections/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 export const enrollmentsApi = {

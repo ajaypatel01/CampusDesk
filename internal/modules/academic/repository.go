@@ -154,6 +154,19 @@ func (r *Repository) ListSections(ctx context.Context, schoolID, yearID uuid.UUI
 	return items, rows.Err()
 }
 
+func (r *Repository) UpdateSection(ctx context.Context, c *domain.ClassSection) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE class_sections SET name=$2, capacity=$3, homeroom_teacher_id=$4, updated_at=NOW()
+		WHERE id=$1`, c.ID, c.Name, c.Capacity, c.HomeroomTeacherID)
+	if err != nil {
+		return database.MapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) GetSection(ctx context.Context, id uuid.UUID) (*domain.ClassSection, error) {
 	var c domain.ClassSection
 	err := r.pool.QueryRow(ctx, `
