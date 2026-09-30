@@ -113,23 +113,158 @@
 .marks-component-field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   font-size: 12px;
   color: var(--gray-600);
 }
 
 .marks-component-field input {
-  width: 70px;
+  width: 100%;
 }
 
 .marks-add-component {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .marks-add-component input {
   padding: 4px 6px;
   border-radius: var(--radius);
   border: 1px solid var(--gray-200);
+}
+
+/* Subjects tab: one card per subject instead of a table row, so a subject's
+   custom fields have room to be shown and managed without fighting for
+   space in a table cell (or forcing horizontal scroll that hides which
+   subject a field even belongs to). */
+.subject-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subject-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.subject-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.subject-card__title { font-size: 15px; }
+
+.subject-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.subject-card__fields-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-400);
+  margin-bottom: 8px;
+}
+
+.field-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 20px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  font-size: 13px;
+}
+
+.field-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--gray-400);
+  font-size: 15px;
+  line-height: 1;
+  transition: all var(--transition);
+}
+
+.field-chip__remove:hover { background: var(--gray-200); color: var(--gray-700); }
+
+.subject-card__fields-total {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 8px;
+}
+
+.subject-card__fields-total--mismatch { color: var(--warning, #f59e0b); }
+
+/* Enter Marks tab: same one-card-per-subject idea, so it's unambiguous
+   which subject's own fields you're filling in -- no more table row whose
+   subject name scrolls out of view while you're looking at its inputs. */
+.mark-subject-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mark-subject-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.mark-subject-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mark-subject-card__title { font-size: 15px; font-weight: 600; color: var(--gray-900); }
+
+.mark-subject-card__absent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.mark-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px 16px;
+}
+
+.mark-subject-card__total {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--gray-500);
 }

@@ -132,7 +132,7 @@ function Results() {
       await resultsApi.createSubject({ school_id: currentSchool.id, grade_level_id: selectedGrade, ...subjectForm })
       setShowSubjectForm(false)
       setSubjectForm({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0, is_co_scholastic: false })
-      resultsApi.listSubjects({ school_id: currentSchool.id, grade_level_id: selectedGrade }).then(r => setSubjects(r.items || []))
+      reloadSubjects()
     } catch (err) { alert(err.message) }
   }
 
@@ -171,10 +171,20 @@ function Results() {
     return (sub.mark_components || []).reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
   }
 
-  function reloadMarkSubjects() {
+  // Sum of a subject's own field max_marks -- compared against the subject's
+  // overall max_marks so a mismatch (fields adding up to less/more than the
+  // subject is actually graded out of) is visible instead of silently wrong.
+  function componentsMaxSum(sub) {
+    return (sub.mark_components || []).reduce((sum, c) => sum + c.max_marks, 0)
+  }
+
+  // Subjects and Enter Marks both list the same subjects (with the same
+  // mark_components), just rendered differently -- one reload keeps both in
+  // sync after a field is added/removed from either tab.
+  function reloadSubjects() {
     if (!selectedGrade) return
     resultsApi.listSubjects({ school_id: currentSchool?.id, grade_level_id: selectedGrade })
-      .then(r => setMarkSubjects(r.items || [])).catch(() => {})
+      .then(r => { const items = r.items || []; setSubjects(items); setMarkSubjects(items) }).catch(() => {})
   }
 
   async function handleAddComponent(sub) {
@@ -187,12 +197,23 @@ function Results() {
       })
       setAddingComponentFor(null)
       setNewComponentForm({ label: '', max_marks: '' })
-      reloadMarkSubjects()
+      reloadSubjects()
     } catch (err) {
       alert(err.message)
     } finally {
       setAddingComponentSaving(false)
     }
+  }
+
+  // Component delete is open to the same roles as adding one (backend only
+  // blocks parent) -- entry-time work, not subject setup, so it isn't
+  // gated behind isTeacher the way creating/deleting the subject itself is.
+  async function handleDeleteComponent(subjectId, key) {
+    if (!confirm('Remove this field?')) return
+    try {
+      await resultsApi.deleteSubjectComponent(subjectId, key)
+      reloadSubjects()
+    } catch (err) { alert(err.message) }
   }
 
   async function handleSaveMarks(e) {
@@ -401,33 +422,78 @@ function Results() {
               </div>
             </form>
           )}
-          <div className="table-card">
-            <table className="data-table">
-              <thead><tr><th>Name</th><th>Code</th><th>Max Marks</th><th>Passing</th><th>Type</th><th></th></tr></thead>
-              <tbody>
-                {subjects.length === 0 ? (
-                  <tr><td colSpan={6} className="data-table__empty">No subjects yet</td></tr>
-                ) : subjects.map(s => (
-                  <tr key={s.id}>
-                    <td>{s.name}</td>
-                    <td className="data-table__muted">{s.code || '-'}</td>
-                    <td>{s.max_marks}</td>
-                    <td>{s.passing_marks}</td>
-                    <td>
-                      {s.is_co_scholastic
-                        ? <span className="badge badge--muted">Grading only</span>
-                        : <span className="data-table__muted">Scored</span>}
-                    </td>
-                    <td>
-                      {!isTeacher && (
-                        <button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)}><Trash2 size={14} /></button>
+          {subjects.length === 0 ? (
+            <p className="empty-text">No subjects yet</p>
+          ) : (
+            <div className="subject-cards">
+              {subjects.map(s => {
+                const components = s.mark_components || []
+                const maxSum = componentsMaxSum(s)
+                const mismatch = components.length > 0 && maxSum !== s.max_marks
+                return (
+                  <div key={s.id} className="subject-card">
+                    <div className="subject-card__header">
+                      <div className="subject-card__title">
+                        <strong>{s.name}</strong>
+                        {s.code && <span className="data-table__muted"> ({s.code})</span>}
+                        {s.is_co_scholastic && <span className="badge badge--muted" style={{ marginLeft: '8px' }}>Grading only</span>}
+                      </div>
+                      <div className="subject-card__meta">
+                        <span>Max <strong>{s.max_marks}</strong></span>
+                        <span>Pass <strong>{s.passing_marks}</strong></span>
+                        {!isTeacher && (
+                          <button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)} title="Delete subject">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="subject-card__fields">
+                      <div className="subject-card__fields-label">Custom Fields</div>
+                      {components.length === 0 ? (
+                        <p className="empty-text" style={{ padding: 0, textAlign: 'left' }}>
+                          No custom fields -- marks are entered as one number out of {s.max_marks}.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="field-chips">
+                            {components.map(c => (
+                              <span key={c.key} className="field-chip">
+                                {c.label} <span className="data-table__muted">/{c.max_marks}</span>
+                                <button type="button" className="field-chip__remove" onClick={() => handleDeleteComponent(s.id, c.key)} title="Remove field">×</button>
+                              </span>
+                            ))}
+                          </div>
+                          <p className={`subject-card__fields-total ${mismatch ? 'subject-card__fields-total--mismatch' : ''}`}>
+                            Fields total {maxSum} / subject max {s.max_marks}
+                            {mismatch && " -- these don't match, double check the field max marks"}
+                          </p>
+                        </>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {addingComponentFor === s.id ? (
+                        <div className="marks-add-component" style={{ marginTop: '8px' }}>
+                          <input placeholder="Field name (e.g. Oral)" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
+                          <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
+                          <button type="button" className="btn btn--primary btn--sm" onClick={() => handleAddComponent(s)} disabled={addingComponentSaving}>
+                            {addingComponentSaving ? 'Adding...' : 'Add'}
+                          </button>
+                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setAddingComponentFor(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button" className="btn btn--outline btn--sm" style={{ marginTop: '8px' }}
+                          onClick={() => { setAddingComponentFor(s.id); setNewComponentForm({ label: '', max_marks: '' }) }}
+                        >
+                          <Plus size={13} /> Add Field
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -497,84 +563,80 @@ function Results() {
           </div>
           {selectedExamId && selectedStudentId && markSubjects.length > 0 && (
             <form onSubmit={handleSaveMarks}>
-              <div className="table-card" style={{ overflowX: 'auto' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '140px' }}>Subject</th>
-                      <th>Sections / Marks</th>
-                      <th style={{ width: '90px' }}>Total</th>
-                      <th style={{ width: '70px' }}>Absent</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {markSubjects.map(sub => {
-                      const components = sub.mark_components || []
-                      return (
-                        <tr key={sub.id}>
-                          <td>{sub.name}</td>
-                          <td>
-                            {components.length > 0 ? (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                {components.map(c => (
-                                  <label key={c.key} className="marks-component-field">
-                                    <span>{c.label} <span className="data-table__muted">/{c.max_marks}</span></span>
-                                    <input
-                                      type="number" min="0" max={c.max_marks} step="0.5"
-                                      className="marks-input"
-                                      disabled={marks[sub.id]?.is_absent}
-                                      value={marks[sub.id]?.components?.[c.key] || ''}
-                                      onChange={e => setMarks(prev => ({
-                                        ...prev,
-                                        [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
-                                      }))}
-                                    />
-                                  </label>
-                                ))}
-                              </div>
-                            ) : (
+              <div className="mark-subject-cards">
+                {markSubjects.map(sub => {
+                  const components = sub.mark_components || []
+                  const isAbsent = marks[sub.id]?.is_absent || false
+                  return (
+                    <div key={sub.id} className="mark-subject-card">
+                      <div className="mark-subject-card__header">
+                        <span className="mark-subject-card__title">{sub.name}</span>
+                        <label className="mark-subject-card__absent">
+                          <input
+                            type="checkbox"
+                            checked={isAbsent}
+                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], is_absent: e.target.checked } }))}
+                          />
+                          Absent
+                        </label>
+                      </div>
+
+                      {components.length > 0 ? (
+                        <div className="mark-fields-grid">
+                          {components.map(c => (
+                            <label key={c.key} className="marks-component-field">
+                              <span>{c.label} <span className="data-table__muted">/{c.max_marks}</span></span>
                               <input
-                                type="number" min="0" max={sub.max_marks} step="0.5"
+                                type="number" min="0" max={c.max_marks} step="0.5"
                                 className="marks-input"
-                                disabled={marks[sub.id]?.is_absent}
-                                value={marks[sub.id]?.marks_obtained || ''}
-                                placeholder={`out of ${sub.max_marks}`}
-                                onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
+                                disabled={isAbsent}
+                                value={marks[sub.id]?.components?.[c.key] || ''}
+                                onChange={e => setMarks(prev => ({
+                                  ...prev,
+                                  [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
+                                }))}
                               />
-                            )}
-                            {addingComponentFor === sub.id ? (
-                              <div className="marks-add-component" style={{ marginTop: '8px' }}>
-                                <input placeholder="Section name" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
-                                <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
-                                <button type="button" className="btn btn--primary btn--sm" onClick={() => handleAddComponent(sub)} disabled={addingComponentSaving}>
-                                  {addingComponentSaving ? 'Adding...' : 'Add'}
-                                </button>
-                                <button type="button" className="btn btn--outline btn--sm" onClick={() => setAddingComponentFor(null)}>Cancel</button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button" className="btn btn--outline btn--sm" style={{ marginTop: '8px' }}
-                                onClick={() => { setAddingComponentFor(sub.id); setNewComponentForm({ label: '', max_marks: '' }) }}
-                              >
-                                <Plus size={13} /> Add Section
-                              </button>
-                            )}
-                          </td>
-                          <td className="data-table__muted">
-                            {components.length > 0 ? `${componentTotal(sub)} / ${sub.max_marks}` : `/ ${sub.max_marks}`}
-                          </td>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={marks[sub.id]?.is_absent || false}
-                              onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], is_absent: e.target.checked } }))}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <label className="marks-component-field">
+                          <span>Marks <span className="data-table__muted">/{sub.max_marks}</span></span>
+                          <input
+                            type="number" min="0" max={sub.max_marks} step="0.5"
+                            className="marks-input"
+                            disabled={isAbsent}
+                            value={marks[sub.id]?.marks_obtained || ''}
+                            placeholder={`out of ${sub.max_marks}`}
+                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
+                          />
+                        </label>
+                      )}
+
+                      <div className="mark-subject-card__total">
+                        {components.length > 0 ? `Total: ${componentTotal(sub)} / ${sub.max_marks}` : `Out of ${sub.max_marks}`}
+                      </div>
+
+                      {addingComponentFor === sub.id ? (
+                        <div className="marks-add-component" style={{ marginTop: '10px' }}>
+                          <input placeholder="Field name (e.g. Oral)" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
+                          <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
+                          <button type="button" className="btn btn--primary btn--sm" onClick={() => handleAddComponent(sub)} disabled={addingComponentSaving}>
+                            {addingComponentSaving ? 'Adding...' : 'Add'}
+                          </button>
+                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setAddingComponentFor(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button" className="btn btn--outline btn--sm" style={{ marginTop: '10px' }}
+                          onClick={() => { setAddingComponentFor(sub.id); setNewComponentForm({ label: '', max_marks: '' }) }}
+                        >
+                          <Plus size={13} /> Add Field
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               {markMsg && <p className={`doc-msg ${markMsg.startsWith('Error') ? 'doc-msg--error' : 'doc-msg--ok'}`} style={{ marginTop: '12px' }}>{markMsg}</p>}
               <button type="submit" className="btn btn--primary" style={{ marginTop: '12px' }} disabled={markSaving}>
