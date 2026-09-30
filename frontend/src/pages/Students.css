@@ -1,19 +1,8 @@
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.page-header h1 {
-  font-size: 1.6rem;
-}
-
-.page-subtitle {
-  color: var(--gray-500);
-  font-size: 0.9rem;
-  margin-top: 4px;
-}
+/* .page-header/.page-header h1/.page-subtitle: no longer redefined here --
+   this was an identical copy of global.css's shared baseline except for
+   missing flex-wrap, which silently undid that baseline's mobile-wrap
+   protection (a page's own CSS loads after and wins the cascade). Removed
+   rather than patched, now that the baseline covers it exactly. */
 
 .page-filters {
   display: flex;

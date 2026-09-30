@@ -470,7 +470,8 @@ function StaffDetail() {
                   </button>
                 )}
               </div>
-              <table className="data-table">
+              <div className="table-card" style={{ overflowX: 'auto' }}>
+                <table className="data-table">
                 <thead>
                   <tr><th>Type</th><th>From</th><th>To</th><th>Reason</th>{isAdmin && <th></th>}</tr>
                 </thead>
@@ -487,7 +488,8 @@ function StaffDetail() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </>
           )}
         </div>
@@ -509,7 +511,8 @@ function StaffDetail() {
             <p className="empty-text">Could not load access control settings.</p>
           ) : (
             <>
-              <table className="data-table">
+              <div className="table-card" style={{ overflowX: 'auto' }}>
+                <table className="data-table">
                 <thead>
                   <tr><th>Section</th><th style={{ textAlign: 'center' }}>View</th><th style={{ textAlign: 'center' }}>Write</th><th></th></tr>
                 </thead>
@@ -533,7 +536,8 @@ function StaffDetail() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
               {permErr && <p className="sd-modal__err">{permErr}</p>}
               {permSaved && <p className="empty-text" style={{ color: 'var(--success)' }}>Access control settings saved.</p>}
               <div className="modal__actions" style={{ justifyContent: 'flex-start', marginTop: '12px' }}>

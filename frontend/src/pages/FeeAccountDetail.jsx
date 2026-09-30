@@ -201,7 +201,8 @@ function FeeAccountDetail() {
         {(!account.payments || account.payments.length === 0) ? (
           <p className="empty-text">No payments recorded yet</p>
         ) : (
-          <table className="data-table">
+          <div className="table-card" style={{ overflowX: 'auto' }}>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -253,7 +254,8 @@ function FeeAccountDetail() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
 
