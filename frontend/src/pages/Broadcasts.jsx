@@ -197,7 +197,8 @@ function Broadcasts() {
                       <div className="broadcast-recipients">
                         {!recipients[b.id] ? <p className="loading-text">Loading...</p> : (
                           recipients[b.id].length === 0 ? <p className="empty-text">No recipient data.</p> : (
-                            <table className="data-table">
+                            <div className="table-card" style={{ overflowX: 'auto' }}>
+                              <table className="data-table">
                               <thead><tr><th>Phone</th><th>Name</th><th>Status</th><th>Error</th></tr></thead>
                               <tbody>
                                 {recipients[b.id].map(rec => (
@@ -209,7 +210,8 @@ function Broadcasts() {
                                   </tr>
                                 ))}
                               </tbody>
-                            </table>
+                              </table>
+                            </div>
                           )
                         )}
                       </div>

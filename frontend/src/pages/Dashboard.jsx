@@ -117,7 +117,8 @@ function Dashboard() {
           ) : recentStudents.length === 0 ? (
             <p className="empty-text">No students yet. <Link to="/students">Add one</Link></p>
           ) : (
-            <table className="data-table">
+            <div className="table-card" style={{ overflowX: 'auto' }}>
+              <table className="data-table">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -140,7 +141,8 @@ function Dashboard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
 

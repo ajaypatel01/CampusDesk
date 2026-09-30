@@ -519,7 +519,8 @@ function Settings() {
               ) : feeStructures.length === 0 ? (
                 <p className="empty-text">No fee structures for {currentYear.name}. Add one per grade.</p>
               ) : (
-                <table className="data-table" style={{ marginTop: '12px' }}>
+                <div className="table-card" style={{ overflowX: 'auto', marginTop: '12px' }}>
+                  <table className="data-table">
                   <thead>
                     <tr>
                       <th>Grade</th>
@@ -548,7 +549,8 @@ function Settings() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               )}
             </div>
           )}

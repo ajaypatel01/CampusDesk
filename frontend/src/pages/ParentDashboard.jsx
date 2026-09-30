@@ -194,7 +194,8 @@ function ParentDashboard() {
               {marksheet && (
                 <div className="marksheet-preview">
                   <p><strong>{marksheet.exam_name}</strong> · {marksheet.academic_year}</p>
-                  <table className="data-table">
+                  <div className="table-card" style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
                     <thead><tr><th>Subject</th><th>Max</th><th>Obtained</th><th>%</th><th>Grade</th><th>Status</th></tr></thead>
                     <tbody>
                       {(marksheet.rows || []).map((row, i) => (
@@ -215,7 +216,8 @@ function ParentDashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                   <p className="parent-dashboard__total">
                     Total: {marksheet.total_obtained} / {marksheet.total_max} ({marksheet.percentage?.toFixed(1)}%) · {marksheet.result}
                   </p>

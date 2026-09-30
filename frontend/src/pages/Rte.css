@@ -3,6 +3,7 @@
 .rte-tabs {
   display: flex; gap: 4px; margin-bottom: 20px;
   border-bottom: 1px solid var(--gray-200); padding-bottom: 0;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 
 .rte-tab {
@@ -37,17 +38,17 @@
 
 .rte-section-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
 }
 .rte-section-header h2 { font-size: 1.1rem; }
 
 .modal-hint { font-size: 13px; color: var(--gray-500); margin-bottom: 16px; margin-top: -12px; }
 
-/* Shared */
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
-.page-header h1 { font-size: 1.6rem; }
-.page-subtitle { color: var(--gray-500); font-size: 0.9rem; margin-top: 4px; }
-.empty-text { color: var(--gray-400); font-size: 14px; padding: 20px 0; text-align: center; }
+/* .page-header/.page-subtitle/.empty-text: no longer redefined here -- this
+   page's copies were identical to global.css's shared baseline except for
+   missing flex-wrap, which silently undid that baseline's mobile-wrap
+   protection since a page's own CSS loads after and wins the cascade.
+   Removed rather than patched, now that the baseline covers it exactly. */
 .table-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--gray-200); overflow-x: auto; padding: 4px 0; }
 .data-table__empty { text-align: center; color: var(--gray-400); padding: 40px 0 !important; }
 .data-table__muted { color: var(--gray-400); }

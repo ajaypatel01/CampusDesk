@@ -109,15 +109,12 @@
 }
 
 /* Shared styles used across pages */
-.page-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  margin-bottom: 24px;
-}
-.page-header h1 { font-size: 1.6rem; }
-.page-subtitle { color: var(--gray-500); font-size: 0.9rem; margin-top: 4px; }
-.empty-text { color: var(--gray-400); font-size: 14px; padding: 20px 0; text-align: center; }
-.table-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--gray-200); overflow-x: auto; padding: 4px 0; }
-.data-table__empty { text-align: center; color: var(--gray-400); padding: 40px 0 !important; }
+/* .page-header/.page-subtitle/.empty-text/.table-card/.data-table__empty:
+   no longer redefined here -- these were identical copies of global.css's
+   shared baseline except .page-header was missing flex-wrap, which
+   silently undid that baseline's mobile-wrap protection (a page's own CSS
+   loads after and wins the cascade). Removed rather than patched, now that
+   the baseline covers all five exactly. */
 
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);

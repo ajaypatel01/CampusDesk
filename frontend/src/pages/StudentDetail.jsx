@@ -393,7 +393,8 @@ function StudentDetail() {
             {feeSummary.payments && feeSummary.payments.length > 0 && (
               <div style={{ marginTop: '12px' }}>
                 <h4 style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--gray-600)' }}>Recent Payments</h4>
-                <table className="data-table" style={{ fontSize: '13px' }}>
+                <div className="table-card" style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ fontSize: '13px' }}>
                   <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead>
                   <tbody>
                     {feeSummary.payments.slice(0, 5).map(p => (
@@ -405,7 +406,8 @@ function StudentDetail() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               </div>
             )}
           </div>
