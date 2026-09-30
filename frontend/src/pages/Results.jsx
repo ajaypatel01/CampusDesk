@@ -624,7 +624,8 @@ function Results() {
                 <p>{marksheet.exam_name} · {marksheet.academic_year}</p>
                 <p><strong>{marksheet.student_name}</strong> · {marksheet.student_code} · {marksheet.grade_level_name}</p>
               </div>
-              <table className="data-table">
+              <div className="table-card" style={{ overflowX: 'auto' }}>
+                <table className="data-table">
                 <thead><tr><th>Subject</th><th>Max</th><th>Pass</th><th>Obtained</th><th>%</th><th>Grade</th><th>Status</th></tr></thead>
                 <tbody>
                   {(marksheet.rows || []).map((row, i) => (
@@ -687,7 +688,8 @@ function Results() {
                     <td><span className={`badge badge--${marksheet.result === 'Pass' ? 'success' : 'danger'}`}>{marksheet.result}</span></td>
                   </tr>
                 </tfoot>
-              </table>
+                </table>
+              </div>
               {totalMsg && <p className="marksheet-total-error">{totalMsg}</p>}
               <p className="marksheet-cgpa">CGPA: <strong>{marksheet.cgpa?.toFixed(2)}</strong></p>
             </div>
