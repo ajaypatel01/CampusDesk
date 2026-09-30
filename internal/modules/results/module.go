@@ -397,19 +397,26 @@ func (m *Module) UpsertMark(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveOneMark routes through the component-aware path when the mark carries
-// a component breakdown (i.e. its exam's grade has a report-card template
-// and the entry form sent one), otherwise saves the plain total as before.
+// a component breakdown, otherwise saves the plain total as before.
+//
+// The scheme used here MUST be the subject's own effective one
+// (GetSubjectComponents: its stored custom components, or the grade
+// template's if it has none of its own) -- not the raw grade template
+// directly. Using the template directly was a real bug: a subject with its
+// own custom field added beyond the template (e.g. an extra "Copy" column)
+// would have that field's value silently dropped on save, since
+// UpsertMarkWithComponents only persists whatever's in the components list
+// it's given.
 func (m *Module) saveOneMark(ctx context.Context, mark *domain.ExamMark) error {
 	if len(mark.Components) == 0 {
 		return m.repo.UpsertMark(ctx, mark)
 	}
-	template, err := m.repo.GetExamReportTemplate(ctx, mark.ExamID)
+	components, err := m.repo.GetSubjectComponents(ctx, mark.SubjectID)
 	if err != nil {
 		return err
 	}
-	components := MarkComponentsForTemplate(template)
 	if len(components) == 0 {
-		// Grade has no template (or none matching a known scheme) -- fall
+		// Grade has no template and subject has no custom components -- fall
 		// back to treating the submitted total as a plain mark.
 		return m.repo.UpsertMark(ctx, mark)
 	}
@@ -440,8 +447,11 @@ func (m *Module) BulkUpsertMarks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, error) {
-	// A bulk save is typically one exam across a whole class, so cache each
-	// exam's component scheme instead of re-querying it per row.
+	// A bulk save is typically one exam across a whole class -- many rows,
+	// same subject -- so cache each subject's component scheme instead of
+	// re-querying it per row. Cached by subject, not by exam: different
+	// subjects in the same exam can have different schemes once a subject
+	// has its own custom components (see saveOneMark's comment above).
 	schemes := map[uuid.UUID][]MarkComponent{}
 	var saved int
 	for i := range marks {
@@ -456,14 +466,14 @@ func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, 
 			saved++
 			continue
 		}
-		components, ok := schemes[mark.ExamID]
+		components, ok := schemes[mark.SubjectID]
 		if !ok {
-			template, err := m.repo.GetExamReportTemplate(ctx, mark.ExamID)
+			var err error
+			components, err = m.repo.GetSubjectComponents(ctx, mark.SubjectID)
 			if err != nil {
 				return saved, err
 			}
-			components = MarkComponentsForTemplate(template)
-			schemes[mark.ExamID] = components
+			schemes[mark.SubjectID] = components
 		}
 		if len(components) == 0 {
 			if err := m.repo.UpsertMark(ctx, mark); err != nil {
