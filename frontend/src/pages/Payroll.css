@@ -4,16 +4,19 @@
   display: flex;
   gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .payroll-summary {
   display: flex;
   gap: 12px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .payroll-stat {
   flex: 1;
+  min-width: 140px;
   display: flex;
   flex-direction: column;
   gap: 4px;
