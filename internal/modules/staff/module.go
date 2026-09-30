@@ -24,7 +24,10 @@ func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
 	r.Route("/staff", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		// Viewing the staff directory (everyone's designation, phone, etc.)
+		// is admin/registrar work; a teacher's own salary comes from the
+		// self-scoped payroll module instead, not this directory.
+		r.Use(httpx.BlockRoles("registrar", "teacher"))
 		r.With(view).Get("/", m.handler.List)
 		r.Route("/{id}", func(r chi.Router) {
 			r.With(view).Get("/", m.handler.Get)

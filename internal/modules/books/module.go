@@ -26,7 +26,10 @@ func (m *Module) Mount(r chi.Router) {
 	write := httpx.RequireFeature(feature, "write")
 
 	r.Group(func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		// Library management is an admin/registrar task -- not something a
+		// teacher needs to do their own job (entering results for their
+		// class, assigning homework).
+		r.Use(httpx.BlockRoles("registrar", "teacher"))
 
 		r.Route("/books", func(r chi.Router) {
 			r.With(view).Get("/", h.ListBooks)

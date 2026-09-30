@@ -24,16 +24,22 @@ func (m *Module) Mount(r chi.Router) {
 	h := m.handler
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
-	r.Route("/enrollments", func(r chi.Router) {
-		r.With(view).Get("/", h.List)
-		r.With(write).Post("/", h.Create)
-		r.Route("/{id}", func(r chi.Router) {
-			r.With(view).Get("/", h.Get)
-			r.With(write).Put("/", h.Update)
+	// Enrollment/attendance record-keeping across the whole school is
+	// admin/registrar work, not something a class teacher needs to enter
+	// results or assign homework for their own class.
+	r.Group(func(r chi.Router) {
+		r.Use(httpx.BlockRoles("teacher"))
+		r.Route("/enrollments", func(r chi.Router) {
+			r.With(view).Get("/", h.List)
+			r.With(write).Post("/", h.Create)
+			r.Route("/{id}", func(r chi.Router) {
+				r.With(view).Get("/", h.Get)
+				r.With(write).Put("/", h.Update)
+			})
 		})
-	})
-	r.Route("/attendance", func(r chi.Router) {
-		r.With(view).Get("/", h.ListAttendance)
-		r.With(write).Post("/", h.RecordAttendance)
+		r.Route("/attendance", func(r chi.Router) {
+			r.With(view).Get("/", h.ListAttendance)
+			r.With(write).Post("/", h.RecordAttendance)
+		})
 	})
 }

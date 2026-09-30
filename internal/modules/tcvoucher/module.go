@@ -22,17 +22,22 @@ const feature = "tc_vouchers"
 func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
-	r.Route("/tc-records", func(r chi.Router) {
-		r.With(view).Get("/", m.handler.ListTCRecords)
-		r.With(write).Post("/", m.handler.CreateTCRecord)
-		r.Route("/{id}", func(r chi.Router) {
-			r.With(view).Get("/", m.handler.GetTCRecord)
-			r.With(write).Put("/", m.handler.UpdateTCRecord)
-			r.With(write).Delete("/", m.handler.DeleteTCRecord)
+	// TC records and vouchers are admin/registrar financial-administrative
+	// documents, not something a class teacher needs.
+	r.Group(func(r chi.Router) {
+		r.Use(httpx.BlockRoles("teacher"))
+		r.Route("/tc-records", func(r chi.Router) {
+			r.With(view).Get("/", m.handler.ListTCRecords)
+			r.With(write).Post("/", m.handler.CreateTCRecord)
+			r.Route("/{id}", func(r chi.Router) {
+				r.With(view).Get("/", m.handler.GetTCRecord)
+				r.With(write).Put("/", m.handler.UpdateTCRecord)
+				r.With(write).Delete("/", m.handler.DeleteTCRecord)
+			})
 		})
-	})
-	r.Route("/vouchers", func(r chi.Router) {
-		r.With(view).Get("/", m.handler.ListVouchers)
-		r.With(write).Post("/", m.handler.CreateVoucher)
+		r.Route("/vouchers", func(r chi.Router) {
+			r.With(view).Get("/", m.handler.ListVouchers)
+			r.With(write).Post("/", m.handler.CreateVoucher)
+		})
 	})
 }

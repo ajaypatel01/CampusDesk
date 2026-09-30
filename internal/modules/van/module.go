@@ -25,21 +25,25 @@ func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
 
-	r.Route("/vans", func(r chi.Router) {
-		r.With(view).Get("/", h.ListVans)
-		r.With(write).Post("/", h.CreateVan)
-		r.Route("/{id}", func(r chi.Router) {
-			r.With(view).Get("/", h.GetVan)
-			r.With(write).Put("/", h.UpdateVan)
-			r.With(write).Delete("/", h.DeleteVan)
-			r.With(write).Post("/routes", h.AddRoute)
-			r.With(write).Delete("/routes/{route_id}", h.DeleteRoute)
-		})
-	})
+	r.Group(func(r chi.Router) {
+		r.Use(httpx.BlockRoles("teacher"))
 
-	r.Route("/van-assignments", func(r chi.Router) {
-		r.With(view).Get("/", h.ListAssignments)
-		r.With(write).Post("/", h.AssignStudent)
-		r.With(write).Delete("/{id}", h.RemoveAssignment)
+		r.Route("/vans", func(r chi.Router) {
+			r.With(view).Get("/", h.ListVans)
+			r.With(write).Post("/", h.CreateVan)
+			r.Route("/{id}", func(r chi.Router) {
+				r.With(view).Get("/", h.GetVan)
+				r.With(write).Put("/", h.UpdateVan)
+				r.With(write).Delete("/", h.DeleteVan)
+				r.With(write).Post("/routes", h.AddRoute)
+				r.With(write).Delete("/routes/{route_id}", h.DeleteRoute)
+			})
+		})
+
+		r.Route("/van-assignments", func(r chi.Router) {
+			r.With(view).Get("/", h.ListAssignments)
+			r.With(write).Post("/", h.AssignStudent)
+			r.With(write).Delete("/{id}", h.RemoveAssignment)
+		})
 	})
 }

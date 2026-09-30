@@ -30,7 +30,9 @@ func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
 	r.Route("/broadcasts", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		// Sending/viewing school-wide broadcasts is admin communication
+		// work, not something a teacher needs for grading their own class.
+		r.Use(httpx.BlockRoles("registrar", "teacher"))
 		r.With(view).Get("/", m.ListBroadcasts)
 		r.With(write).Post("/", m.SendBroadcast)
 		r.With(view).Get("/{id}/recipients", m.ListRecipients)

@@ -90,7 +90,9 @@ func (m *Module) Mount(r chi.Router) {
 	r.Post("/auth/phone/verify/request", m.handler.RequestPhoneVerification)
 	r.Post("/auth/phone/verify/confirm", m.handler.ConfirmPhoneVerification)
 	r.Route("/users", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		// Browsing/editing other accounts is admin work -- a teacher's own
+		// profile comes from /auth/me above, unaffected by this block.
+		r.Use(httpx.BlockRoles("registrar", "teacher"))
 		r.With(view).Get("/", m.handler.List)
 		r.With(write).Post("/", m.handler.Create)
 		r.Route("/{id}", func(r chi.Router) {

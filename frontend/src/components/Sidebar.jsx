@@ -26,28 +26,33 @@ import {
 } from 'lucide-react'
 import './Sidebar.css'
 
+// A teacher's access is intentionally narrow: entering/viewing results for
+// their own homeroom class (enforced server-side, not just hidden here),
+// homework, their own salary, and basic account settings -- nothing else.
+// Every other item below explicitly denies 'teacher' for that reason.
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', deny: ['parent'] },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', deny: ['parent', 'teacher'] },
   { to: '/my-ward', icon: Users, label: 'My Ward', only: ['parent'] },
-  { to: '/admissions', icon: ClipboardList, label: 'Admissions', deny: ['parent'] },
-  { to: '/students', icon: Users, label: 'Students', deny: ['parent'] },
-  { to: '/fees', icon: IndianRupee, label: 'Fees', deny: ['parent'] },
-  { to: '/teachers', icon: UserCog, label: 'Teachers', deny: ['registrar', 'parent'] },
-  { to: '/staff', icon: Briefcase, label: 'Staff', deny: ['registrar', 'parent'] },
-  { to: '/ledger', icon: LedgerIcon, label: 'Fee Ledger', deny: ['parent'] },
-  { to: '/fee-report', icon: PieChart, label: 'Fee Report', deny: ['registrar', 'parent'] },
-  { to: '/tc-records', icon: FileMinus, label: 'TC Records', deny: ['parent'] },
-  { to: '/udise-checklist', icon: ClipboardCheck, label: 'UDISE+ Checklist', deny: ['parent'] },
-  { to: '/vouchers', icon: Receipt, label: 'Vouchers', deny: ['parent'] },
-  { to: '/documents', icon: FileText, label: 'Documents', deny: ['registrar', 'parent'] },
-  { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts', deny: ['registrar', 'parent'] },
+  { to: '/admissions', icon: ClipboardList, label: 'Admissions', deny: ['parent', 'teacher'] },
+  { to: '/students', icon: Users, label: 'Students', deny: ['parent', 'teacher'] },
+  { to: '/fees', icon: IndianRupee, label: 'Fees', deny: ['parent', 'teacher'] },
+  { to: '/teachers', icon: UserCog, label: 'Teachers', deny: ['registrar', 'parent', 'teacher'] },
+  { to: '/staff', icon: Briefcase, label: 'Staff', deny: ['registrar', 'parent', 'teacher'] },
+  { to: '/ledger', icon: LedgerIcon, label: 'Fee Ledger', deny: ['parent', 'teacher'] },
+  { to: '/fee-report', icon: PieChart, label: 'Fee Report', deny: ['registrar', 'parent', 'teacher'] },
+  { to: '/tc-records', icon: FileMinus, label: 'TC Records', deny: ['parent', 'teacher'] },
+  { to: '/udise-checklist', icon: ClipboardCheck, label: 'UDISE+ Checklist', deny: ['parent', 'teacher'] },
+  { to: '/vouchers', icon: Receipt, label: 'Vouchers', deny: ['parent', 'teacher'] },
+  { to: '/documents', icon: FileText, label: 'Documents', deny: ['registrar', 'parent', 'teacher'] },
+  { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts', deny: ['registrar', 'parent', 'teacher'] },
   { to: '/results', icon: BarChart2, label: 'Results', deny: ['parent'] },
   { to: '/homework', icon: BookOpen, label: 'Homework', deny: ['parent'] },
-  { to: '/transport', icon: Bus, label: 'Transport', deny: ['parent'] },
-  { to: '/rte', icon: ShieldCheck, label: 'RTE', deny: ['parent'] },
-  { to: '/books', icon: Library, label: 'Books', deny: ['registrar', 'parent'] },
-  { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar', 'parent'] },
+  { to: '/transport', icon: Bus, label: 'Transport', deny: ['parent', 'teacher'] },
+  { to: '/rte', icon: ShieldCheck, label: 'RTE', deny: ['parent', 'teacher'] },
+  { to: '/books', icon: Library, label: 'Books', deny: ['registrar', 'parent', 'teacher'] },
+  { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar', 'parent', 'teacher'] },
   { to: '/payroll', icon: Wallet, label: 'Payroll', only: ['super_admin'] },
+  { to: '/my-salary', icon: Wallet, label: 'My Salary', only: ['teacher'] },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
