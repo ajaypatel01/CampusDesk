@@ -110,15 +110,17 @@ function Results() {
       .then(r => setExams(r.items || [])).catch(() => {})
     const gradeName = grades.find(g => g.id === selectedGrade)?.name
     const studentParams = { school_id: currentSchool.id, limit: 500 }
-    // Scope the student picker to this class teacher's own grade — the backend still
-    // enforces this independently, but there's no reason to show other classes' students.
-    if (isTeacher && gradeName) {
+    // Scope the student picker to the selected grade -- for every role, not
+    // just teachers. This was teacher-only before, so an admin/registrar
+    // picking e.g. Nursery still saw all 352 students in the school in the
+    // Enter Marks/Marksheet/Report Card dropdowns instead of just Nursery's.
+    if (gradeName) {
       studentParams.academic_year_id = currentYear.id
       studentParams.grade_level = gradeName
     }
     studentsApi.list(studentParams)
       .then(r => setStudents(r.items || [])).catch(() => {})
-  }, [currentSchool, currentYear, selectedGrade, grades, isTeacher])
+  }, [currentSchool, currentYear, selectedGrade, grades])
 
   useEffect(() => {
     if (!selectedGrade) return
