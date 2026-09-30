@@ -27,7 +27,10 @@ func (m *Module) Mount(r chi.Router) {
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
 	r.Route("/documents", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"))
+		// Generating bonafide/TC/salary-slip documents for *other* people is
+		// admin/registrar work. A teacher's own salary slip comes from the
+		// payroll module instead (self-scoped there), not this admin path.
+		r.Use(httpx.BlockRoles("registrar", "teacher"))
 		r.With(view).Get("/bonafide", h.DownloadBonafide)
 		r.With(write).Post("/bonafide/email", h.EmailBonafide)
 		r.With(write).Post("/bonafide/whatsapp", h.WhatsAppBonafide)

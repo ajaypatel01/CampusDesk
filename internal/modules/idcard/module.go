@@ -29,7 +29,7 @@ const feature = "id_cards"
 
 func (m *Module) Mount(r chi.Router) {
 	r.Route("/id-cards", func(r chi.Router) {
-		r.Use(httpx.BlockRoles("registrar"), httpx.RequireFeature(feature, "write"))
+		r.Use(httpx.BlockRoles("registrar", "teacher"), httpx.RequireFeature(feature, "write"))
 		r.Post("/students", m.StudentCards)
 		r.Post("/teachers", m.TeacherCards)
 	})

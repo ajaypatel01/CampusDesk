@@ -25,6 +25,7 @@ import TCRecords from './pages/TCRecords'
 import Vouchers from './pages/Vouchers'
 import Ledger from './pages/Ledger'
 import Payroll from './pages/Payroll'
+import MySalary from './pages/MySalary'
 import FeeReport from './pages/FeeReport'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -40,6 +41,15 @@ import { ConfigProvider } from './services/ConfigContext'
 const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/fee-report']
 // Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
 const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
+// A teacher's access is intentionally narrow -- results for their own class
+// (enforced server-side), homework, their own salary, and settings, nothing
+// else. Mirrors the backend's BlockRoles("teacher") checks added alongside
+// this across every other module.
+const TEACHER_BLOCKED_PATHS = [
+  '/admissions', '/students', '/fees', '/teachers', '/staff', '/ledger', '/fee-report',
+  '/tc-records', '/udise-checklist', '/vouchers', '/documents', '/broadcasts',
+  '/transport', '/rte', '/books', '/id-cards', '/payroll',
+]
 
 function RegistrarGuard({ user, children }) {
   const location = useLocation()
@@ -47,7 +57,9 @@ function RegistrarGuard({ user, children }) {
     REGISTRAR_BLOCKED_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
   const isSuperAdminOnly = user?.role !== 'super_admin' &&
     SUPER_ADMIN_ONLY_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
-  if (isRegistrarBlocked || isSuperAdminOnly) return <Navigate to="/" replace />
+  const isTeacherBlocked = user?.role === 'teacher' &&
+    TEACHER_BLOCKED_PATHS.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
+  if (isRegistrarBlocked || isSuperAdminOnly || isTeacherBlocked) return <Navigate to="/" replace />
   return children
 }
 
@@ -90,7 +102,11 @@ function App() {
       <SchoolProvider user={user}>
         <Routes>
           <Route element={<RegistrarGuard user={user}><Layout onLogout={handleLogout} user={user} /></RegistrarGuard>}>
-            <Route index element={user.role === 'parent' ? <Navigate to="/my-ward" replace /> : <Dashboard />} />
+            <Route index element={
+              user.role === 'parent' ? <Navigate to="/my-ward" replace /> :
+              user.role === 'teacher' ? <Navigate to="/results" replace /> :
+              <Dashboard />
+            } />
             <Route path="my-ward" element={<ParentDashboard />} />
             <Route path="admissions" element={<Admissions />} />
             <Route path="students" element={<Students />} />
@@ -105,6 +121,7 @@ function App() {
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="ledger" element={<Ledger />} />
             <Route path="payroll" element={<Payroll />} />
+            <Route path="my-salary" element={<MySalary />} />
             <Route path="fee-report" element={<FeeReport />} />
             <Route path="documents" element={<Documents />} />
             <Route path="broadcasts" element={<Broadcasts />} />

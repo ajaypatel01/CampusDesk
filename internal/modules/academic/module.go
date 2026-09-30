@@ -28,7 +28,7 @@ func (m *Module) Mount(r chi.Router) {
 	write := httpx.RequireFeature(feature, "write")
 	r.Route("/academic-years", func(r chi.Router) {
 		r.With(view).Get("/", h.ListYears)
-		r.With(write).Post("/", h.CreateYear)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", h.CreateYear)
 	})
 	r.Route("/grade-levels", func(r chi.Router) {
 		r.With(view).Get("/", h.ListGrades)
@@ -38,7 +38,10 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", h.UpdateGrade)
 	})
 	r.Route("/class-sections", func(r chi.Router) {
+		// View stays open to teacher -- Results uses this to resolve which
+		// grade(s) they're the homeroom teacher for. Creating a section is
+		// admin setup work, same as grades above.
 		r.With(view).Get("/", h.ListSections)
-		r.With(write).Post("/", h.CreateSection)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", h.CreateSection)
 	})
 }

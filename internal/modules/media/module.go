@@ -29,8 +29,8 @@ func (m *Module) Mount(r chi.Router) {
 	// Photo upload piggybacks on the same "students"/"staff" access-control
 	// features as those records themselves, rather than its own -- there's
 	// no separate "media" section in the matrix.
-	r.With(httpx.RequireFeature("students", "write")).Post("/media/students/{id}/photo", m.UploadStudentPhoto)
-	r.With(httpx.BlockRoles("registrar"), httpx.RequireFeature("staff", "write")).Post("/media/users/{id}/photo", m.UploadUserPhoto)
+	r.With(httpx.BlockRoles("teacher"), httpx.RequireFeature("students", "write")).Post("/media/students/{id}/photo", m.UploadStudentPhoto)
+	r.With(httpx.BlockRoles("registrar", "teacher"), httpx.RequireFeature("staff", "write")).Post("/media/users/{id}/photo", m.UploadUserPhoto)
 }
 
 const maxPhotoSize = 5 << 20 // 5 MB

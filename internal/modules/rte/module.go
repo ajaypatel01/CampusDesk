@@ -26,6 +26,7 @@ func (m *Module) Mount(r chi.Router) {
 	write := httpx.RequireFeature(feature, "write")
 
 	r.Route("/rte", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("teacher"))
 		r.With(view).Get("/summary", h.GetSummary)
 		r.With(view).Get("/students", h.ListRTEStudents)
 		r.Route("/quotas", func(r chi.Router) {

@@ -24,7 +24,10 @@ func (m *Module) Mount(r chi.Router) {
 	h := m.handler
 	view := httpx.RequireFeature(feature, "view")
 	write := httpx.RequireFeature(feature, "write")
+	// Guardian/parent contact info management is admin/registrar work, not
+	// something a class teacher needs to enter results for their own class.
 	r.Route("/guardians", func(r chi.Router) {
+		r.Use(httpx.BlockRoles("teacher"))
 		r.With(view).Get("/", h.ListByStudent)
 		r.With(write).Post("/", h.Create)
 		r.With(write).Post("/link", h.Link)
