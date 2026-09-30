@@ -106,6 +106,25 @@ func (h *Handler) CreateSection(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+func (h *Handler) UpdateSection(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in SectionUpdateInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	c, err := h.svc.UpdateSection(r.Context(), id, in)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, c)
+}
+
 func (h *Handler) ListSections(w http.ResponseWriter, r *http.Request) {
 	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
 	if err != nil {

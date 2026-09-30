@@ -49,6 +49,15 @@ type SectionInput struct {
 	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id"`
 }
 
+// SectionUpdateInput mirrors SectionInput minus the identifiers that never
+// change after creation (school/year/grade) -- a section can only be
+// renamed, resized, or reassigned a class teacher.
+type SectionUpdateInput struct {
+	Name              string     `json:"name"`
+	Capacity          int        `json:"capacity"`
+	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id"`
+}
+
 func (s *Service) CreateYear(ctx context.Context, in YearInput) (*domain.AcademicYear, error) {
 	if in.SchoolID == uuid.Nil || strings.TrimSpace(in.Name) == "" || !in.EndDate.After(in.StartDate) {
 		return nil, apperr.ErrInvalidInput
@@ -130,4 +139,22 @@ func (s *Service) ListSections(ctx context.Context, schoolID, yearID uuid.UUID) 
 		return nil, apperr.ErrInvalidInput
 	}
 	return s.repo.ListSections(ctx, schoolID, yearID)
+}
+
+// UpdateSection renames/resizes a section or (re)assigns its class teacher.
+// A nil HomeroomTeacherID clears the assignment -- same "explicit null
+// means clear" convention as UpdateGrade's report_card_template above.
+func (s *Service) UpdateSection(ctx context.Context, id uuid.UUID, in SectionUpdateInput) (*domain.ClassSection, error) {
+	if id == uuid.Nil || strings.TrimSpace(in.Name) == "" {
+		return nil, apperr.ErrInvalidInput
+	}
+	cap := in.Capacity
+	if cap <= 0 {
+		cap = 30
+	}
+	c := &domain.ClassSection{ID: id, Name: strings.TrimSpace(in.Name), Capacity: cap, HomeroomTeacherID: in.HomeroomTeacherID}
+	if err := s.repo.UpdateSection(ctx, c); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSection(ctx, id)
 }

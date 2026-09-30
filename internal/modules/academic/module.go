@@ -43,5 +43,8 @@ func (m *Module) Mount(r chi.Router) {
 		// admin setup work, same as grades above.
 		r.With(view).Get("/", h.ListSections)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", h.CreateSection)
+		// Assigning/changing a section's class teacher is the same admin
+		// setup work as creating the section.
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", h.UpdateSection)
 	})
 }

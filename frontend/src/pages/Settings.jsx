@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, Check, X, UserCircle, Smartphone } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
-import { schoolsApi, academicApi, feesApi, usersApi } from '../services/api'
+import { schoolsApi, academicApi, feesApi, usersApi, staffApi } from '../services/api'
 import './Settings.css'
 
 const roleLabel = {
@@ -29,6 +29,7 @@ function Settings() {
   const [phoneMsg, setPhoneMsg] = useState('')
   const [grades, setGrades] = useState([])
   const [sections, setSections] = useState([])
+  const [teachers, setTeachers] = useState([])
   const [feeStructures, setFeeStructures] = useState([])
   const [pendingUsers, setPendingUsers] = useState([])
   const [pendingLoading, setPendingLoading] = useState(false)
@@ -48,7 +49,8 @@ function Settings() {
   const [gradeForm, setGradeForm] = useState({ name: '', sort_order: '' })
 
   const [showSectionModal, setShowSectionModal] = useState(false)
-  const [sectionForm, setSectionForm] = useState({ grade_level_id: '', name: '', capacity: '30' })
+  const [editingSectionId, setEditingSectionId] = useState(null)
+  const [sectionForm, setSectionForm] = useState({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
 
   const [saving, setSaving] = useState(false)
 
@@ -104,6 +106,13 @@ function Settings() {
       .then(res => setFeeStructures(res.items || []))
       .catch(() => setFeeStructures([]))
   }, [currentSchool, currentYear])
+
+  useEffect(() => {
+    if (!currentSchool) return
+    staffApi.list({ school_id: currentSchool.id, limit: 500 })
+      .then(res => setTeachers((res.items || []).filter(u => u.role === 'teacher')))
+      .catch(() => setTeachers([]))
+  }, [currentSchool])
 
   useEffect(() => {
     if (!isAdmin || activeTab !== 'approvals') return
@@ -178,21 +187,41 @@ function Settings() {
     } catch (err) { alert(err.message) }
   }
 
-  async function handleCreateSection(e) {
+  async function handleSaveSection(e) {
     e.preventDefault()
     setSaving(true)
     try {
-      await academicApi.createSection({
-        school_id: currentSchool.id, academic_year_id: currentYear.id,
-        grade_level_id: sectionForm.grade_level_id, name: sectionForm.name,
-        capacity: parseInt(sectionForm.capacity, 10) || 30,
-      })
+      const homeroomTeacherId = sectionForm.homeroom_teacher_id || null
+      if (editingSectionId) {
+        await academicApi.updateSection(editingSectionId, {
+          name: sectionForm.name,
+          capacity: parseInt(sectionForm.capacity, 10) || 30,
+          homeroom_teacher_id: homeroomTeacherId,
+        })
+      } else {
+        await academicApi.createSection({
+          school_id: currentSchool.id, academic_year_id: currentYear.id,
+          grade_level_id: sectionForm.grade_level_id, name: sectionForm.name,
+          capacity: parseInt(sectionForm.capacity, 10) || 30,
+          homeroom_teacher_id: homeroomTeacherId,
+        })
+      }
       setShowSectionModal(false)
-      setSectionForm({ grade_level_id: '', name: '', capacity: '30' })
+      setEditingSectionId(null)
+      setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
       const res = await academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id })
       setSections(res.items || [])
     } catch (err) { alert(err.message) }
     finally { setSaving(false) }
+  }
+
+  function openEditSection(s) {
+    setEditingSectionId(s.id)
+    setSectionForm({
+      grade_level_id: s.grade_level_id, name: s.name,
+      capacity: String(s.capacity), homeroom_teacher_id: s.homeroom_teacher_id || '',
+    })
+    setShowSectionModal(true)
   }
 
   async function handleSaveFeeStructure(e) {
@@ -407,7 +436,14 @@ function Settings() {
                       <Plus size={16} /> Add Grade
                     </button>
                     {currentYear && (
-                      <button className="btn btn--primary btn--sm" onClick={() => setShowSectionModal(true)}>
+                      <button
+                        className="btn btn--primary btn--sm"
+                        onClick={() => {
+                          setEditingSectionId(null)
+                          setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
+                          setShowSectionModal(true)
+                        }}
+                      >
                         <Plus size={16} /> Add Section
                       </button>
                     )}
@@ -439,11 +475,21 @@ function Settings() {
                         </label>
                       </div>
                       <div className="grade-item__sections">
-                        {sections.filter(s => s.grade_level_id === g.id).map(s => (
-                          <span key={s.id} className="section-tag">
-                            {s.name} ({s.capacity})
-                          </span>
-                        ))}
+                        {sections.filter(s => s.grade_level_id === g.id).map(s => {
+                          const teacher = teachers.find(t => t.id === s.homeroom_teacher_id)
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className="section-tag"
+                              title="Edit section / class teacher"
+                              onClick={() => openEditSection(s)}
+                              style={{ cursor: 'pointer', border: 'none' }}
+                            >
+                              {s.name} ({s.capacity}){teacher ? ` · ${teacher.first_name} ${teacher.last_name}` : ' · No class teacher'}
+                            </button>
+                          )
+                        })}
                         {sections.filter(s => s.grade_level_id === g.id).length === 0 && (
                           <span className="settings-list__meta">No sections for {currentYear?.name || 'current year'}</span>
                         )}
@@ -620,13 +666,13 @@ function Settings() {
       )}
 
       {showSectionModal && (
-        <div className="modal-overlay" onClick={() => setShowSectionModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowSectionModal(false); setEditingSectionId(null) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Class Section</h2>
-            <form className="modal__form" onSubmit={handleCreateSection}>
+            <h2>{editingSectionId ? 'Edit Class Section' : 'Add Class Section'}</h2>
+            <form className="modal__form" onSubmit={handleSaveSection}>
               <label className="form-field">
                 <span>Grade Level *</span>
-                <select required value={sectionForm.grade_level_id} onChange={e => setSectionForm({ ...sectionForm, grade_level_id: e.target.value })}>
+                <select required disabled={!!editingSectionId} value={sectionForm.grade_level_id} onChange={e => setSectionForm({ ...sectionForm, grade_level_id: e.target.value })}>
                   <option value="">Select grade</option>
                   {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
@@ -635,9 +681,17 @@ function Settings() {
                 <label className="form-field"><span>Section Name *</span><input required value={sectionForm.name} onChange={e => setSectionForm({ ...sectionForm, name: e.target.value })} placeholder="e.g. A, B, C" /></label>
                 <label className="form-field"><span>Capacity</span><input type="number" value={sectionForm.capacity} onChange={e => setSectionForm({ ...sectionForm, capacity: e.target.value })} /></label>
               </div>
+              <label className="form-field">
+                <span>Class Teacher</span>
+                <select value={sectionForm.homeroom_teacher_id} onChange={e => setSectionForm({ ...sectionForm, homeroom_teacher_id: e.target.value })}>
+                  <option value="">No class teacher assigned</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
+                </select>
+              </label>
+              <p className="settings-list__meta">The class teacher gets edit access to their own class&apos;s results.</p>
               <div className="modal__actions">
-                <button type="button" className="btn btn--outline" onClick={() => setShowSectionModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Creating...' : 'Add Section'}</button>
+                <button type="button" className="btn btn--outline" onClick={() => { setShowSectionModal(false); setEditingSectionId(null) }}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving...' : (editingSectionId ? 'Save Changes' : 'Add Section')}</button>
               </div>
             </form>
           </div>
