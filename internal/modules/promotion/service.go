@@ -93,6 +93,18 @@ func (s *Service) MoveGrade(ctx context.Context, in MoveGradeInput) (*MoveGradeR
 		if section.GradeLevelID != in.ToGradeLevelID || section.AcademicYearID != in.ToAcademicYearID {
 			return nil, fmt.Errorf("%w: that section doesn't belong to the target grade/year", apperr.ErrInvalidInput)
 		}
+	} else {
+		// No section picked: if the grade has exactly one section that year,
+		// there's only one place the student can be, so assign it. Results
+		// (and homework/broadcasts) only reach students through their
+		// enrollment's section, so leaving it NULL hides them from their
+		// class teacher. Grades with several sections still need an admin to
+		// choose one.
+		sectionID, err := s.onlySectionOfGrade(ctx, st.SchoolID, in.ToAcademicYearID, in.ToGradeLevelID)
+		if err != nil {
+			return nil, err
+		}
+		in.ClassSectionID = sectionID
 	}
 	fs, err := s.fees.GetFeeStructureByGrade(ctx, st.SchoolID, in.ToAcademicYearID, in.ToGradeLevelID)
 	if err != nil {
@@ -161,6 +173,26 @@ func (s *Service) MoveGrade(ctx context.Context, in MoveGradeInput) (*MoveGradeR
 	}
 
 	return &MoveGradeResult{StudentID: in.StudentID, AccountID: accountID, GradeLevelID: in.ToGradeLevelID, GradeLevelName: grade.Name}, nil
+}
+
+// onlySectionOfGrade returns the grade's section in yearID when it has
+// exactly one, or nil when it has none or several.
+func (s *Service) onlySectionOfGrade(ctx context.Context, schoolID, yearID, gradeID uuid.UUID) (*uuid.UUID, error) {
+	sections, err := s.academic.ListSections(ctx, schoolID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	var only *uuid.UUID
+	for i := range sections {
+		if sections[i].GradeLevelID != gradeID {
+			continue
+		}
+		if only != nil {
+			return nil, nil
+		}
+		only = &sections[i].ID
+	}
+	return only, nil
 }
 
 func (s *Service) outstandingBalance(ctx context.Context, fa *domain.StudentFeeAccount) (int, error) {
