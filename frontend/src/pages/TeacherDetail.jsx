@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Mail, ShieldCheck, Clock, BookOpen, Users, Edit2, Save, X, Trash2 } from 'lucide-react'
+import { useParams, useNavigate, Link, useOutletContext } from 'react-router-dom'
+import { ArrowLeft, Mail, ShieldCheck, Clock, BookOpen, Users, Edit2, Save, X, Trash2, Plus } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { usersApi, academicApi } from '../services/api'
 import './TeacherDetail.css'
@@ -24,6 +24,10 @@ const roleBadge = {
 function TeacherDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user: viewer } = useOutletContext() || {}
+  // Same roles the backend lets touch a section's class teacher (BlockRoles
+  // teacher/parent on PUT /class-sections/{id}) -- registrar included.
+  const canAssignSections = viewer && viewer.role !== 'teacher' && viewer.role !== 'parent'
   const { currentSchool, currentYear } = useSchool()
   const [user, setUser] = useState(null)
   const [sections, setSections] = useState([])
@@ -33,6 +37,12 @@ function TeacherDetail() {
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [assignGradeId, setAssignGradeId] = useState('')
+  const [assignSectionId, setAssignSectionId] = useState('')
+  const [assignSaving, setAssignSaving] = useState(false)
+  const [assignErr, setAssignErr] = useState('')
+  const [unassigningId, setUnassigningId] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -72,6 +82,12 @@ function TeacherDetail() {
     }
   }
 
+  function reloadSections() {
+    if (!currentSchool || !currentYear) return
+    academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id })
+      .then(res => setSections(res.items || [])).catch(() => {})
+  }
+
   useEffect(() => {
     if (!currentSchool || !currentYear) return
     Promise.all([
@@ -83,11 +99,51 @@ function TeacherDetail() {
     }).catch(() => {})
   }, [currentSchool, currentYear])
 
+  async function handleAssignSection() {
+    if (!assignSectionId) return
+    const section = sections.find(s => s.id === assignSectionId)
+    if (!section) return
+    if (section.homeroom_teacher_id && section.homeroom_teacher_id !== user.id) {
+      if (!window.confirm(`This section already has a class teacher. Reassign it to ${user.first_name} ${user.last_name} instead?`)) return
+    }
+    setAssignSaving(true); setAssignErr('')
+    try {
+      await academicApi.updateSection(section.id, {
+        name: section.name, capacity: section.capacity, homeroom_teacher_id: user.id,
+      })
+      reloadSections()
+      setShowAssignModal(false)
+      setAssignGradeId(''); setAssignSectionId('')
+    } catch (err) {
+      setAssignErr(err.message)
+    } finally {
+      setAssignSaving(false)
+    }
+  }
+
+  async function handleUnassignSection(section) {
+    const gradeName = grades.find(g => g.id === section.grade_level_id)?.name || 'Grade'
+    if (!window.confirm(`Remove ${user.first_name} ${user.last_name} as class teacher of ${gradeName} ${section.name}?`)) return
+    setUnassigningId(section.id)
+    try {
+      await academicApi.updateSection(section.id, {
+        name: section.name, capacity: section.capacity, homeroom_teacher_id: null,
+      })
+      reloadSections()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setUnassigningId(null)
+    }
+  }
+
   if (loading) return <p className="loading-text">Loading...</p>
   if (!user) return <p className="empty-text">User not found</p>
 
   const assignedSections = sections.filter(s => s.homeroom_teacher_id === user.id)
   const gradeMap = Object.fromEntries(grades.map(g => [g.id, g.name]))
+  // Sections available to assign: not already this teacher's own.
+  const assignableSections = sections.filter(s => s.grade_level_id === assignGradeId && s.homeroom_teacher_id !== user.id)
   const f = editing ? form : user
 
   return (
@@ -189,14 +245,21 @@ function TeacherDetail() {
         <div className="td-card">
           <div className="td-card__header">
             <h3><BookOpen size={18} /> Class Assignments</h3>
-            {currentYear && <span className="td-card__year">{currentYear.name}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {currentYear && <span className="td-card__year">{currentYear.name}</span>}
+              {canAssignSections && currentYear && (
+                <button className="btn btn--outline btn--sm" onClick={() => { setShowAssignModal(true); setAssignGradeId(''); setAssignSectionId(''); setAssignErr('') }}>
+                  <Plus size={14} /> Assign Section
+                </button>
+              )}
+            </div>
           </div>
           {!currentYear ? (
             <p className="empty-text">Select an academic year to see assignments</p>
           ) : assignedSections.length === 0 ? (
             <div className="td-empty-assign">
               <Users size={32} />
-              <p>No class sections assigned as homeroom teacher</p>
+              <p>No class sections assigned as homeroom teacher{canAssignSections ? ' -- use "Assign Section" above to add one' : ''}</p>
             </div>
           ) : (
             <div className="td-sections">
@@ -207,11 +270,56 @@ function TeacherDetail() {
                     <span className="td-section-card__name">Section {s.name}</span>
                     <span className="td-section-card__cap">{s.capacity} students capacity</span>
                   </div>
+                  {canAssignSections && (
+                    <button
+                      className="btn-icon" title="Remove as class teacher of this section"
+                      onClick={() => handleUnassignSection(s)} disabled={unassigningId === s.id}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {showAssignModal && (
+          <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <h2>Assign {user.first_name} as Class Teacher</h2>
+              <div className="modal__form">
+                <label className="form-field">
+                  <span>Grade *</span>
+                  <select value={assignGradeId} onChange={e => { setAssignGradeId(e.target.value); setAssignSectionId('') }}>
+                    <option value="">Select grade</option>
+                    {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Section *</span>
+                  <select value={assignSectionId} onChange={e => setAssignSectionId(e.target.value)} disabled={!assignGradeId}>
+                    <option value="">Select section</option>
+                    {assignableSections.map(s => {
+                      const currentTeacher = s.homeroom_teacher_id ? 'assigned' : 'unassigned'
+                      return <option key={s.id} value={s.id}>{s.name} ({currentTeacher})</option>
+                    })}
+                  </select>
+                  {assignGradeId && assignableSections.length === 0 && (
+                    <span className="settings-list__meta">No sections for this grade yet -- add one in Settings → Grades &amp; Sections first.</span>
+                  )}
+                </label>
+                {assignErr && <p className="doc-msg doc-msg--error">{assignErr}</p>}
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--outline" onClick={() => setShowAssignModal(false)}>Cancel</button>
+                  <button type="button" className="btn btn--primary" onClick={handleAssignSection} disabled={!assignSectionId || assignSaving}>
+                    {assignSaving ? 'Assigning...' : 'Assign'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="td-card td-card--full">
           <h3>Account Details</h3>

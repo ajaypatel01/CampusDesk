@@ -799,10 +799,13 @@ func (m *Module) UpsertDisciplineGrades(w http.ResponseWriter, r *http.Request) 
 // A teacher only sees/enters results for the grade(s)/student(s) of the class
 // section(s) where they are the homeroom teacher. Every other role is unaffected.
 
-// teacherIDIfRestricted returns the requester's user id and restricted=true only when
-// the requester is a teacher who is homeroom teacher of at least one class section
-// somewhere. A teacher with no homeroom class assigned yet (nothing set up) falls back
-// to unrestricted access instead of being locked out of Results entirely.
+// teacherIDIfRestricted returns the requester's user id and restricted=true
+// whenever the requester is a teacher -- scoped strictly to whichever class
+// section(s), if any, have them set as homeroom_teacher_id. A teacher with no
+// homeroom class assigned yet sees/can touch nothing in Results, rather than
+// falling back to unrestricted access: now that admins have a real place to
+// assign class teachers (Settings -> Grades & Sections), "not assigned yet"
+// should mean "no class", not "every class".
 func (m *Module) teacherIDIfRestricted(ctx context.Context, claims *httpx.Claims) (teacherID uuid.UUID, restricted bool, err error) {
 	if claims == nil || claims.Role != "teacher" {
 		return uuid.Nil, false, nil
@@ -811,11 +814,7 @@ func (m *Module) teacherIDIfRestricted(ctx context.Context, claims *httpx.Claims
 	if err != nil {
 		return uuid.Nil, false, err
 	}
-	hasHomeroom, err := m.repo.TeacherHasAnyHomeroom(ctx, teacherID)
-	if err != nil {
-		return uuid.Nil, false, err
-	}
-	return teacherID, hasHomeroom, nil
+	return teacherID, true, nil
 }
 
 func (m *Module) teacherCanAccessGrade(ctx context.Context, claims *httpx.Claims, gradeID uuid.UUID) (bool, error) {

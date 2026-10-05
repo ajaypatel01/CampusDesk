@@ -88,9 +88,11 @@ function Results() {
             .filter(s => s.homeroom_teacher_id === user.id)
             .map(s => s.grade_level_id)
         )
-        // No homeroom class assigned yet anywhere — nothing to restrict to, so show everything
-        // (mirrors the backend's fallback so we don't lock teachers out before setup is done).
-        const g = myGrades.size === 0 ? allGrades : allGrades.filter(gr => myGrades.has(gr.id))
+        // Strictly their own class section(s) only, same as the backend now
+        // enforces -- a teacher not yet assigned as any section's class
+        // teacher sees no grades at all (an empty grade list below prompts
+        // them to ask an admin to assign one), not every class in the school.
+        const g = allGrades.filter(gr => myGrades.has(gr.id))
         setMyGradeIds(myGrades)
         setGrades(g)
         setSelectedGrade(prev => (prev && g.some(gr => gr.id === prev)) ? prev : (g[0]?.id || ''))
@@ -363,6 +365,10 @@ function Results() {
   }
 
   if (!currentSchool || !currentYear) return <p className="empty-text">Select a school and academic year first.</p>
+
+  if (isTeacher && myGradeIds !== null && myGradeIds.size === 0) {
+    return <p className="empty-text">You haven&apos;t been assigned as a class teacher yet. Ask your school admin to assign you to a class section under Settings → Grades &amp; Sections.</p>
+  }
 
   return (
     <div className="results-page">
