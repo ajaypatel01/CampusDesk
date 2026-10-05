@@ -599,6 +599,14 @@ function Results() {
               </select>
             </label>
           </div>
+          {exams.length === 0 && (
+            <p className="empty-text">
+              No exams yet for this grade --{' '}
+              {isTeacher
+                ? 'ask your admin or registrar to add one under the Exams tab before you can enter marks.'
+                : 'add one under the Exams tab above first.'}
+            </p>
+          )}
           {selectedExamId && selectedStudentId && markSubjects.length > 0 && (
             <form onSubmit={handleSaveMarks}>
               <div className="mark-subject-cards">
