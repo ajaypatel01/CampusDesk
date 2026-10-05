@@ -251,7 +251,11 @@ func (m *Module) DeleteSubjectComponent(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	key := chi.URLParam(r, "key")
-	if err := m.repo.DeleteSubjectComponent(r.Context(), subjectID, key); err != nil {
+	var createdBy uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		createdBy, _ = uuid.Parse(claims.Sub)
+	}
+	if err := m.repo.DeleteSubjectComponent(r.Context(), subjectID, key, createdBy); err != nil {
 		if errors.Is(err, apperr.ErrConflict) {
 			httpx.Error(w, http.StatusConflict, "this section already has marks recorded against it and can't be removed")
 			return

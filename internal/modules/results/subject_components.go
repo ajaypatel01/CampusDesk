@@ -2,6 +2,7 @@ package results
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -126,7 +127,12 @@ func (r *Repository) AddSubjectComponent(ctx context.Context, subjectID uuid.UUI
 // DeleteSubjectComponent removes one component from a subject -- refused if
 // any exam already has a recorded (non-zero) value under that key, so
 // deleting a component can't silently make real marks disappear.
-func (r *Repository) DeleteSubjectComponent(ctx context.Context, subjectID uuid.UUID, key string) error {
+//
+// A subject nobody has customised has no stored rows: its components are the
+// grade template's computed default. Removing one of those first persists
+// the rest of the default (same as AddSubjectComponent does on a first add),
+// otherwise there'd be nothing to delete and the field could never go away.
+func (r *Repository) DeleteSubjectComponent(ctx context.Context, subjectID uuid.UUID, key string, createdBy uuid.UUID) error {
 	var hasValues bool
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS(
@@ -141,12 +147,66 @@ func (r *Repository) DeleteSubjectComponent(ctx context.Context, subjectID uuid.
 	if hasValues {
 		return apperr.ErrConflict
 	}
-	tag, err := r.pool.Exec(ctx, `DELETE FROM subject_mark_components WHERE subject_id=$1 AND key=$2`, subjectID, key)
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var count int
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM subject_mark_components WHERE subject_id=$1`, subjectID).Scan(&count); err != nil {
+		return err
+	}
+	template, err := r.subjectGradeTemplate(ctx, subjectID)
+	if err != nil {
+		return err
+	}
+	defaults := MarkComponentsForTemplate(template)
+
+	if count == 0 {
+		found := false
+		for _, c := range defaults {
+			if c.Key == key {
+				found = true
+			}
+		}
+		if !found {
+			return apperr.ErrNotFound
+		}
+		if len(defaults) == 1 {
+			return lastTemplateFieldErr
+		}
+		sort := 0
+		for _, c := range defaults {
+			if c.Key == key {
+				continue
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO subject_mark_components (subject_id, key, label, max_marks, sort_order, created_by)
+				VALUES ($1,$2,$3,$4,$5,$6)`,
+				subjectID, c.Key, c.Label, c.MaxMarks, sort, createdBy,
+			); err != nil {
+				return database.MapError(err)
+			}
+			sort++
+		}
+		return tx.Commit(ctx)
+	}
+
+	// With stored rows, removing the last one would make the subject fall
+	// back to its template default -- the field would come straight back.
+	if count == 1 && len(defaults) > 0 {
+		return lastTemplateFieldErr
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM subject_mark_components WHERE subject_id=$1 AND key=$2`, subjectID, key)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return apperr.ErrNotFound
 	}
-	return nil
+	return tx.Commit(ctx)
 }
+
+var lastTemplateFieldErr = fmt.Errorf("%w: a subject on this grade's report-card template needs at least one field -- add the new field first, then remove this one", apperr.ErrInvalidInput)
