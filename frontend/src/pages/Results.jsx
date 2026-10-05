@@ -241,9 +241,8 @@ function Results() {
     }
   }
 
-  // Component delete is open to the same roles as adding one (backend only
-  // blocks parent). The UI doesn't offer adding or deleting components to
-  // teachers -- they only enter marks.
+  // Component add/delete is subject setup: the backend blocks teachers and
+  // parents, and the UI doesn't offer it to teachers -- they only enter marks.
   async function handleDeleteComponent(subjectId, key) {
     if (!confirm('Remove this field?')) return
     try {

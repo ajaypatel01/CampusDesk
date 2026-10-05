@@ -17,7 +17,7 @@ func slugifyComponentKey(label string) string {
 	return strings.Trim(s, "_")
 }
 
-// This file lets a teacher/registrar add graded components ("sections" --
+// This file lets an admin/registrar add graded components ("sections" --
 // Oral, Unit Test, Activity, Practical, Written, or any new one) to one
 // subject, independent of the fixed per-grade-template scheme in
 // templates.go. A subject nobody has touched keeps using that computed
