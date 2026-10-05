@@ -362,18 +362,6 @@ func (r *Repository) DeleteTotalOverride(ctx context.Context, examID, studentID 
 
 // ---- Class-teacher scoping ----
 
-// TeacherHasAnyHomeroom reports whether teacherID is homeroom teacher of any
-// section at all, in any year. Schools that haven't set up class sections yet
-// use this to fall back to unrestricted access instead of locking every teacher out.
-func (r *Repository) TeacherHasAnyHomeroom(ctx context.Context, teacherID uuid.UUID) (bool, error) {
-	var exists bool
-	err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE homeroom_teacher_id=$1)`,
-		teacherID,
-	).Scan(&exists)
-	return exists, err
-}
-
 // TeacherOwnsGrade reports whether teacherID is the homeroom teacher of any
 // section in gradeLevelID, in any academic year.
 func (r *Repository) TeacherOwnsGrade(ctx context.Context, teacherID, gradeLevelID uuid.UUID) (bool, error) {

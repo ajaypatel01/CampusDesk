@@ -214,6 +214,7 @@
 .td-section-card__info {
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .td-section-card__name {
