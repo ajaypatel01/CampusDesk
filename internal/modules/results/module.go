@@ -42,12 +42,13 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", m.UpdateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteSubject)
-		// Adding/removing a graded component ("section") changes how a subject
+		// Adding/editing/removing a graded component ("section") changes how a subject
 		// is marked, so it's subject setup like the routes above -- teachers
 		// can list components (to enter marks against them) but not change them.
 		r.Route("/{id}/mark-components", func(r chi.Router) {
 			r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListSubjectComponents)
 			r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.AddSubjectComponent)
+			r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{key}", m.UpdateSubjectComponent)
 			r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{key}", m.DeleteSubjectComponent)
 		})
 	})
@@ -242,6 +243,45 @@ func (m *Module) AddSubjectComponent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusCreated, map[string]interface{}{"items": components})
+}
+
+// UpdateSubjectComponent renames a subject's mark field and/or changes its
+// max marks (e.g. Written 60 -> 50). Max marks can't change once marks are
+// recorded under the field.
+func (m *Module) UpdateSubjectComponent(w http.ResponseWriter, r *http.Request) {
+	subjectID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	key := chi.URLParam(r, "key")
+	var in struct {
+		Label    string `json:"label"`
+		MaxMarks int    `json:"max_marks"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	in.Label = strings.TrimSpace(in.Label)
+	if in.MaxMarks < 0 || (in.Label == "" && in.MaxMarks == 0) {
+		httpx.Error(w, http.StatusBadRequest, "send a label and/or a positive max_marks")
+		return
+	}
+	var createdBy uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		createdBy, _ = uuid.Parse(claims.Sub)
+	}
+	components, err := m.repo.UpdateSubjectComponent(r.Context(), subjectID, key, in.Label, in.MaxMarks, createdBy)
+	if err != nil {
+		if errors.Is(err, apperr.ErrConflict) {
+			httpx.Error(w, http.StatusConflict, "marks are already recorded for this field, so its max marks can't change -- you can still rename it")
+			return
+		}
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": components})
 }
 
 func (m *Module) DeleteSubjectComponent(w http.ResponseWriter, r *http.Request) {

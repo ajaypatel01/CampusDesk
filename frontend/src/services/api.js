@@ -234,10 +234,12 @@ export const resultsApi = {
   deleteSubject: (id) => request(`/subjects/${id}`, { method: 'DELETE' }),
 
   // Per-subject graded "sections" (Oral/Unit Test/Activity/Practical/
-  // Written/...). Teacher/registrar access, same as entering marks --
-  // subjects themselves stay admin-only above.
+  // Written/...). Admin subject setup -- the backend blocks teachers and
+  // parents from adding/editing/removing them.
   listSubjectComponents: (subjectId) => request(`/subjects/${subjectId}/mark-components`),
   addSubjectComponent: (subjectId, body) => request(`/subjects/${subjectId}/mark-components`, { method: 'POST', body: JSON.stringify(body) }),
+  // Rename a field and/or change its max marks (refused once marks are recorded under it).
+  updateSubjectComponent: (subjectId, key, body) => request(`/subjects/${subjectId}/mark-components/${key}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteSubjectComponent: (subjectId, key) => request(`/subjects/${subjectId}/mark-components/${key}`, { method: 'DELETE' }),
 
   listExams: (params) => request(`/exams${qs(params)}`),
