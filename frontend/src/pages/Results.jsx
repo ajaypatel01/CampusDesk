@@ -251,6 +251,15 @@ function Results() {
     } catch (err) { alert(err.message) }
   }
 
+  // Start blank whenever the exam or student changes, so one student's
+  // numbers can never be saved against the next.
+  function pickMarksExam(id) {
+    setSelectedExamId(id); setMarks({}); setMarkMsg('')
+  }
+  function pickMarksStudent(id) {
+    setSelectedStudentId(id); setMarks({}); setMarkMsg('')
+  }
+
   async function handleSaveMarks(e) {
     e.preventDefault()
     if (!selectedExamId || !selectedStudentId) return
@@ -598,14 +607,14 @@ function Results() {
           <div className="form-row" style={{ marginBottom: '16px' }}>
             <label className="form-field">
               <span>Exam *</span>
-              <select value={selectedExamId} onChange={e => setSelectedExamId(e.target.value)}>
+              <select value={selectedExamId} onChange={e => pickMarksExam(e.target.value)}>
                 <option value="">Select exam...</option>
                 {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
               </select>
             </label>
             <label className="form-field">
               <span>Student *</span>
-              <select value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+              <select value={selectedStudentId} onChange={e => pickMarksStudent(e.target.value)}>
                 <option value="">Select student...</option>
                 {students.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.student_code})</option>)}
               </select>
