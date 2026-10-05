@@ -46,9 +46,13 @@ type ListFilter struct {
 	Search         string
 	Category       string
 	GradeLevel     string
-	PaymentStatus  string // "paid", "due", "partial"
-	SortBy         string
-	SortOrder      string
+	// ClassSectionIDs limits the list to students enrolled in one of these
+	// sections in AcademicYearID -- the same rule results uses to decide
+	// which students a class teacher may enter marks for.
+	ClassSectionIDs []string
+	PaymentStatus   string // "paid", "due", "partial"
+	SortBy          string
+	SortOrder       string
 }
 
 type Repository struct {
@@ -131,6 +135,14 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		where += fmt.Sprintf(" AND s.category = $%d", argN)
 		args = append(args, f.Category)
 		argN++
+	}
+	if len(f.ClassSectionIDs) > 0 {
+		where += fmt.Sprintf(` AND EXISTS (
+			SELECT 1 FROM enrollments e
+			WHERE e.student_id = s.id AND e.academic_year_id = $%d AND e.class_section_id = ANY($%d::uuid[])
+		)`, argN, argN+1)
+		args = append(args, f.AcademicYearID, f.ClassSectionIDs)
+		argN += 2
 	}
 	if hasFeeJoin {
 		if f.GradeLevel != "" {

@@ -30,6 +30,9 @@ function Results() {
   // Grade level ids of the class section(s) this teacher is homeroom teacher of —
   // a class teacher only sees results for their own class, not the whole school.
   const [myGradeIds, setMyGradeIds] = useState(null)
+  // The teacher's own homeroom sections, so student pickers only list students
+  // the backend will let them save marks for (same section, not just same grade).
+  const [mySections, setMySections] = useState([])
 
   // Subjects
   const [subjects, setSubjects] = useState([])
@@ -90,20 +93,18 @@ function Results() {
         academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id }),
       ]).then(([gradeRes, sectionRes]) => {
         const allGrades = gradeRes.items || []
-        const myGrades = new Set(
-          (sectionRes.items || [])
-            .filter(s => s.homeroom_teacher_id === user.id)
-            .map(s => s.grade_level_id)
-        )
+        const ownSections = (sectionRes.items || []).filter(s => s.homeroom_teacher_id === user.id)
+        const myGrades = new Set(ownSections.map(s => s.grade_level_id))
         // Strictly their own class section(s) only, same as the backend now
         // enforces -- a teacher not yet assigned as any section's class
         // teacher sees no grades at all (an empty grade list below prompts
         // them to ask an admin to assign one), not every class in the school.
         const g = allGrades.filter(gr => myGrades.has(gr.id))
         setMyGradeIds(myGrades)
+        setMySections(ownSections)
         setGrades(g)
         setSelectedGrade(prev => (prev && g.some(gr => gr.id === prev)) ? prev : (g[0]?.id || ''))
-      }).catch(() => { setGrades([]); setMyGradeIds(new Set()) })
+      }).catch(() => { setGrades([]); setMyGradeIds(new Set()); setMySections([]) })
       return
     }
     academicApi.listGrades(currentSchool.id)
@@ -127,9 +128,15 @@ function Results() {
       studentParams.academic_year_id = currentYear.id
       studentParams.grade_level = gradeName
     }
+    if (isTeacher) {
+      const sectionIds = mySections.filter(s => s.grade_level_id === selectedGrade).map(s => s.id)
+      if (!sectionIds.length) { setStudents([]); return }
+      studentParams.academic_year_id = currentYear.id
+      studentParams.class_section_ids = sectionIds.join(',')
+    }
     studentsApi.list(studentParams)
       .then(r => setStudents(r.items || [])).catch(() => {})
-  }, [currentSchool, currentYear, selectedGrade, grades])
+  }, [currentSchool, currentYear, selectedGrade, grades, isTeacher, mySections])
 
   useEffect(() => {
     if (!selectedGrade) return

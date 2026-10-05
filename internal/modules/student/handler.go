@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/modules/guardian"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
@@ -200,6 +201,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.AcademicYearID = yearID
+	}
+	if raw := r.URL.Query().Get("class_section_ids"); raw != "" {
+		if f.AcademicYearID == uuid.Nil {
+			httpx.Error(w, http.StatusBadRequest, "academic_year_id is required with class_section_ids")
+			return
+		}
+		for _, id := range strings.Split(raw, ",") {
+			if _, err := uuid.Parse(id); err != nil {
+				httpx.Error(w, http.StatusBadRequest, "invalid class_section_ids")
+				return
+			}
+			f.ClassSectionIDs = append(f.ClassSectionIDs, id)
+		}
 	}
 	items, total, err := h.svc.List(r.Context(), f, p.Limit, p.Offset)
 	if err != nil {
