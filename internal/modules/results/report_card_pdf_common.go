@@ -106,18 +106,48 @@ func writeGradeCell(pdf *fpdf.Fpdf, w, h float64, grade string, theme pdfTheme) 
 	pdf.SetTextColor(0, 0, 0)
 }
 
+// examColumns is the union of the fields the exam's subjects use, in first-
+// seen order, with each field's max marks when every subject that has it
+// agrees (0 otherwise -- printed as "-"). Subjects can have different fields
+// per exam, so this is built from the report card's cells rather than the
+// grade template.
+func examColumns(rc ReportCard, examIdx int) []MarkComponent {
+	var cols []MarkComponent
+	idx := map[string]int{}
+	for _, sub := range rc.Subjects {
+		for _, cv := range sub.ByExam[examIdx].Components {
+			i, seen := idx[cv.Key]
+			if !seen {
+				idx[cv.Key] = len(cols)
+				cols = append(cols, MarkComponent{Key: cv.Key, Label: cv.Label, MaxMarks: cv.MaxMarks})
+				continue
+			}
+			if cols[i].MaxMarks != cv.MaxMarks {
+				cols[i].MaxMarks = 0
+			}
+		}
+	}
+	return cols
+}
+
 // writeExamComponentTable renders one exam's SUBJECT/MARKING/subjects/
-// G.TOTAL/PERCENTAGE block for the "kg"/"primary" templates.
-func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx int, components []MarkComponent, theme pdfTheme) {
+// G.TOTAL/PERCENTAGE block for the "kg"/"primary"/"middle" templates.
+func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx int, theme pdfTheme) {
 	exam := rc.Exams[examIdx]
+	components := examColumns(rc, examIdx)
 	pdf.SetFont("Arial", "B", 10)
 	fill := theme.setSectionStyle(pdf)
 	pdf.CellFormat(w, 7, fmt.Sprintf("%s (%s)", exam.ExamName, romanNumeral(exam.Position)), "1", 1, "C", fill, 0, "")
 	pdf.SetTextColor(0, 0, 0)
 
-	subjectW := 45.0
 	totalW := 22.0
-	compW := (w - subjectW - totalW) / float64(len(components))
+	subjectW := 45.0
+	compW := 0.0
+	if len(components) > 0 {
+		compW = (w - subjectW - totalW) / float64(len(components))
+	} else {
+		subjectW = w - totalW
+	}
 
 	pdf.SetFont("Arial", "B", 8)
 	fill = theme.setHeaderStyle(pdf)
@@ -130,17 +160,29 @@ func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx i
 
 	pdf.SetFont("Arial", "", 8)
 	pdf.CellFormat(subjectW, 6, "MARKING", "1", 0, "L", false, 0, "")
+	uniform := true
 	markingTotal := 0
 	for _, c := range components {
+		if c.MaxMarks == 0 {
+			uniform = false
+			pdf.CellFormat(compW, 6, "-", "1", 0, "C", false, 0, "")
+			continue
+		}
 		pdf.CellFormat(compW, 6, fmt.Sprintf("%d", c.MaxMarks), "1", 0, "C", false, 0, "")
 		markingTotal += c.MaxMarks
 	}
-	pdf.CellFormat(totalW, 6, fmt.Sprintf("%d", markingTotal), "1", 1, "C", false, 0, "")
+	if uniform && len(components) > 0 {
+		pdf.CellFormat(totalW, 6, fmt.Sprintf("%d", markingTotal), "1", 1, "C", false, 0, "")
+	} else {
+		pdf.CellFormat(totalW, 6, "-", "1", 1, "C", false, 0, "")
+	}
 
 	colTotals := make([]float64, len(components))
 	var gTotal float64
+	var gMax int
 	for _, sub := range rc.Subjects {
 		cell := sub.ByExam[examIdx]
+		gMax += cell.MaxMarks
 		pdf.CellFormat(subjectW, 6, sub.SubjectName, "1", 0, "L", false, 0, "")
 		if cell.IsAbsent {
 			for range components {
@@ -154,11 +196,19 @@ func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx i
 			byKey[cv.Key] = cv.Obtained
 		}
 		for i, c := range components {
-			v := byKey[c.Key]
+			v, has := byKey[c.Key]
+			if !has {
+				pdf.CellFormat(compW, 6, "-", "1", 0, "C", false, 0, "")
+				continue
+			}
 			colTotals[i] += v
 			pdf.CellFormat(compW, 6, formatMarks(v), "1", 0, "C", false, 0, "")
 		}
-		pdf.CellFormat(totalW, 6, formatMarks(cell.Obtained), "1", 1, "C", false, 0, "")
+		total := formatMarks(cell.Obtained)
+		if !uniform || len(components) == 0 {
+			total = fmt.Sprintf("%s/%d", total, cell.MaxMarks)
+		}
+		pdf.CellFormat(totalW, 6, total, "1", 1, "C", false, 0, "")
 		gTotal += cell.Obtained
 	}
 
@@ -169,9 +219,11 @@ func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx i
 	}
 	pdf.CellFormat(totalW, 6, formatMarks(gTotal), "1", 1, "C", false, 0, "")
 
+	// Each subject's own max for this exam: identical to the old
+	// MARKING-total x subjects when every subject shares one scheme.
 	pct := 0.0
-	if markingTotal > 0 && len(rc.Subjects) > 0 {
-		pct = gTotal / (float64(markingTotal) * float64(len(rc.Subjects))) * 100
+	if gMax > 0 {
+		pct = gTotal / float64(gMax) * 100
 	}
 	pdf.CellFormat(w-totalW, 6, "PERCENTAGE", "1", 0, "L", false, 0, "")
 	pdf.CellFormat(totalW, 6, fmt.Sprintf("%.1f%%", pct), "1", 1, "C", false, 0, "")

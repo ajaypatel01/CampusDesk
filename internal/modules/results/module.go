@@ -56,6 +56,11 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListExams)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateExam)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/{id}/publish", m.PublishExam)
+		// Per-exam marks distribution for each subject. Teachers read it (to
+		// enter marks against it) for their own class; only admins change it.
+		r.With(httpx.BlockRoles("parent"), view).Get("/{id}/mark-formats", m.ListExamFormats)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}/mark-formats/{subjectId}", m.SetExamSubjectFormat)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}/mark-formats/{subjectId}", m.ResetExamSubjectFormat)
 	})
 	r.Route("/exam-marks", func(r chi.Router) {
 		r.With(httpx.BlockRoles("parent"), write).Post("/", m.UpsertMark)
@@ -398,6 +403,98 @@ type examResponse struct {
 	MarkComponents     []MarkComponent `json:"mark_components,omitempty"`
 }
 
+// ListExamFormats returns each subject's marks distribution for one exam.
+func (m *Module) ListExamFormats(w http.ResponseWriter, r *http.Request) {
+	examID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	gradeID, yearID, err := m.repo.ExamGradeAndYear(r.Context(), examID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	if ok, err := m.teacherCanAccessGradeInYear(r.Context(), httpx.ClaimsFromContext(r.Context()), yearID, gradeID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
+	items, err := m.repo.ListExamFormats(r.Context(), examID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+// SetExamSubjectFormat sets one subject's fields for one exam, e.g.
+// {"components":[{"label":"Written","max_marks":20}]}; an empty list means one
+// plain mark. Send a field's existing key to rename it without losing marks.
+func (m *Module) SetExamSubjectFormat(w http.ResponseWriter, r *http.Request) {
+	examID, err1 := uuid.Parse(chi.URLParam(r, "id"))
+	subjectID, err2 := uuid.Parse(chi.URLParam(r, "subjectId"))
+	if err1 != nil || err2 != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		Components []MarkComponent `json:"components"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	components, err := NormalizeComponents(in.Components)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	var createdBy uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		createdBy, _ = uuid.Parse(claims.Sub)
+	}
+	if err := m.repo.SetExamSubjectFormat(r.Context(), examID, subjectID, components, createdBy); err != nil {
+		if errors.Is(err, ErrFormatHasMarks) {
+			httpx.Error(w, http.StatusConflict, strings.TrimPrefix(err.Error(), ErrFormatHasMarks.Error()+": "))
+			return
+		}
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	m.writeExamFormats(w, r, examID)
+}
+
+// ResetExamSubjectFormat makes a subject use its own fields again in one exam.
+func (m *Module) ResetExamSubjectFormat(w http.ResponseWriter, r *http.Request) {
+	examID, err1 := uuid.Parse(chi.URLParam(r, "id"))
+	subjectID, err2 := uuid.Parse(chi.URLParam(r, "subjectId"))
+	if err1 != nil || err2 != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := m.repo.ResetExamSubjectFormat(r.Context(), examID, subjectID); err != nil {
+		if errors.Is(err, ErrFormatHasMarks) {
+			httpx.Error(w, http.StatusConflict, strings.TrimPrefix(err.Error(), ErrFormatHasMarks.Error()+": "))
+			return
+		}
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	m.writeExamFormats(w, r, examID)
+}
+
+func (m *Module) writeExamFormats(w http.ResponseWriter, r *http.Request, examID uuid.UUID) {
+	items, err := m.repo.ListExamFormats(r.Context(), examID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
 func (m *Module) PublishExam(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -455,7 +552,7 @@ func (m *Module) saveOneMark(ctx context.Context, mark *domain.ExamMark) error {
 	if len(mark.Components) == 0 {
 		return m.repo.UpsertMark(ctx, mark)
 	}
-	components, err := m.repo.GetSubjectComponents(ctx, mark.SubjectID)
+	components, err := m.repo.EffectiveComponents(ctx, mark.ExamID, mark.SubjectID)
 	if err != nil {
 		return err
 	}
@@ -492,11 +589,11 @@ func (m *Module) BulkUpsertMarks(w http.ResponseWriter, r *http.Request) {
 
 func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, error) {
 	// A bulk save is typically one exam across a whole class -- many rows,
-	// same subject -- so cache each subject's component scheme instead of
-	// re-querying it per row. Cached by subject, not by exam: different
-	// subjects in the same exam can have different schemes once a subject
-	// has its own custom components (see saveOneMark's comment above).
-	schemes := map[uuid.UUID][]MarkComponent{}
+	// same subjects -- so cache each (exam, subject) scheme instead of
+	// re-querying it per row. Each subject can have its own fields, and its
+	// own format per exam (see EffectiveComponents).
+	type schemeKey struct{ examID, subjectID uuid.UUID }
+	schemes := map[schemeKey][]MarkComponent{}
 	var saved int
 	for i := range marks {
 		mark := &marks[i]
@@ -510,14 +607,15 @@ func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, 
 			saved++
 			continue
 		}
-		components, ok := schemes[mark.SubjectID]
+		sk := schemeKey{mark.ExamID, mark.SubjectID}
+		components, ok := schemes[sk]
 		if !ok {
 			var err error
-			components, err = m.repo.GetSubjectComponents(ctx, mark.SubjectID)
+			components, err = m.repo.EffectiveComponents(ctx, mark.ExamID, mark.SubjectID)
 			if err != nil {
 				return saved, err
 			}
-			schemes[mark.SubjectID] = components
+			schemes[sk] = components
 		}
 		if len(components) == 0 {
 			if err := m.repo.UpsertMark(ctx, mark); err != nil {

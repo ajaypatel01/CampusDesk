@@ -4,6 +4,7 @@ import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationC
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
 import CustomFieldsSection from '../components/CustomFieldsSection'
+import ExamMarkFormats from '../components/ExamMarkFormats'
 import './Results.css'
 
 function downloadBlob(blob, filename) {
@@ -44,6 +45,7 @@ function Results() {
   const [showExamForm, setShowExamForm] = useState(false)
   const [examForm, setExamForm] = useState({ name: '', exam_date: '', weight_percent: 100 })
   const [publishingId, setPublishingId] = useState(null)
+  const [formatExamId, setFormatExamId] = useState(null) // exam whose marks format is open
 
   // Marks
   const [selectedExamId, setSelectedExamId] = useState('')
@@ -53,6 +55,8 @@ function Results() {
   const [marks, setMarks] = useState({}) // subjectId → { marks_obtained, is_absent }
   const [markSaving, setMarkSaving] = useState(false)
   const [markMsg, setMarkMsg] = useState('')
+  // The selected exam's fields per subject (its own format, or the subject's fields).
+  const [examFormats, setExamFormats] = useState({})
   const [addingComponentFor, setAddingComponentFor] = useState(null) // subject id or null
   const [newComponentForm, setNewComponentForm] = useState({ label: '', max_marks: '' })
   const [addingComponentSaving, setAddingComponentSaving] = useState(false)
@@ -207,7 +211,7 @@ function Results() {
   // used to share.
   function componentTotal(sub) {
     const vals = marks[sub.id]?.components || {}
-    return (sub.mark_components || []).reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
+    return fieldsFor(sub).reduce((sum, c) => sum + (parseFloat(vals[c.key]) || 0), 0)
   }
 
   // Sum of a subject's own field max_marks -- compared against the subject's
@@ -280,7 +284,7 @@ function Results() {
     setSelectedExamId(''); setSelectedStudentId(''); setMarks({}); setMarkMsg('')
     setMsExamId(''); setMsStudentId(''); setMarksheet(null); setEditingTotal(false); setTotalMsg('')
     setRcStudentId(''); setReportCard(null); setRcError(''); setRcMsg('')
-    setAddingComponentFor(null); setEditingField(null)
+    setAddingComponentFor(null); setEditingField(null); setFormatExamId(null)
   }
 
   // Start blank whenever the exam or student changes, so one student's
@@ -290,6 +294,20 @@ function Results() {
   }
   function pickMarksStudent(id) {
     setSelectedStudentId(id); setMarks({}); setMarkMsg('')
+  }
+
+  function loadExamFormats(examId) {
+    if (!examId) { setExamFormats({}); return }
+    resultsApi.listExamFormats(examId)
+      .then(r => setExamFormats(Object.fromEntries((r.items || []).map(f => [f.subject_id, f.components]))))
+      .catch(() => setExamFormats({}))
+  }
+
+  useEffect(() => { loadExamFormats(selectedExamId) }, [selectedExamId])
+
+  // Fields a subject is marked on in the selected exam.
+  function fieldsFor(sub) {
+    return examFormats[sub.id] || sub.mark_components || []
   }
 
   async function handleSaveMarks(e) {
@@ -307,7 +325,7 @@ function Results() {
           is_absent: entry.is_absent || false,
           remarks: '',
         }
-        const subComponents = sub.mark_components || []
+        const subComponents = fieldsFor(sub)
         if (subComponents.length > 0) {
           const components = {}
           subComponents.forEach(c => { components[c.key] = parseFloat(entry.components?.[c.key] || 0) })
@@ -630,13 +648,20 @@ function Results() {
                     <td>{e.weight_percent}%</td>
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
                     {!isTeacher && (
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
                         <button
                           className="btn btn--outline btn--sm"
                           onClick={() => handleTogglePublish(e)}
                           disabled={publishingId === e.id}
                         >
                           {publishingId === e.id ? 'Saving...' : (e.is_published ? 'Unpublish' : 'Publish')}
+                        </button>
+                        <button
+                          className={`btn btn--sm ${formatExamId === e.id ? 'btn--primary' : 'btn--outline'}`}
+                          style={{ marginLeft: '6px' }}
+                          onClick={() => setFormatExamId(formatExamId === e.id ? null : e.id)}
+                        >
+                          Marks format
                         </button>
                       </td>
                     )}
@@ -645,6 +670,18 @@ function Results() {
               </tbody>
             </table>
           </div>
+          {formatExamId && exams.some(e => e.id === formatExamId) && (
+            <div style={{ marginTop: '16px' }}>
+              <div className="results-section__header">
+                <h2>Marks format: {exams.find(e => e.id === formatExamId)?.name}</h2>
+                <button className="btn btn--outline btn--sm" onClick={() => setFormatExamId(null)}>Close</button>
+              </div>
+              <ExamMarkFormats
+                exam={exams.find(e => e.id === formatExamId)}
+                onChanged={() => { if (formatExamId === selectedExamId) loadExamFormats(selectedExamId) }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -680,7 +717,8 @@ function Results() {
             <form onSubmit={handleSaveMarks}>
               <div className="mark-subject-cards">
                 {markSubjects.map(sub => {
-                  const components = sub.mark_components || []
+                  const components = fieldsFor(sub)
+                  const fieldsMax = components.reduce((sum, c) => sum + c.max_marks, 0)
                   const isAbsent = marks[sub.id]?.is_absent || false
                   return (
                     <div key={sub.id} className="mark-subject-card">
@@ -729,25 +767,16 @@ function Results() {
                       )}
 
                       <div className="mark-subject-card__total">
-                        {components.length > 0 ? `Total: ${componentTotal(sub)} / ${sub.max_marks}` : `Out of ${sub.max_marks}`}
+                        {components.length > 0 ? `Total: ${componentTotal(sub)} / ${fieldsMax}` : `Out of ${sub.max_marks}`}
                       </div>
 
-                      {/* Teachers only enter marks -- adding mark fields is subject setup */}
-                      {isTeacher ? null : addingComponentFor === sub.id ? (
-                        <div className="marks-add-component" style={{ marginTop: '10px' }}>
-                          <input placeholder="Field name (e.g. Oral)" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
-                          <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
-                          <button type="button" className="btn btn--primary btn--sm" onClick={() => handleAddComponent(sub)} disabled={addingComponentSaving}>
-                            {addingComponentSaving ? 'Adding...' : 'Add'}
-                          </button>
-                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setAddingComponentFor(null)}>Cancel</button>
-                        </div>
-                      ) : (
+                      {/* Teachers only enter marks; admins change fields per exam under Exams > Marks format */}
+                      {!isTeacher && (
                         <button
                           type="button" className="btn btn--outline btn--sm" style={{ marginTop: '10px' }}
-                          onClick={() => { setAddingComponentFor(sub.id); setNewComponentForm({ label: '', max_marks: '' }) }}
+                          onClick={() => { setTab('exams'); setFormatExamId(selectedExamId) }}
                         >
-                          <Plus size={13} /> Add Field
+                          <Pencil size={13} /> Change fields for this exam
                         </button>
                       )}
                     </div>
