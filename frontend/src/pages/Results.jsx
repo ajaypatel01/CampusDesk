@@ -13,12 +13,18 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
+const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap]]
+// Teachers only enter marks and view marksheets; subjects, exams and report
+// cards are managed by admins.
+const TEACHER_TABS = ['marks', 'marksheet']
+
 function Results() {
   const { user } = useOutletContext() || {}
   const isTeacher = user?.role === 'teacher'
   const isSuperAdmin = user?.role === 'super_admin'
+  const tabs = isTeacher ? ALL_TABS.filter(([key]) => TEACHER_TABS.includes(key)) : ALL_TABS
   const { currentSchool, currentYear } = useSchool()
-  const [tab, setTab] = useState('subjects')
+  const [tab, setTab] = useState(isTeacher ? 'marks' : 'subjects')
   const [grades, setGrades] = useState([])
   const [selectedGrade, setSelectedGrade] = useState('')
   // Grade level ids of the class section(s) this teacher is homeroom teacher of —
@@ -408,7 +414,7 @@ function Results() {
       </div>
 
       <div className="docs-tabs">
-        {[['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap]].map(([key, label, Icon]) => (
+        {tabs.map(([key, label, Icon]) => (
           <button key={key} className={`docs-tab ${tab === key ? 'docs-tab--active' : ''}`} onClick={() => setTab(key)}>
             <Icon size={16} /> {label}
           </button>
@@ -416,7 +422,7 @@ function Results() {
       </div>
 
       {/* Subjects Tab */}
-      {tab === 'subjects' && (
+      {tab === 'subjects' && !isTeacher && (
         <div className="results-section">
           <div className="results-section__header">
             <h2>Subjects for {grades.find(g => g.id === selectedGrade)?.name || '—'}</h2>
@@ -525,7 +531,7 @@ function Results() {
       )}
 
       {/* Exams Tab */}
-      {tab === 'exams' && (
+      {tab === 'exams' && !isTeacher && (
         <div className="results-section">
           <div className="results-section__header">
             <h2>Exams</h2>
@@ -806,7 +812,7 @@ function Results() {
       )}
 
       {/* Report Card Tab */}
-      {tab === 'report-card' && (
+      {tab === 'report-card' && !isTeacher && (
         <div className="results-section">
           <h2>Report Card</h2>
           <div className="form-row" style={{ marginBottom: '16px' }}>
