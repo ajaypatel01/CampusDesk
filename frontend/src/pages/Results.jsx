@@ -251,6 +251,17 @@ function Results() {
     } catch (err) { alert(err.message) }
   }
 
+  // Exams and students belong to a grade, so switching grade clears every
+  // selection and result made for the old one (same as the mobile app).
+  function pickGrade(id) {
+    if (id === selectedGrade) return
+    setSelectedGrade(id)
+    setSelectedExamId(''); setSelectedStudentId(''); setMarks({}); setMarkMsg('')
+    setMsExamId(''); setMsStudentId(''); setMarksheet(null); setEditingTotal(false); setTotalMsg('')
+    setRcStudentId(''); setReportCard(null); setRcError(''); setRcMsg('')
+    setAddingComponentFor(null)
+  }
+
   // Start blank whenever the exam or student changes, so one student's
   // numbers can never be saved against the next.
   function pickMarksExam(id) {
@@ -422,7 +433,7 @@ function Results() {
       <div className="results-grade-bar">
         <span className="results-grade-label">Grade:</span>
         {grades.map(g => (
-          <button key={g.id} className={`grade-chip ${selectedGrade === g.id ? 'grade-chip--active' : ''}`} onClick={() => setSelectedGrade(g.id)}>
+          <button key={g.id} className={`grade-chip ${selectedGrade === g.id ? 'grade-chip--active' : ''}`} onClick={() => pickGrade(g.id)}>
             {g.name}
           </button>
         ))}
