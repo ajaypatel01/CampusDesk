@@ -23,10 +23,12 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 // ---- Subjects ----
 
+// CreateSubject adds a subject with no mark fields: an admin adds the ones
+// they want, rather than every grade-template field appearing by default.
 func (r *Repository) CreateSubject(ctx context.Context, s *domain.Subject) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO subjects (school_id, grade_level_id, name, code, max_marks, passing_marks, sort_order, is_co_scholastic)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		INSERT INTO subjects (school_id, grade_level_id, name, code, max_marks, passing_marks, sort_order, is_co_scholastic, uses_template_components)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)
 		RETURNING id, created_at, updated_at`,
 		s.SchoolID, s.GradeLevelID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic,
 	)

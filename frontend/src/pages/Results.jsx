@@ -56,6 +56,9 @@ function Results() {
   const [addingComponentFor, setAddingComponentFor] = useState(null) // subject id or null
   const [newComponentForm, setNewComponentForm] = useState({ label: '', max_marks: '' })
   const [addingComponentSaving, setAddingComponentSaving] = useState(false)
+  // { subjectId, key, label, max_marks } while a field is being edited
+  const [editingField, setEditingField] = useState(null)
+  const [editingFieldSaving, setEditingFieldSaving] = useState(false)
 
   // Marksheet
   const [msExamId, setMsExamId] = useState('')
@@ -241,6 +244,24 @@ function Results() {
     }
   }
 
+  async function handleSaveField() {
+    const maxMarks = parseInt(editingField.max_marks, 10)
+    if (!editingField.label.trim() || !maxMarks) return
+    setEditingFieldSaving(true)
+    try {
+      await resultsApi.updateSubjectComponent(editingField.subjectId, editingField.key, {
+        label: editingField.label.trim(),
+        max_marks: maxMarks,
+      })
+      setEditingField(null)
+      reloadSubjects()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setEditingFieldSaving(false)
+    }
+  }
+
   // Component add/delete is subject setup: the backend blocks teachers and
   // parents, and the UI doesn't offer it to teachers -- they only enter marks.
   async function handleDeleteComponent(subjectId, key) {
@@ -259,7 +280,7 @@ function Results() {
     setSelectedExamId(''); setSelectedStudentId(''); setMarks({}); setMarkMsg('')
     setMsExamId(''); setMsStudentId(''); setMarksheet(null); setEditingTotal(false); setTotalMsg('')
     setRcStudentId(''); setReportCard(null); setRcError(''); setRcMsg('')
-    setAddingComponentFor(null)
+    setAddingComponentFor(null); setEditingField(null)
   }
 
   // Start blank whenever the exam or student changes, so one student's
@@ -520,6 +541,12 @@ function Results() {
                             {components.map(c => (
                               <span key={c.key} className="field-chip">
                                 {c.label} <span className="data-table__muted">/{c.max_marks}</span>
+                                <button
+                                  type="button" className="field-chip__remove" title="Edit field"
+                                  onClick={() => { setAddingComponentFor(null); setEditingField({ subjectId: s.id, key: c.key, label: c.label, max_marks: String(c.max_marks) }) }}
+                                >
+                                  <Pencil size={11} />
+                                </button>
                                 <button type="button" className="field-chip__remove" onClick={() => handleDeleteComponent(s.id, c.key)} title="Remove field">×</button>
                               </span>
                             ))}
@@ -529,6 +556,16 @@ function Results() {
                             {mismatch && " -- these don't match, double check the field max marks"}
                           </p>
                         </>
+                      )}
+                      {editingField?.subjectId === s.id && (
+                        <div className="marks-add-component" style={{ marginTop: '8px' }}>
+                          <input placeholder="Field name" value={editingField.label} onChange={e => setEditingField({ ...editingField, label: e.target.value })} />
+                          <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={editingField.max_marks} onChange={e => setEditingField({ ...editingField, max_marks: e.target.value })} />
+                          <button type="button" className="btn btn--primary btn--sm" onClick={handleSaveField} disabled={editingFieldSaving}>
+                            {editingFieldSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setEditingField(null)}>Cancel</button>
+                        </div>
                       )}
                       {addingComponentFor === s.id ? (
                         <div className="marks-add-component" style={{ marginTop: '8px' }}>
@@ -542,7 +579,7 @@ function Results() {
                       ) : (
                         <button
                           type="button" className="btn btn--outline btn--sm" style={{ marginTop: '8px' }}
-                          onClick={() => { setAddingComponentFor(s.id); setNewComponentForm({ label: '', max_marks: '' }) }}
+                          onClick={() => { setEditingField(null); setAddingComponentFor(s.id); setNewComponentForm({ label: '', max_marks: '' }) }}
                         >
                           <Plus size={13} /> Add Field
                         </button>
