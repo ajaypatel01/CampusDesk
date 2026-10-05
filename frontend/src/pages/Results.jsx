@@ -235,8 +235,8 @@ function Results() {
   }
 
   // Component delete is open to the same roles as adding one (backend only
-  // blocks parent) -- entry-time work, not subject setup, so it isn't
-  // gated behind isTeacher the way creating/deleting the subject itself is.
+  // blocks parent). The UI doesn't offer adding or deleting components to
+  // teachers -- they only enter marks.
   async function handleDeleteComponent(subjectId, key) {
     if (!confirm('Remove this field?')) return
     try {
@@ -669,7 +669,8 @@ function Results() {
                         {components.length > 0 ? `Total: ${componentTotal(sub)} / ${sub.max_marks}` : `Out of ${sub.max_marks}`}
                       </div>
 
-                      {addingComponentFor === sub.id ? (
+                      {/* Teachers only enter marks -- adding mark fields is subject setup */}
+                      {isTeacher ? null : addingComponentFor === sub.id ? (
                         <div className="marks-add-component" style={{ marginTop: '10px' }}>
                           <input placeholder="Field name (e.g. Oral)" value={newComponentForm.label} onChange={e => setNewComponentForm({ ...newComponentForm, label: e.target.value })} />
                           <input type="number" min="1" placeholder="Max" style={{ width: '70px' }} value={newComponentForm.max_marks} onChange={e => setNewComponentForm({ ...newComponentForm, max_marks: e.target.value })} />
