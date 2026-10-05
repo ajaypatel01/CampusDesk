@@ -42,13 +42,13 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", m.UpdateSubject)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteSubject)
-		// Adding a graded component ("section") to a subject is entry-time
-		// work, same access as entering marks -- open to teachers, unlike
-		// creating/deleting the subject itself above.
+		// Adding/removing a graded component ("section") changes how a subject
+		// is marked, so it's subject setup like the routes above -- teachers
+		// can list components (to enter marks against them) but not change them.
 		r.Route("/{id}/mark-components", func(r chi.Router) {
 			r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListSubjectComponents)
-			r.With(httpx.BlockRoles("parent"), write).Post("/", m.AddSubjectComponent)
-			r.With(httpx.BlockRoles("parent"), write).Delete("/{key}", m.DeleteSubjectComponent)
+			r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.AddSubjectComponent)
+			r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{key}", m.DeleteSubjectComponent)
 		})
 	})
 	r.Route("/exams", func(r chi.Router) {
