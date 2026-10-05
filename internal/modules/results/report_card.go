@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
@@ -202,7 +203,6 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		return nil, fmt.Errorf("%s has no report-card template set", rc.GradeLevelName)
 	}
 	rc.Template = *template
-	components := MarkComponentsForTemplate(template)
 
 	examRows, err := r.pool.Query(ctx, `
 		SELECT id, name FROM exams WHERE school_id=$1 AND grade_level_id=$2 AND academic_year_id=$3
@@ -284,6 +284,19 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		}
 	}
 
+	// Each subject's fields can differ per exam (exam_subject_mark_formats);
+	// without an exam format a subject uses its own fields.
+	formats, err := r.examFormats(ctx, examIDs)
+	if err != nil {
+		return nil, err
+	}
+	subjectSchemes := make(map[uuid.UUID][]MarkComponent, len(subjects))
+	for _, sub := range subjects {
+		if subjectSchemes[sub.ID], err = r.GetSubjectComponents(ctx, sub.ID); err != nil {
+			return nil, err
+		}
+	}
+
 	var overallObtained float64
 	var overallMax int
 	for _, sub := range subjects {
@@ -292,6 +305,10 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		var subMax int
 		for _, e := range rc.Exams {
 			cell := ReportCardSubjectExamCell{}
+			components, hasFormat := formats[e.ExamID][sub.ID]
+			if !hasFormat {
+				components = subjectSchemes[sub.ID]
+			}
 			mk, ok := marksByKey[markKey{e.ExamID, sub.ID}]
 			if !ok {
 				// Nothing entered yet: show the scheme's empty component
@@ -309,12 +326,22 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 					for _, cv := range cvs {
 						byKey[cv.Key] = cv
 					}
+					inScheme := make(map[string]bool, len(components))
 					for _, c := range components {
+						inScheme[c.Key] = true
 						if cv, found := byKey[c.Key]; found {
 							cv.Label = c.Label
 							cell.Components = append(cell.Components, cv)
 						} else {
 							cell.Components = append(cell.Components, ReportCardComponentValue{Key: c.Key, Label: c.Label, MaxMarks: c.MaxMarks})
+						}
+					}
+					// Values recorded under a field the scheme no longer has
+					// still count in the total, so keep them visible too.
+					for _, cv := range cvs {
+						if !inScheme[cv.Key] {
+							cv.Label = strings.ToUpper(strings.ReplaceAll(cv.Key, "_", " "))
+							cell.Components = append(cell.Components, cv)
 						}
 					}
 				}

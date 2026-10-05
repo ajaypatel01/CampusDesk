@@ -245,6 +245,10 @@ export const resultsApi = {
   listExams: (params) => request(`/exams${qs(params)}`),
   createExam: (body) => request('/exams', { method: 'POST', body: JSON.stringify(body) }),
   publishExam: (id, publish) => request(`/exams/${id}/publish`, { method: 'POST', body: JSON.stringify({ publish }) }),
+  // Per-exam marks distribution for each subject (admins change it; teachers read it).
+  listExamFormats: (examId) => request(`/exams/${examId}/mark-formats`),
+  setExamSubjectFormat: (examId, subjectId, body) => request(`/exams/${examId}/mark-formats/${subjectId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  resetExamSubjectFormat: (examId, subjectId) => request(`/exams/${examId}/mark-formats/${subjectId}`, { method: 'DELETE' }),
 
   upsertMark: (body) => request('/exam-marks', { method: 'POST', body: JSON.stringify(body) }),
   bulkUpsertMarks: (marks) => request('/exam-marks/bulk', { method: 'POST', body: JSON.stringify({ marks }) }),

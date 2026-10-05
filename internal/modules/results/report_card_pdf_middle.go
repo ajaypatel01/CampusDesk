@@ -21,9 +21,8 @@ func generateMiddleReportCardPDF(rc ReportCard, theme pdfTheme) ([]byte, error) 
 
 	writeReportCardHeader(pdf, w, rc, theme)
 
-	components := MarkComponentsForTemplate(&rc.Template)
 	for i := range rc.Exams {
-		writeExamComponentTable(pdf, w, rc, i, components, theme)
+		writeExamComponentTable(pdf, w, rc, i, theme)
 	}
 	writeDisciplineTable(pdf, w, rc, theme)
 	writeReportCardFooterDetails(pdf, w, rc)
