@@ -34,6 +34,7 @@ function Results() {
   const [exams, setExams] = useState([])
   const [showExamForm, setShowExamForm] = useState(false)
   const [examForm, setExamForm] = useState({ name: '', exam_date: '', weight_percent: 100 })
+  const [publishingId, setPublishingId] = useState(null)
 
   // Marks
   const [selectedExamId, setSelectedExamId] = useState('')
@@ -161,6 +162,24 @@ function Results() {
       resultsApi.listExams({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
         .then(r => setExams(r.items || []))
     } catch (err) { alert(err.message) }
+  }
+
+  // A published exam's marks become visible to parents/on report cards; an
+  // admin un-publishing one hides them again without deleting anything, same
+  // toggle either direction.
+  async function handleTogglePublish(exam) {
+    const nextState = !exam.is_published
+    if (nextState && !window.confirm(`Publish "${exam.name}"? Parents will be able to see marks recorded against it.`)) return
+    setPublishingId(exam.id)
+    try {
+      await resultsApi.publishExam(exam.id, nextState)
+      const res = await resultsApi.listExams({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
+      setExams(res.items || [])
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setPublishingId(null)
+    }
   }
 
   // The selected exam's component scheme (Written/Note Book/.../Theory), if
@@ -531,16 +550,27 @@ function Results() {
           )}
           <div className="table-card">
             <table className="data-table">
-              <thead><tr><th>Exam Name</th><th>Date</th><th>Weight</th><th>Published</th></tr></thead>
+              <thead><tr><th>Exam Name</th><th>Date</th><th>Weight</th><th>Published</th>{!isTeacher && <th></th>}</tr></thead>
               <tbody>
                 {exams.length === 0 ? (
-                  <tr><td colSpan={4} className="data-table__empty">No exams yet</td></tr>
+                  <tr><td colSpan={isTeacher ? 4 : 5} className="data-table__empty">No exams yet</td></tr>
                 ) : exams.map(e => (
                   <tr key={e.id}>
                     <td>{e.name}</td>
                     <td className="data-table__muted">{e.exam_date ? new Date(e.exam_date).toLocaleDateString('en-IN') : '-'}</td>
                     <td>{e.weight_percent}%</td>
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
+                    {!isTeacher && (
+                      <td>
+                        <button
+                          className="btn btn--outline btn--sm"
+                          onClick={() => handleTogglePublish(e)}
+                          disabled={publishingId === e.id}
+                        >
+                          {publishingId === e.id ? 'Saving...' : (e.is_published ? 'Unpublish' : 'Publish')}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
