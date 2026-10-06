@@ -242,17 +242,18 @@ func (r *Repository) UpsertMark(ctx context.Context, m *domain.ExamMark) error {
 }
 
 type MarksheetRow struct {
-	SubjectName    string  `json:"subject_name"`
-	SubjectCode    string  `json:"subject_code"`
-	MaxMarks       int     `json:"max_marks"`
-	PassingMarks   int     `json:"passing_marks"`
-	MarksObtained  float64 `json:"marks_obtained"`
-	IsAbsent       bool    `json:"is_absent"`
-	Percentage     float64 `json:"percentage"`
-	Grade          string  `json:"grade"`
-	GradePoint     float64 `json:"grade_point"`
-	Status         string  `json:"status"` // Pass / Fail / Absent
-	IsCoScholastic bool    `json:"is_co_scholastic"`
+	SubjectID      uuid.UUID `json:"subject_id"`
+	SubjectName    string    `json:"subject_name"`
+	SubjectCode    string    `json:"subject_code"`
+	MaxMarks       int       `json:"max_marks"`
+	PassingMarks   int       `json:"passing_marks"`
+	MarksObtained  float64   `json:"marks_obtained"`
+	IsAbsent       bool      `json:"is_absent"`
+	Percentage     float64   `json:"percentage"`
+	Grade          string    `json:"grade"`
+	GradePoint     float64   `json:"grade_point"`
+	Status         string    `json:"status"` // Pass / Fail / Absent
+	IsCoScholastic bool      `json:"is_co_scholastic"`
 }
 
 type StudentMarksheet struct {
@@ -304,7 +305,7 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 	}
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT sub.name, COALESCE(sub.code,''), em.max_marks, sub.passing_marks,
+		SELECT sub.id, sub.name, COALESCE(sub.code,''), em.max_marks, sub.passing_marks,
 			em.marks_obtained, em.is_absent, COALESCE(em.remarks,''), sub.is_co_scholastic
 		FROM exam_marks em
 		JOIN subjects sub ON sub.id = em.subject_id
@@ -315,18 +316,47 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 	}
 	defer rows.Close()
 
+	for rows.Next() {
+		var row MarksheetRow
+		var remarks string
+		if err := rows.Scan(&row.SubjectID, &row.SubjectName, &row.SubjectCode, &row.MaxMarks, &row.PassingMarks,
+			&row.MarksObtained, &row.IsAbsent, &remarks, &row.IsCoScholastic); err != nil {
+			return nil, err
+		}
+		ms.Rows = append(ms.Rows, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var override *float64
+	var overrideTotal float64
+	err = r.pool.QueryRow(ctx,
+		`SELECT total_obtained FROM marksheet_total_overrides WHERE exam_id=$1 AND student_id=$2`,
+		examID, studentID,
+	).Scan(&overrideTotal)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("get total override: %w", err)
+	}
+	if err == nil {
+		override = &overrideTotal
+	}
+	scoreMarksheet(&ms, override)
+	return &ms, nil
+}
+
+// scoreMarksheet fills each row's percentage/grade/status and the overall
+// total, percentage, CGPA, grade and Pass/Fail result from ms.Rows, then
+// applies a super_admin total override if there is one. The single-student
+// marksheet and the class result sheet both use it, so they always agree.
+func scoreMarksheet(ms *StudentMarksheet, override *float64) {
 	var totalObtained float64
 	var totalMax int
 	var totalGP float64
 	var scoredCount int
 
-	for rows.Next() {
-		var row MarksheetRow
-		var remarks string
-		if err := rows.Scan(&row.SubjectName, &row.SubjectCode, &row.MaxMarks, &row.PassingMarks,
-			&row.MarksObtained, &row.IsAbsent, &remarks, &row.IsCoScholastic); err != nil {
-			return nil, err
-		}
+	for i := range ms.Rows {
+		row := &ms.Rows[i]
 		if row.IsAbsent {
 			row.Status = "Absent"
 			row.Grade = "AB"
@@ -348,10 +378,6 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 				scoredCount++
 			}
 		}
-		ms.Rows = append(ms.Rows, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	ms.TotalObtained = totalObtained
@@ -372,25 +398,15 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 		}
 	}
 
-	var overrideTotal float64
-	err = r.pool.QueryRow(ctx,
-		`SELECT total_obtained FROM marksheet_total_overrides WHERE exam_id=$1 AND student_id=$2`,
-		examID, studentID,
-	).Scan(&overrideTotal)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("get total override: %w", err)
-	}
-	if err == nil {
+	if override != nil {
 		ms.ComputedTotalObtained = ms.TotalObtained
 		ms.IsTotalOverridden = true
-		ms.TotalObtained = overrideTotal
+		ms.TotalObtained = *override
 		if ms.TotalMax > 0 {
-			ms.Percentage = (overrideTotal / float64(ms.TotalMax)) * 100
+			ms.Percentage = (*override / float64(ms.TotalMax)) * 100
 		}
 		ms.OverallGrade, _ = gradeFromPercent(ms.Percentage)
 	}
-
-	return &ms, nil
 }
 
 // SetTotalOverride records (or replaces) a super_admin's manual correction of

@@ -1,10 +1,11 @@
 import { useState, useEffect, Fragment } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap, Pencil, RotateCcw } from 'lucide-react'
+import { Plus, Trash2, Download, BookOpen, ClipboardList, BarChart2, GraduationCap, Pencil, RotateCcw, Table } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { resultsApi, academicApi, studentsApi } from '../services/api'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import ExamMarkFormats from '../components/ExamMarkFormats'
+import ResultSheet from '../components/ResultSheet'
 import './Results.css'
 import { formatDate } from '../utils/date'
 
@@ -15,16 +16,21 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
-const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap]]
+const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap], ['result-sheet','Result Sheet', Table]]
 // Teachers only enter marks and view marksheets; subjects, exams and report
 // cards are managed by admins.
 const TEACHER_TABS = ['marks', 'marksheet']
+// The whole-class result sheet is for the school's admins and the owner.
+const RESULT_SHEET_ROLES = ['super_admin', 'school_admin']
 
 function Results() {
   const { user } = useOutletContext() || {}
   const isTeacher = user?.role === 'teacher'
   const isSuperAdmin = user?.role === 'super_admin'
-  const tabs = isTeacher ? ALL_TABS.filter(([key]) => TEACHER_TABS.includes(key)) : ALL_TABS
+  const canSeeResultSheet = RESULT_SHEET_ROLES.includes(user?.role)
+  const tabs = isTeacher
+    ? ALL_TABS.filter(([key]) => TEACHER_TABS.includes(key))
+    : ALL_TABS.filter(([key]) => key !== 'result-sheet' || canSeeResultSheet)
   const { currentSchool, currentYear } = useSchool()
   const [tab, setTab] = useState(isTeacher ? 'marks' : 'subjects')
   const [grades, setGrades] = useState([])
@@ -974,6 +980,13 @@ function Results() {
       )}
 
       {/* Report Card Tab */}
+      {tab === 'result-sheet' && canSeeResultSheet && (
+        <div className="results-section">
+          <h2>Result Sheet: {grades.find(g => g.id === selectedGrade)?.name || '—'}</h2>
+          <ResultSheet exams={exams} />
+        </div>
+      )}
+
       {tab === 'report-card' && !isTeacher && (
         <div className="results-section">
           <h2>Report Card</h2>

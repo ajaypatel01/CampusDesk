@@ -256,6 +256,8 @@ export const resultsApi = {
   upsertMark: (body) => request('/exam-marks', { method: 'POST', body: JSON.stringify(body) }),
   bulkUpsertMarks: (marks) => request('/exam-marks/bulk', { method: 'POST', body: JSON.stringify({ marks }) }),
 
+  // Whole-class marks for one exam (admins and the owner only).
+  getResultSheet: (examId) => request(`/exams/${examId}/result-sheet`),
   getMarksheet: (examId, studentId) => request(`/marksheets${qs({ exam_id: examId, student_id: studentId })}`),
   downloadMarksheet: (examId, studentId) =>
     requestBlob(`/marksheets/pdf?exam_id=${examId}&student_id=${studentId}`),
