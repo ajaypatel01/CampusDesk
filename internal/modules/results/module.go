@@ -55,6 +55,8 @@ func (m *Module) Mount(r chi.Router) {
 	r.Route("/exams", func(r chi.Router) {
 		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListExams)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/", m.CreateExam)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Put("/{id}", m.UpdateExam)
+		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteExam)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/{id}/publish", m.PublishExam)
 		// Per-exam marks distribution for each subject. Teachers read it (to
 		// enter marks against it) for their own class; only admins change it.
@@ -493,6 +495,67 @@ func (m *Module) writeExamFormats(w http.ResponseWriter, r *http.Request, examID
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+// UpdateExam edits an exam's name, date (YYYY-MM-DD, "" clears it) and weight.
+func (m *Module) UpdateExam(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		Name          string `json:"name"`
+		ExamDate      string `json:"exam_date"`
+		WeightPercent int    `json:"weight_percent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	e, err := m.repo.GetExamByID(r.Context(), id)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	e.Name = strings.TrimSpace(in.Name)
+	if e.Name == "" {
+		httpx.Error(w, http.StatusBadRequest, "exam name is required")
+		return
+	}
+	if in.WeightPercent < 1 || in.WeightPercent > 100 {
+		httpx.Error(w, http.StatusBadRequest, "weight must be between 1 and 100")
+		return
+	}
+	e.WeightPercent = in.WeightPercent
+	e.ExamDate = nil
+	if in.ExamDate != "" {
+		d, err := time.Parse("2006-01-02", in.ExamDate)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid exam_date, expected YYYY-MM-DD")
+			return
+		}
+		e.ExamDate = &d
+	}
+	if err := m.repo.UpdateExam(r.Context(), e); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, e)
+}
+
+// DeleteExam removes an exam that is unpublished and has no marks entered.
+func (m *Module) DeleteExam(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := m.repo.DeleteExam(r.Context(), id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.NoContent(w)
 }
 
 func (m *Module) PublishExam(w http.ResponseWriter, r *http.Request) {

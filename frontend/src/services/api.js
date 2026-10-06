@@ -244,6 +244,9 @@ export const resultsApi = {
 
   listExams: (params) => request(`/exams${qs(params)}`),
   createExam: (body) => request('/exams', { method: 'POST', body: JSON.stringify(body) }),
+  // Edit name/date/weight; delete is refused while published or once marks are entered.
+  updateExam: (id, body) => request(`/exams/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteExam: (id) => request(`/exams/${id}`, { method: 'DELETE' }),
   publishExam: (id, publish) => request(`/exams/${id}/publish`, { method: 'POST', body: JSON.stringify({ publish }) }),
   // Per-exam marks distribution for each subject (admins change it; teachers read it).
   listExamFormats: (examId) => request(`/exams/${examId}/mark-formats`),
