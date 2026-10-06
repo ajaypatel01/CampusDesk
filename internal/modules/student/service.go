@@ -2,6 +2,7 @@ package student
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -151,9 +152,23 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, 
 		Status:            status,
 	}
 	if err := s.repo.Create(ctx, st); err != nil {
-		return nil, err
+		return nil, s.explainConflict(ctx, err, st.SchoolID, st.StudentCode, uuid.Nil)
 	}
 	return st, nil
+}
+
+// explainConflict turns the database's bare unique-violation on (school,
+// scholar no.) into a message the person saving can act on. The only
+// unique rule on students besides the id is that scholar no.
+func (s *Service) explainConflict(ctx context.Context, err error, schoolID uuid.UUID, code string, selfID uuid.UUID) error {
+	if !errors.Is(err, apperr.ErrConflict) {
+		return err
+	}
+	name, lookupErr := s.repo.StudentNameByCode(ctx, schoolID, code, selfID)
+	if lookupErr != nil || name == "" {
+		return fmt.Errorf("%w: scholar no. %s is already used by another student in this school", apperr.ErrConflict, code)
+	}
+	return fmt.Errorf("%w: scholar no. %s is already used by %s -- each student in a school needs a different scholar no.", apperr.ErrConflict, code, name)
 }
 
 // ImportRowResult is one row's outcome from a bulk import -- returned for
@@ -272,7 +287,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	st.TCDate = in.TCDate
 	st.TCYear = strings.TrimSpace(in.TCYear)
 	if err := s.repo.Update(ctx, st); err != nil {
-		return nil, err
+		return nil, s.explainConflict(ctx, err, st.SchoolID, st.StudentCode, st.ID)
 	}
 	return s.repo.GetByID(ctx, id)
 }
