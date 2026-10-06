@@ -280,6 +280,27 @@ func normalizeIndianPhone(phone string) string {
 	return d
 }
 
+// ListLedgerPayments returns all of a school's payments for one academic year
+// (GET /fee-payments/ledger?school_id=&academic_year_id=).
+func (h *Handler) ListLedgerPayments(w http.ResponseWriter, r *http.Request) {
+	schoolID, err := uuid.Parse(r.URL.Query().Get("school_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "school_id required")
+		return
+	}
+	yearID, err := uuid.Parse(r.URL.Query().Get("academic_year_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "academic_year_id required")
+		return
+	}
+	items, err := h.svc.ListLedgerPayments(r.Context(), schoolID, yearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
 func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
 	accountID, err := uuid.Parse(r.URL.Query().Get("student_fee_account_id"))
 	if err != nil {
