@@ -8,6 +8,7 @@ import {
 import { staffApi, payrollApi, permissionsApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import './StaffDetail.css'
+import { formatDate } from '../utils/date'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -393,7 +394,7 @@ function StaffDetail() {
           <Field
             label="Joined"
             value={member.created_at
-              ? new Date(member.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+              ? formatDate(member.created_at)
               : null}
           />
           <div className="sd-field">
@@ -425,13 +426,13 @@ function StaffDetail() {
                   <span>Year</span>
                   <input type="number" value={payYear} onChange={e => setPayYear(parseInt(e.target.value, 10) || now.getFullYear())} />
                 </label>
-                <button className="btn btn--outline btn--sm" onClick={handleDownloadSlip} disabled={slipDownloading || !payrollRow || slipLocked} title={slipLocked ? `Available from ${slipUnlockDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined}>
+                <button className="btn btn--outline btn--sm" onClick={handleDownloadSlip} disabled={slipDownloading || !payrollRow || slipLocked} title={slipLocked ? `Available from ${formatDate(slipUnlockDate)}` : undefined}>
                   <Download size={14} /> {slipDownloading ? 'Downloading...' : 'Download Salary Slip'}
                 </button>
               </div>
               {slipLocked && payrollRow && (
                 <p className="empty-text" style={{ marginTop: '-8px', marginBottom: '12px' }}>
-                  This month's slip unlocks on {slipUnlockDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                  This month's slip unlocks on {formatDate(slipUnlockDate)}.
                 </p>
               )}
 

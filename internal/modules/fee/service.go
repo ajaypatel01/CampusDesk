@@ -457,6 +457,16 @@ func (s *Service) UpdateFeeAccount(ctx context.Context, id uuid.UUID, in UpdateF
 	return s.repo.GetFeeAccountByID(ctx, id)
 }
 
+// ist is India time (UTC+5:30, no daylight saving), which every school uses.
+var ist = time.FixedZone("IST", 5*60*60+30*60)
+
+// todayIST is today's calendar date in India, as midnight UTC -- the same
+// shape payment dates parse to from "YYYY-MM-DD".
+func todayIST() time.Time {
+	y, m, d := time.Now().In(ist).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 func (s *Service) RecordPayment(ctx context.Context, in RecordPaymentInput) (*domain.FeePayment, error) {
 	if in.StudentFeeAccountID == uuid.Nil || in.Amount <= 0 {
 		return nil, apperr.ErrInvalidInput
@@ -484,7 +494,18 @@ func (s *Service) RecordPayment(ctx context.Context, in RecordPaymentInput) (*do
 			return nil, apperr.ErrInvalidInput
 		}
 	} else {
-		payDate = time.Now().UTC()
+		payDate = todayIST()
+	}
+	// payment_date is a DATE column: keep just the calendar day, so a sent
+	// timestamp's time of day can't push it past "today".
+	{
+		y, m, d := payDate.Date()
+		payDate = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
+	// A payment can't be from the future. A day/month mix-up (e.g. 09/12
+	// read as 9 Dec instead of 12 Sep) otherwise lands silently in the ledger.
+	if payDate.After(todayIST()) {
+		return nil, fmt.Errorf("%w: payment date %s is in the future -- check the day and month", apperr.ErrInvalidInput, payDate.Format("02 Jan 2006"))
 	}
 	p := &domain.FeePayment{
 		StudentFeeAccountID: in.StudentFeeAccountID,

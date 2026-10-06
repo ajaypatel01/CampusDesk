@@ -4,6 +4,7 @@ import { Plus, Search, Mail, Filter, X, ArrowUpDown, LayoutGrid, List, Users, Us
 import { useSchool } from '../services/SchoolContext'
 import { usersApi } from '../services/api'
 import './Teachers.css'
+import { formatDate } from '../utils/date'
 
 const roleLabels = {
   super_admin: 'Super Admin',
@@ -240,7 +241,7 @@ function Teachers() {
                     <span className={`teacher-status-dot ${u.is_active ? 'teacher-status-dot--active' : ''}`} />
                     <span className={u.is_active ? '' : 'data-table__muted'}>{u.is_active ? 'Active' : 'Inactive'}</span>
                   </td>
-                  <td className="data-table__muted">{u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : '-'}</td>
+                  <td className="data-table__muted">{formatDate(u.created_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -272,7 +273,7 @@ function Teachers() {
                 </div>
                 <div className="teacher-card__info-item">
                   <Clock size={14} />
-                  <span>Joined {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN') : '-'}</span>
+                  <span>Joined {formatDate(u.created_at)}</span>
                 </div>
               </div>
             </Link>

@@ -4,6 +4,7 @@ import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, C
 import { useSchool } from '../services/SchoolContext'
 import { schoolsApi, academicApi, feesApi, usersApi, staffApi } from '../services/api'
 import './Settings.css'
+import { formatDate } from '../utils/date'
 
 const roleLabel = {
   super_admin: 'Owner',
@@ -414,7 +415,7 @@ function Settings() {
                         {y.is_current && <span className="badge badge--success">Current</span>}
                       </div>
                       <span className="settings-list__meta">
-                        {new Date(y.start_date).toLocaleDateString('en-IN')} - {new Date(y.end_date).toLocaleDateString('en-IN')}
+                        {formatDate(y.start_date)} - {formatDate(y.end_date)}
                       </span>
                     </div>
                   ))}

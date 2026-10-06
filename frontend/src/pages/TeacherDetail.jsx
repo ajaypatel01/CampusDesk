@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, ShieldCheck, Clock, BookOpen, Users, Edit2, Save, X, T
 import { useSchool } from '../services/SchoolContext'
 import { usersApi, academicApi } from '../services/api'
 import './TeacherDetail.css'
+import { formatDate } from '../utils/date'
 
 const roleLabels = {
   super_admin: 'Super Admin',
@@ -226,7 +227,7 @@ function TeacherDetail() {
               <div>
                 <span className="td-field__label">Created</span>
                 <span className="td-field__value">
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                  {formatDate(user.created_at)}
                 </span>
               </div>
             </div>
@@ -235,7 +236,7 @@ function TeacherDetail() {
               <div>
                 <span className="td-field__label">Last Updated</span>
                 <span className="td-field__value">
-                  {user.updated_at ? new Date(user.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                  {formatDate(user.updated_at)}
                 </span>
               </div>
             </div>

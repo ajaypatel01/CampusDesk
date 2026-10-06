@@ -5,6 +5,7 @@ import { useSchool } from '../services/SchoolContext'
 import { studentsApi, academicApi } from '../services/api'
 import SortHeader from '../components/SortHeader'
 import './Students.css'
+import { formatDate } from '../utils/date'
 
 function Students() {
   const { currentSchool, currentYear } = useSchool()
@@ -340,7 +341,7 @@ function Students() {
                   <td className="data-table__muted">{s.phone || '-'}</td>
                   <td><span className={`badge badge--${s.status === 'active' ? 'success' : 'muted'}`}>{s.status}</span></td>
                   <td className="data-table__muted">{s.grade_level_name || '-'}</td>
-                  <td className="data-table__muted">{s.admission_date ? new Date(s.admission_date).toLocaleDateString('en-IN') : '-'}</td>
+                  <td className="data-table__muted">{formatDate(s.admission_date)}</td>
                 </tr>
               ))}
             </tbody>

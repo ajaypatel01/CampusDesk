@@ -6,6 +6,7 @@ import { resultsApi, academicApi, studentsApi } from '../services/api'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import ExamMarkFormats from '../components/ExamMarkFormats'
 import './Results.css'
+import { formatDate } from '../utils/date'
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -706,7 +707,7 @@ function Results() {
                 ) : (
                   <tr key={e.id}>
                     <td>{e.name}</td>
-                    <td className="data-table__muted">{e.exam_date ? new Date(e.exam_date).toLocaleDateString('en-IN') : '-'}</td>
+                    <td className="data-table__muted">{formatDate(e.exam_date)}</td>
                     <td>{e.weight_percent}%</td>
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
                     {!isTeacher && (

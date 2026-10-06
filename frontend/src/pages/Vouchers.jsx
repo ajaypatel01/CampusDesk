@@ -3,10 +3,11 @@ import { Search, Download, Plus, X, Receipt } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { vouchersApi } from '../services/api'
 import './Vouchers.css'
+import { formatDate } from '../utils/date'
 
 function fmt(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-IN')
+  return formatDate(d)
 }
 
 function Vouchers() {
@@ -47,7 +48,7 @@ function Vouchers() {
   function exportCSV() {
     const headers = ['Date', 'Account Name', 'To (Payee)', 'Amount', 'Description', 'Mode']
     const rows = filtered.map(v => [
-      new Date(v.date).toLocaleDateString('en-IN'),
+      formatDate(v.date),
       `"${v.account_name}"`,
       `"${v.payee || ''}"`,
       v.amount,
