@@ -307,3 +307,18 @@ func scanListRow(row scannable) (*StudentListItem, error) {
 	}
 	return &item, nil
 }
+
+// StudentNameByCode returns the full name of the student in schoolID using
+// code as their scholar no., other than excludeID ("" when none).
+func (r *Repository) StudentNameByCode(ctx context.Context, schoolID uuid.UUID, code string, excludeID uuid.UUID) (string, error) {
+	var name string
+	err := r.pool.QueryRow(ctx, `
+		SELECT TRIM(first_name || ' ' || last_name) FROM students
+		WHERE school_id=$1 AND student_code=$2 AND id <> $3 LIMIT 1`,
+		schoolID, code, excludeID,
+	).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return name, err
+}
