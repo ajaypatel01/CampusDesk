@@ -157,6 +157,62 @@ func (r *Repository) ListExams(ctx context.Context, schoolID, yearID, gradeLevel
 	return items, rows.Err()
 }
 
+// UpdateExam changes an exam's name, date and weight. Its grade and academic
+// year are fixed: marks, formats and report cards hang off them.
+func (r *Repository) UpdateExam(ctx context.Context, e *domain.Exam) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE exams SET name=$2, exam_date=$3, weight_percent=$4, updated_at=NOW() WHERE id=$1`,
+		e.ID, e.Name, e.ExamDate, e.WeightPercent)
+	if err != nil {
+		return database.MapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
+// ExamStudentsWithMarks counts students with anything recorded in an exam: a
+// non-zero mark, a non-zero field value, or marked absent. Blank rows from an
+// empty save don't count.
+func (r *Repository) ExamStudentsWithMarks(ctx context.Context, examID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT em.student_id) FROM exam_marks em
+		WHERE em.exam_id = $1 AND (em.marks_obtained <> 0 OR em.is_absent
+			OR EXISTS (SELECT 1 FROM exam_mark_components emc WHERE emc.exam_mark_id = em.id AND emc.obtained <> 0))`,
+		examID).Scan(&n)
+	return n, err
+}
+
+// DeleteExam removes an exam -- and, by cascade, its marks, formats and
+// total overrides -- so it's refused while the exam is published or has any
+// marks recorded.
+func (r *Repository) DeleteExam(ctx context.Context, id uuid.UUID) error {
+	e, err := r.GetExamByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if e.IsPublished {
+		return fmt.Errorf("%w: %s is published, so parents can see it -- unpublish it first", apperr.ErrConflict, e.Name)
+	}
+	n, err := r.ExamStudentsWithMarks(ctx, id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("%w: %s has marks entered for %d student(s) -- deleting it would delete those marks", apperr.ErrConflict, e.Name, n)
+	}
+	tag, err := r.pool.Exec(ctx, `DELETE FROM exams WHERE id=$1 AND NOT is_published`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) PublishExam(ctx context.Context, id uuid.UUID, publish bool) error {
 	tag, err := r.pool.Exec(ctx, `UPDATE exams SET is_published=$2, updated_at=NOW() WHERE id=$1`, id, publish)
 	if err != nil {

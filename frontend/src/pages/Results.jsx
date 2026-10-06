@@ -46,6 +46,8 @@ function Results() {
   const [examForm, setExamForm] = useState({ name: '', exam_date: '', weight_percent: 100 })
   const [publishingId, setPublishingId] = useState(null)
   const [formatExamId, setFormatExamId] = useState(null) // exam whose marks format is open
+  const [editingExam, setEditingExam] = useState(null) // { id, name, exam_date, weight_percent } while a row is edited
+  const [examSaving, setExamSaving] = useState(false)
 
   // Marks
   const [selectedExamId, setSelectedExamId] = useState('')
@@ -184,6 +186,53 @@ function Results() {
     } catch (err) { alert(err.message) }
   }
 
+  function reloadExams() {
+    return resultsApi.listExams({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
+      .then(r => setExams(r.items || []))
+  }
+
+  function startEditExam(e) {
+    setEditingExam({
+      id: e.id,
+      name: e.name,
+      exam_date: e.exam_date ? e.exam_date.slice(0, 10) : '',
+      weight_percent: String(e.weight_percent),
+    })
+  }
+
+  async function handleSaveExam() {
+    if (!editingExam.name.trim()) return
+    setExamSaving(true)
+    try {
+      await resultsApi.updateExam(editingExam.id, {
+        name: editingExam.name.trim(),
+        exam_date: editingExam.exam_date || '',
+        weight_percent: parseInt(editingExam.weight_percent, 10) || 0,
+      })
+      setEditingExam(null)
+      await reloadExams()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setExamSaving(false)
+    }
+  }
+
+  // Deleting an exam deletes its marks too, so the backend refuses it while
+  // the exam is published or has marks entered -- that reason is shown as is.
+  async function handleDeleteExam(e) {
+    if (!confirm(`Delete "${e.name}"? This can't be undone.`)) return
+    try {
+      await resultsApi.deleteExam(e.id)
+      if (formatExamId === e.id) setFormatExamId(null)
+      if (selectedExamId === e.id) pickMarksExam('')
+      if (msExamId === e.id) { setMsExamId(''); setMarksheet(null) }
+      await reloadExams()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
   // A published exam's marks become visible to parents/on report cards; an
   // admin un-publishing one hides them again without deleting anything, same
   // toggle either direction.
@@ -284,7 +333,7 @@ function Results() {
     setSelectedExamId(''); setSelectedStudentId(''); setMarks({}); setMarkMsg('')
     setMsExamId(''); setMsStudentId(''); setMarksheet(null); setEditingTotal(false); setTotalMsg('')
     setRcStudentId(''); setReportCard(null); setRcError(''); setRcMsg('')
-    setAddingComponentFor(null); setEditingField(null); setFormatExamId(null)
+    setAddingComponentFor(null); setEditingField(null); setFormatExamId(null); setEditingExam(null)
   }
 
   // Start blank whenever the exam or student changes, so one student's
@@ -641,7 +690,20 @@ function Results() {
               <tbody>
                 {exams.length === 0 ? (
                   <tr><td colSpan={isTeacher ? 4 : 5} className="data-table__empty">No exams yet</td></tr>
-                ) : exams.map(e => (
+                ) : exams.map(e => editingExam?.id === e.id ? (
+                  <tr key={e.id}>
+                    <td><input value={editingExam.name} onChange={ev => setEditingExam({ ...editingExam, name: ev.target.value })} placeholder="Exam name" /></td>
+                    <td><input type="date" value={editingExam.exam_date} onChange={ev => setEditingExam({ ...editingExam, exam_date: ev.target.value })} /></td>
+                    <td><input type="number" min="1" max="100" style={{ width: '70px' }} value={editingExam.weight_percent} onChange={ev => setEditingExam({ ...editingExam, weight_percent: ev.target.value })} /></td>
+                    <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button className="btn btn--primary btn--sm" onClick={handleSaveExam} disabled={examSaving || !editingExam.name.trim()}>
+                        {examSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button className="btn btn--outline btn--sm" style={{ marginLeft: '6px' }} onClick={() => setEditingExam(null)} disabled={examSaving}>Cancel</button>
+                    </td>
+                  </tr>
+                ) : (
                   <tr key={e.id}>
                     <td>{e.name}</td>
                     <td className="data-table__muted">{e.exam_date ? new Date(e.exam_date).toLocaleDateString('en-IN') : '-'}</td>
@@ -649,6 +711,12 @@ function Results() {
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
                     {!isTeacher && (
                       <td style={{ whiteSpace: 'nowrap' }}>
+                        <button className="btn btn--outline btn--sm" title="Edit exam" onClick={() => startEditExam(e)} style={{ marginRight: '6px' }}>
+                          <Pencil size={13} />
+                        </button>
+                        <button className="btn btn--outline btn--sm" title="Delete exam" onClick={() => handleDeleteExam(e)} style={{ marginRight: '6px' }}>
+                          <Trash2 size={13} />
+                        </button>
                         <button
                           className="btn btn--outline btn--sm"
                           onClick={() => handleTogglePublish(e)}
