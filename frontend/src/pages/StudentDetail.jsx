@@ -5,6 +5,7 @@ import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api
 import { useSchool } from '../services/SchoolContext'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import './StudentDetail.css'
+import { formatDate } from '../utils/date'
 
 const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
 const SCHOLAR_NO_EDITOR_ROLES = ['registrar', 'super_admin']
@@ -258,7 +259,7 @@ function StudentDetail() {
                 </>
               ) : (
                 <>
-                  <Field label="TC Date" value={f.tc_date ? new Date(f.tc_date).toLocaleDateString('en-IN') : '-'} editing={false} />
+                  <Field label="TC Date" value={formatDate(f.tc_date)} editing={false} />
                   <Field label="TC Year" value={f.tc_year || '-'} editing={false} />
                 </>
               )
@@ -399,7 +400,7 @@ function StudentDetail() {
                   <tbody>
                     {feeSummary.payments.slice(0, 5).map(p => (
                       <tr key={p.id}>
-                        <td>{new Date(p.payment_date).toLocaleDateString('en-IN')}</td>
+                        <td>{formatDate(p.payment_date)}</td>
                         <td>{p.fee_type}</td>
                         <td style={{ color: 'var(--success-600)' }}>{fmt(p.amount)}</td>
                         <td>{p.payment_mode}</td>

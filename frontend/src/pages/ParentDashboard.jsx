@@ -3,6 +3,7 @@ import { GraduationCap, BookOpen, BarChart2, Download, IndianRupee } from 'lucid
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, homeworkApi, resultsApi, feesApi } from '../services/api'
 import './ParentDashboard.css'
+import { formatDate } from '../utils/date'
 
 function fmtAmount(n) {
   return `₹${(n || 0).toLocaleString('en-IN')}`
@@ -22,7 +23,7 @@ function downloadBlob(blob, filename) {
 }
 
 function fmtDate(d) {
-  return d ? new Date(d).toLocaleDateString('en-IN') : '-'
+  return formatDate(d)
 }
 
 const submissionBadge = {

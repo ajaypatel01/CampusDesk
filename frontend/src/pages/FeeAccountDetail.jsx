@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, XCircle, IndianRupee, Download, MessageCircle, ArrowLe
 import { feesApi, academicApi } from '../services/api'
 import { useConfig } from '../services/ConfigContext'
 import './FeeAccountDetail.css'
+import { formatDate, todayIST } from '../utils/date'
 
 function FeeAccountDetail() {
   const { id } = useParams()
@@ -17,7 +18,7 @@ function FeeAccountDetail() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentForm, setPaymentForm] = useState({
     fee_type: 'tuition', amount: '', payment_mode: 'cash',
-    installment_number: '', reference_number: '', notes: '', payment_date: new Date().toISOString().split('T')[0],
+    installment_number: '', reference_number: '', notes: '', payment_date: todayIST(),
   })
   const [saving, setSaving] = useState(false)
   const [movePaymentId, setMovePaymentId] = useState(null)
@@ -56,7 +57,7 @@ function FeeAccountDetail() {
         notes: paymentForm.notes || undefined,
       })
       setShowPaymentModal(false)
-      setPaymentForm({ fee_type: 'tuition', amount: '', payment_mode: 'cash', installment_number: '', reference_number: '', notes: '', payment_date: new Date().toISOString().split('T')[0] })
+      setPaymentForm({ fee_type: 'tuition', amount: '', payment_mode: 'cash', installment_number: '', reference_number: '', notes: '', payment_date: todayIST() })
       loadAccount()
     } catch (err) {
       alert(err.message)
@@ -219,7 +220,7 @@ function FeeAccountDetail() {
             <tbody>
               {account.payments.map(p => (
                 <tr key={p.id} className={p.voided ? 'fee-detail__voided-row' : ''}>
-                  <td className="data-table__muted">{new Date(p.payment_date).toLocaleDateString('en-IN')}</td>
+                  <td className="data-table__muted">{formatDate(p.payment_date)}</td>
                   <td><span className="badge badge--muted">{p.fee_type}</span></td>
                   <td className="data-table__muted">{p.installment_number || '-'}</td>
                   <td className="fees-page__paid">{fmt(p.amount)}</td>
@@ -290,7 +291,7 @@ function FeeAccountDetail() {
                 </label>
                 <label className="form-field">
                   <span>Payment Date</span>
-                  <input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
+                  <input type="date" max={todayIST()} value={paymentForm.payment_date} onChange={e => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
                 </label>
               </div>
               <div className="form-row">

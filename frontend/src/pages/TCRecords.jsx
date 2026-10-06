@@ -3,6 +3,7 @@ import { Search, Download, Plus, X, FileText, Pencil, Trash2 } from 'lucide-reac
 import { useSchool } from '../services/SchoolContext'
 import { tcRecordsApi } from '../services/api'
 import './TCRecords.css'
+import { formatDate } from '../utils/date'
 
 const emptyForm = {
   scholar_number: '', student_name: '', father_name: '', mother_name: '',
@@ -17,7 +18,7 @@ function toDateInput(d) {
 
 function fmt(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-IN')
+  return formatDate(d)
 }
 
 function TCRecords() {
@@ -59,11 +60,11 @@ function TCRecords() {
     const rows = filtered.map((r, i) => [
       i + 1, r.scholar_number || '', `"${r.student_name}"`,
       `"${r.father_name || ''}"`, `"${r.mother_name || ''}"`,
-      r.dob ? new Date(r.dob).toLocaleDateString('en-IN') : '',
+      r.dob ? formatDate(r.dob) : '',
       r.caste || '', r.category || '',
-      r.date_of_admission ? new Date(r.date_of_admission).toLocaleDateString('en-IN') : '',
-      r.application_date ? new Date(r.application_date).toLocaleDateString('en-IN') : '',
-      r.issue_date ? new Date(r.issue_date).toLocaleDateString('en-IN') : '',
+      r.date_of_admission ? formatDate(r.date_of_admission) : '',
+      r.application_date ? formatDate(r.application_date) : '',
+      r.issue_date ? formatDate(r.issue_date) : '',
       r.class_passed || '', r.pen_number || '', r.apar_id || '', r.samagra_id || '',
       `"${r.new_school || ''}"`, r.dice_code || '', `"${r.remark || ''}"`,
     ].join(','))

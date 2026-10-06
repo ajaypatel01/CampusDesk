@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, Download, BookOpen, List, Receipt, Search } from '
 import { useSchool } from '../services/SchoolContext'
 import { booksApi, academicApi, studentsApi } from '../services/api'
 import './Books.css'
+import { formatDate } from '../utils/date'
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -385,7 +386,7 @@ function Books() {
                       return (
                         <tr key={r.id}>
                           <td>{stu ? `${stu.first_name} ${stu.last_name} (${stu.student_code})` : r.student_id}</td>
-                          <td>{r.received_date ? new Date(r.received_date).toLocaleDateString('en-IN') : '-'}</td>
+                          <td>{formatDate(r.received_date)}</td>
                           <td>{r.received_by || '-'}</td>
                           <td className="data-table__muted">{r.notes || '-'}</td>
                         </tr>

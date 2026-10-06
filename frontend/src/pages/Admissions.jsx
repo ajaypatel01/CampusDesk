@@ -4,10 +4,11 @@ import { UserPlus, Search, Download } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, enrollmentsApi, academicApi } from '../services/api'
 import './Admissions.css'
+import { formatDate } from '../utils/date'
 
 function fmt(dateStr) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDate(dateStr)
 }
 
 function statusBadge(status) {

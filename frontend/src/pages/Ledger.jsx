@@ -4,6 +4,7 @@ import { Search, Download, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
 import './Ledger.css'
+import { formatDate, todayIST, dateKey } from '../utils/date'
 
 const modeColor = {
   cash: 'ledger-mode--cash',
@@ -14,7 +15,7 @@ const modeColor = {
 
 function fmt(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatDate(d)
 }
 
 function fmtAmt(n) {
@@ -29,7 +30,7 @@ function Ledger() {
   const [selectedYearId, setSelectedYearId] = useState('')
 
   // Date range filter (default: today)
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayIST()
   const [fromDate, setFromDate] = useState(today)
   const [toDate, setToDate] = useState(today)
   const [mode, setMode] = useState('day') // day | range | month | all
@@ -107,8 +108,10 @@ function Ledger() {
   const filtered = useMemo(() => {
     let result = payments.filter(p => !p.voided)
 
-    if (fromDate) result = result.filter(p => p.payment_date >= fromDate)
-    if (toDate) result = result.filter(p => p.payment_date <= toDate)
+    // payment_date arrives as "2026-10-06T00:00:00Z"; compare just the date so
+    // payments on the To date itself are included.
+    if (fromDate) result = result.filter(p => dateKey(p.payment_date) >= fromDate)
+    if (toDate) result = result.filter(p => dateKey(p.payment_date) <= toDate)
 
     if (search) {
       const q = search.toLowerCase()
@@ -139,7 +142,7 @@ function Ledger() {
     const headers = ['#', 'Date', 'Student Name', 'Code', 'Class', 'Fee Type', 'Amount', 'Mode', 'Reference', 'Notes']
     const rows = filtered.map((p, i) => [
       i + 1,
-      new Date(p.payment_date).toLocaleDateString('en-IN'),
+      formatDate(p.payment_date),
       `"${p.student_name}"`,
       p.student_code,
       `"${p.grade || ''}"`,

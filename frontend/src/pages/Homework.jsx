@@ -3,6 +3,7 @@ import { Plus, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { homeworkApi, academicApi, studentsApi, resultsApi } from '../services/api'
 import './Homework.css'
+import { formatDate } from '../utils/date'
 
 function Homework() {
   const { currentSchool, currentYear } = useSchool()
@@ -94,7 +95,7 @@ function Homework() {
     return map[status] || 'muted'
   }
 
-  function fmtDate(s) { return new Date(s).toLocaleDateString('en-IN') }
+  function fmtDate(s) { return formatDate(s) }
 
   if (!currentSchool || !currentYear) return <p className="empty-text">Select a school and academic year first.</p>
 
