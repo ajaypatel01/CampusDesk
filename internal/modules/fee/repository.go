@@ -358,6 +358,49 @@ func (r *Repository) ListPayments(ctx context.Context, accountID uuid.UUID) ([]d
 	return items, rows.Err()
 }
 
+// LedgerPayment is one payment with the student it belongs to, for the
+// school-wide fee ledger.
+type LedgerPayment struct {
+	domain.FeePayment
+	AccountID   uuid.UUID `json:"account_id"`
+	StudentName string    `json:"student_name"`
+	StudentCode string    `json:"student_code"`
+	Grade       string    `json:"grade"`
+}
+
+// ListLedgerPayments returns every payment (voided included, flagged) on the
+// school's fee accounts for one academic year, newest first, in one query --
+// the ledger used to make one request per fee account.
+func (r *Repository) ListLedgerPayments(ctx context.Context, schoolID, yearID uuid.UUID) ([]LedgerPayment, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT fp.id, fp.student_fee_account_id, fp.fee_type, fp.installment_number, fp.amount, fp.payment_date,
+			fp.payment_mode, COALESCE(fp.reference_number,''), COALESCE(fp.notes,''), fp.voided, fp.created_at, fp.updated_at,
+			TRIM(s.first_name || ' ' || s.last_name), s.student_code, gl.name
+		FROM fee_payments fp
+		JOIN student_fee_accounts sfa ON sfa.id = fp.student_fee_account_id
+		JOIN students s ON s.id = sfa.student_id
+		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
+		JOIN grade_levels gl ON gl.id = fs.grade_level_id
+		WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2
+		ORDER BY fp.payment_date DESC, fp.created_at DESC`, schoolID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LedgerPayment{}
+	for rows.Next() {
+		var p LedgerPayment
+		if err := rows.Scan(&p.ID, &p.StudentFeeAccountID, &p.FeeType, &p.InstallmentNumber, &p.Amount,
+			&p.PaymentDate, &p.PaymentMode, &p.ReferenceNumber, &p.Notes, &p.Voided, &p.CreatedAt, &p.UpdatedAt,
+			&p.StudentName, &p.StudentCode, &p.Grade); err != nil {
+			return nil, err
+		}
+		p.AccountID = p.StudentFeeAccountID
+		items = append(items, p)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) GetPaymentByID(ctx context.Context, id uuid.UUID) (*domain.FeePayment, error) {
 	var p domain.FeePayment
 	err := r.pool.QueryRow(ctx, `

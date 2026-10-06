@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Search, Download, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Download, X, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
 import './Ledger.css'
@@ -35,9 +35,11 @@ function Ledger() {
   const [toDate, setToDate] = useState(today)
   const [mode, setMode] = useState('day') // day | range | month | all
 
-  const [accounts, setAccounts] = useState([])
   const [payments, setPayments] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false) // first load for this school/year
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [updatedAt, setUpdatedAt] = useState(null)
   const [search, setSearch] = useState('')
 
   // Load academic years for this school's dropdown
@@ -55,36 +57,38 @@ function Ledger() {
     if (currentYear) setSelectedYearId(currentYear.id)
   }, [currentYear])
 
-  // Load all fee accounts for the selected year (to join with payments)
-  useEffect(() => {
+  // All of the school's payments for the year in one request. If it fails the
+  // ledger says so -- it never shows a partial list as if it were complete.
+  const requestId = useRef(0)
+  const loadPayments = useCallback(async ({ background = false } = {}) => {
     if (!currentSchool || !selectedYearId) return
-    feesApi.listAccounts({ school_id: currentSchool.id, academic_year_id: selectedYearId, limit: 5000 })
-      .then(res => setAccounts(res.items || []))
-      .catch(() => setAccounts([]))
+    const id = ++requestId.current
+    if (background) setRefreshing(true)
+    else { setLoading(true); setPayments([]) }
+    try {
+      const res = await feesApi.listLedgerPayments({ school_id: currentSchool.id, academic_year_id: selectedYearId })
+      if (id !== requestId.current) return
+      setPayments(res.items || [])
+      setLoadError('')
+      setUpdatedAt(new Date())
+    } catch (err) {
+      if (id !== requestId.current) return
+      setLoadError(err.message || 'Could not load payments')
+    } finally {
+      if (id === requestId.current) { setLoading(false); setRefreshing(false) }
+    }
   }, [currentSchool, selectedYearId])
 
-  // Load payments for each account and flatten — filtered by date client-side
+  useEffect(() => { loadPayments() }, [loadPayments])
+
+  // Coming back to this tab (e.g. after recording a fee elsewhere) refreshes it.
   useEffect(() => {
-    if (!currentSchool || accounts.length === 0) return
-    setLoading(true)
-    // We don't have a school-level payments endpoint, so we load per account
-    // This is fine for ledger views since we filter client-side
-    Promise.all(
-      accounts.map(a =>
-        feesApi.listPayments(a.id)
-          .then(res => (res.items || []).map(p => ({
-            ...p,
-            student_name: a.student_name,
-            student_code: a.student_code,
-            grade: a.grade_level_name,
-            account_id: a.id,
-          })))
-          .catch(() => [])
-      )
-    )
-      .then(results => setPayments(results.flat()))
-      .finally(() => setLoading(false))
-  }, [accounts])
+    function onVisible() {
+      if (document.visibilityState === 'visible') loadPayments({ background: true })
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [loadPayments])
 
   // Date range helpers
   function setModeDay() {
@@ -169,9 +173,19 @@ function Ledger() {
           <h1>Daily Fee Ledger</h1>
           <p className="page-subtitle">Fee collection register — day-wise payment log</p>
         </div>
-        <button className="btn btn--outline" onClick={exportCSV} disabled={filtered.length === 0}>
-          <Download size={16} /> Export CSV
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {updatedAt && !loading && (
+            <span className="data-table__muted" style={{ fontSize: '12px' }}>
+              Updated {updatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button className="btn btn--outline" onClick={() => loadPayments({ background: true })} disabled={loading || refreshing} title="Load the latest payments">
+            <RefreshCw size={16} /> {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button className="btn btn--outline" onClick={exportCSV} disabled={filtered.length === 0}>
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Year + Date controls */}
@@ -235,9 +249,16 @@ function Ledger() {
         {loading ? 'Loading payments...' : `${filtered.length} payment${filtered.length !== 1 ? 's' : ''}`}
       </div>
 
+      {loadError && (
+        <div className="doc-msg doc-msg--error" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span>Couldn&apos;t load payments: {loadError}.{payments.length > 0 ? ' Showing the last loaded list.' : ''}</span>
+          <button className="btn btn--outline btn--sm" onClick={() => loadPayments({ background: payments.length > 0 })}>Try again</button>
+        </div>
+      )}
+
       {loading ? (
         <p className="loading-text">Loading fee payments...</p>
-      ) : filtered.length === 0 ? (
+      ) : loadError && payments.length === 0 ? null : filtered.length === 0 ? (
         <p className="empty-text">No payments found for this period</p>
       ) : (
         <div className="table-card">

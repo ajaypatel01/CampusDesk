@@ -457,6 +457,11 @@ func (s *Service) UpdateFeeAccount(ctx context.Context, id uuid.UUID, in UpdateF
 	return s.repo.GetFeeAccountByID(ctx, id)
 }
 
+// ListLedgerPayments is the school-wide payment list for the fee ledger.
+func (s *Service) ListLedgerPayments(ctx context.Context, schoolID, yearID uuid.UUID) ([]LedgerPayment, error) {
+	return s.repo.ListLedgerPayments(ctx, schoolID, yearID)
+}
+
 // ist is India time (UTC+5:30, no daylight saving), which every school uses.
 var ist = time.FixedZone("IST", 5*60*60+30*60)
 

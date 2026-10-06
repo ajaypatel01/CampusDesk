@@ -196,6 +196,8 @@ export const feesApi = {
   updateAccount: (id, body) => request(`/fee-accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
   listPayments: (accountId) => request(`/fee-payments${qs({ student_fee_account_id: accountId })}`),
+  // All of a school's payments for one year, with student name/code/class (office staff only).
+  listLedgerPayments: (params) => request(`/fee-payments/ledger${qs(params)}`),
   recordPayment: (body) => request('/fee-payments', { method: 'POST', body: JSON.stringify(body) }),
   voidPayment: (id) => request(`/fee-payments/${id}`, { method: 'DELETE' }),
   // Reassigns a payment to a different academic year's fee account for the

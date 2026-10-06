@@ -55,6 +55,8 @@ func (m *Module) Mount(r chi.Router) {
 
 		r.Route("/fee-payments", func(r chi.Router) {
 			r.With(view).Get("/", h.ListPayments)
+			// The whole school's payments with student names: office staff only.
+			r.With(httpx.BlockRoles("teacher", "parent"), view).Get("/ledger", h.ListLedgerPayments)
 			r.With(write).Post("/", h.RecordPayment)
 			r.With(write).Delete("/{id}", h.VoidPayment)
 			// Moving a payment to a different year corrects a mis-entered record
