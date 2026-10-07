@@ -47,9 +47,9 @@ type WhatsAppConfig struct {
 }
 
 type EmailConfig struct {
-	SendGridAPIKey string
-	FromEmail      string
-	FromName       string
+	ResendAPIKey string
+	FromEmail    string
+	FromName     string
 }
 
 type ServerConfig struct {
@@ -98,9 +98,11 @@ func Load() (*Config, error) {
 		Database: DatabaseConfig{URL: dbURL},
 		Auth:     AuthConfig{JWTSecret: jwtSecret},
 		Email: EmailConfig{
-			SendGridAPIKey: os.Getenv("SENDGRID_API_KEY"),
-			FromEmail:      getEnv("EMAIL_FROM", "noreply@campusdesk.app"),
-			FromName:       getEnv("EMAIL_FROM_NAME", "CampusDesk"),
+			// Resend: EMAIL_FROM's domain must be verified in Resend. Email
+			// stays off until both RESEND_API_KEY and EMAIL_FROM are set.
+			ResendAPIKey: os.Getenv("RESEND_API_KEY"),
+			FromEmail:    os.Getenv("EMAIL_FROM"),
+			FromName:     getEnv("EMAIL_FROM_NAME", "CampusDesk"),
 		},
 		Storage: StorageConfig{
 			Endpoint:        os.Getenv("S3_ENDPOINT"),
