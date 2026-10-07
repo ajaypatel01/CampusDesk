@@ -205,9 +205,9 @@ function ParentDashboard() {
                             {row.subject_name}
                             {row.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
                           </td>
-                          <td className="data-table__muted">{row.max_marks}</td>
-                          <td>{row.is_absent ? 'Absent' : row.marks_obtained}</td>
-                          <td className="data-table__muted">{row.is_absent ? '-' : row.percentage?.toFixed(1) + '%'}</td>
+                          <td className="data-table__muted">{row.grade_letter ? '-' : row.max_marks}</td>
+                          <td>{row.is_absent ? 'Absent' : row.grade_letter ? '-' : row.marks_obtained}</td>
+                          <td className="data-table__muted">{row.is_absent || row.grade_letter ? '-' : row.percentage?.toFixed(1) + '%'}</td>
                           <td><span className="badge badge--muted">{row.grade}</span></td>
                           <td>
                             <span className={`badge badge--${row.status === 'Pass' ? 'success' : row.status === 'Fail' ? 'danger' : 'muted'}`}>

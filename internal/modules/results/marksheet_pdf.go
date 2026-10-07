@@ -65,6 +65,13 @@ func generateMarksheetPDF(ms StudentMarksheet) ([]byte, error) {
 			pdf.CellFormat(colW[4], 7, "-", "1", 0, "C", false, 0, "")
 			pdf.CellFormat(colW[5], 7, "AB", "1", 0, "C", false, 0, "")
 			pdf.CellFormat(colW[6], 7, "AB", "1", 0, "C", false, 0, "")
+		} else if r.GradeLetter != "" {
+			pdf.CellFormat(colW[3], 7, "-", "1", 0, "C", false, 0, "")
+			pdf.CellFormat(colW[4], 7, "-", "1", 0, "C", false, 0, "")
+			pdf.SetFont("Arial", "B", 9)
+			pdf.CellFormat(colW[5], 7, r.GradeLetter, "1", 0, "C", false, 0, "")
+			pdf.SetFont("Arial", "", 9)
+			pdf.CellFormat(colW[6], 7, "-", "1", 0, "C", false, 0, "")
 		} else {
 			pdf.CellFormat(colW[3], 7, fmt.Sprintf("%.1f", r.MarksObtained), "1", 0, "C", false, 0, "")
 			pdf.CellFormat(colW[4], 7, fmt.Sprintf("%.1f", r.Percentage), "1", 0, "C", false, 0, "")

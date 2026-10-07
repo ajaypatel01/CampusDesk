@@ -48,6 +48,9 @@ type ExamMark struct {
 	// when the exam's grade uses one of the report-card templates. When set,
 	// MarksObtained/MaxMarks are computed from it rather than taken as given.
 	Components map[string]float64 `json:"components,omitempty"`
+	// GradeLetter is the A/B/C/D grade for a grading-only (co-scholastic)
+	// subject, entered instead of marks. Empty for every marked subject.
+	GradeLetter string `json:"grade_letter,omitempty"`
 	Timestamps
 }
 

@@ -5,6 +5,8 @@ import './ResultDashboard.css'
 
 // Grade scale from the backend's gradeFromPercent, best first.
 const GRADES = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D', 'F']
+// Letters a grading-only subject is given instead of marks.
+const GRADE_LETTERS = ['A', 'B', 'C', 'D']
 const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
 const pct = (n) => `${n.toFixed(1)}%`
 
@@ -52,7 +54,7 @@ function ResultDashboard({ exams }) {
     for (const st of sorted) {
       lines.push([
         st.rank || '', st.student_code, st.student_name,
-        ...sheet.subjects.map(sub => { const c = st.marks[sub.id]; return !c ? '' : c.is_absent ? 'AB' : fmt(c.obtained) }),
+        ...sheet.subjects.map(sub => { const c = st.marks[sub.id]; return !c ? '' : c.is_absent ? 'AB' : c.grade_letter || fmt(c.obtained) }),
         st.has_marks ? fmt(st.total_obtained) : '', st.has_marks ? st.total_max : '',
         st.has_marks ? st.percentage.toFixed(1) : '', st.grade || '', st.result || '',
       ].map(esc).join(','))
@@ -138,12 +140,20 @@ function ResultDashboard({ exams }) {
                     <div className="rd-hbar__name" role="cell">
                       {s.name}{s.coScholastic && <span className="rd-muted"> · CS</span>}
                     </div>
-                    <div className="rd-hbar__track" role="cell">
-                      {s.avgPct !== null && <div className="rd-hbar__fill" style={{ width: `${Math.max(s.avgPct, 1)}%` }} />}
-                      <span className="rd-hbar__value">{s.avgPct === null ? '–' : pct(s.avgPct)}</span>
-                    </div>
+                    {s.letters && s.avgPct === null ? (
+                      <div className="rd-hbar__letters" role="cell">
+                        {GRADE_LETTERS.map(g => (
+                          <span key={g} className="rd-letter"><strong>{g}</strong> {s.letters[g] || 0}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rd-hbar__track" role="cell">
+                        {s.avgPct !== null && <div className="rd-hbar__fill" style={{ width: `${Math.max(s.avgPct, 1)}%` }} />}
+                        <span className="rd-hbar__value">{s.avgPct === null ? '–' : pct(s.avgPct)}</span>
+                      </div>
+                    )}
                     <div className="rd-hbar__meta" role="cell">
-                      {s.sat ? `${s.passed}/${s.sat} passed` : 'No marks'}
+                      {s.letters && s.avgPct === null ? 'Graded' : s.sat ? `${s.passed}/${s.sat} passed` : 'No marks'}
                       {s.absent > 0 && <span className="rd-muted"> · {s.absent} AB</span>}
                     </div>
                   </div>
@@ -252,6 +262,7 @@ function ResultDashboard({ exams }) {
                         const c = st.marks[sub.id]
                         if (!c) return <td key={sub.id} className="rd-num data-table__muted">–</td>
                         if (c.is_absent) return <td key={sub.id} className="rd-num rd-absent">AB</td>
+                        if (c.grade_letter) return <td key={sub.id} className="rd-num" title="Graded"><strong>{c.grade_letter}</strong></td>
                         const fail = c.status === 'Fail' && !sub.is_co_scholastic
                         return <td key={sub.id} className={`rd-num ${fail ? 'rd-fail' : ''}`} title={`${c.grade} · ${c.status}`}>{fmt(c.obtained)}</td>
                       })}
@@ -288,11 +299,17 @@ function buildStats(sheet) {
   const subjects = sheet.subjects.map(sub => {
     const cells = withMarks.map(s => s.marks[sub.id]).filter(Boolean)
     const sat = cells.filter(c => !c.is_absent)
-    const avg = sat.length ? sat.reduce((t, c) => t + (c.max_marks ? (c.obtained / c.max_marks) * 100 : 0), 0) / sat.length : null
+    // Letter-graded cells (A-D) have no marks: count letters instead of averaging.
+    const lettered = sat.filter(c => c.grade_letter)
+    const marked = sat.filter(c => !c.grade_letter)
+    const avg = marked.length ? marked.reduce((t, c) => t + (c.max_marks ? (c.obtained / c.max_marks) * 100 : 0), 0) / marked.length : null
+    const letters = {}
+    for (const c of lettered) letters[c.grade_letter] = (letters[c.grade_letter] || 0) + 1
     return {
       id: sub.id, name: sub.name, coScholastic: sub.is_co_scholastic,
-      avgPct: avg, sat: sat.length, absent: cells.length - sat.length,
-      passed: sat.filter(c => c.status === 'Pass').length,
+      avgPct: avg, sat: marked.length, absent: cells.length - sat.length,
+      passed: marked.filter(c => c.status === 'Pass').length,
+      letters: lettered.length ? letters : null,
     }
   })
 

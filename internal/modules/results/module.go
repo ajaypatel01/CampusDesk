@@ -641,7 +641,40 @@ func (m *Module) UpsertMark(w http.ResponseWriter, r *http.Request) {
 // would have that field's value silently dropped on save, since
 // UpsertMarkWithComponents only persists whatever's in the components list
 // it's given.
+// gradeMarkError checks a mark that carries a letter grade: the letter must be
+// one of GradeLetters and the subject must be grading-only. ok is false for
+// an ordinary marks entry (no letter), which is saved as before.
+func (m *Module) gradeMarkError(ctx context.Context, mark *domain.ExamMark, coScholastic map[uuid.UUID]bool) (ok bool, err error) {
+	mark.GradeLetter = strings.ToUpper(strings.TrimSpace(mark.GradeLetter))
+	if mark.GradeLetter == "" {
+		return false, nil
+	}
+	valid := false
+	for _, g := range GradeLetters {
+		valid = valid || g == mark.GradeLetter
+	}
+	if !valid {
+		return false, fmt.Errorf("%w: grade must be one of %s", apperr.ErrInvalidInput, strings.Join(GradeLetters, ", "))
+	}
+	cs, seen := coScholastic[mark.SubjectID]
+	if !seen {
+		if cs, err = m.repo.SubjectIsCoScholastic(ctx, mark.SubjectID); err != nil {
+			return false, err
+		}
+		coScholastic[mark.SubjectID] = cs
+	}
+	if !cs {
+		return false, fmt.Errorf("%w: only grading-only subjects take a letter grade -- enter marks for this subject", apperr.ErrInvalidInput)
+	}
+	return true, nil
+}
+
 func (m *Module) saveOneMark(ctx context.Context, mark *domain.ExamMark) error {
+	if isGrade, err := m.gradeMarkError(ctx, mark, map[uuid.UUID]bool{}); err != nil {
+		return err
+	} else if isGrade {
+		return m.repo.UpsertGradeMark(ctx, mark)
+	}
 	if len(mark.Components) == 0 {
 		return m.repo.UpsertMark(ctx, mark)
 	}
@@ -688,8 +721,26 @@ func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, 
 	type schemeKey struct{ examID, subjectID uuid.UUID }
 	schemes := map[schemeKey][]MarkComponent{}
 	var saved int
+	// Check every letter grade before saving anything, so a bad one rejects
+	// the whole save instead of leaving it half done.
+	coScholastic := map[uuid.UUID]bool{}
+	isGrade := make([]bool, len(marks))
+	for i := range marks {
+		ok, err := m.gradeMarkError(ctx, &marks[i], coScholastic)
+		if err != nil {
+			return 0, err
+		}
+		isGrade[i] = ok
+	}
 	for i := range marks {
 		mark := &marks[i]
+		if isGrade[i] {
+			if err := m.repo.UpsertGradeMark(ctx, mark); err != nil {
+				return saved, err
+			}
+			saved++
+			continue
+		}
 		if mark.MaxMarks <= 0 {
 			mark.MaxMarks = 100
 		}

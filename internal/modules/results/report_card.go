@@ -42,12 +42,17 @@ type ReportCardSubjectExamCell struct {
 	Obtained   float64                    `json:"obtained"`
 	MaxMarks   int                        `json:"max_marks"`
 	IsAbsent   bool                       `json:"is_absent"`
+	// GradeLetter is the A/B/C/D grade of a letter-graded subject (no marks).
+	GradeLetter string `json:"grade_letter,omitempty"`
 }
 
 type ReportCardSubjectRow struct {
-	SubjectID       uuid.UUID                   `json:"subject_id"`
-	SubjectName     string                      `json:"subject_name"`
-	IsCoScholastic  bool                        `json:"is_co_scholastic"`
+	SubjectID      uuid.UUID `json:"subject_id"`
+	SubjectName    string    `json:"subject_name"`
+	IsCoScholastic bool      `json:"is_co_scholastic"`
+	// IsGraded: the subject was given letter grades, so it has no total or
+	// percentage; Grade is its latest letter.
+	IsGraded        bool                        `json:"is_graded,omitempty"`
 	ByExam          []ReportCardSubjectExamCell `json:"by_exam"` // aligned with ReportCard.Exams
 	OverallObtained float64                     `json:"overall_obtained"`
 	OverallMax      int                         `json:"overall_max"`
@@ -135,10 +140,10 @@ func (r *Repository) UpsertMarkWithComponents(ctx context.Context, mark *domain.
 	defer tx.Rollback(ctx)
 
 	row := tx.QueryRow(ctx, `
-		INSERT INTO exam_marks (exam_id, student_id, subject_id, marks_obtained, max_marks, is_absent, remarks)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO exam_marks (exam_id, student_id, subject_id, marks_obtained, max_marks, is_absent, remarks, grade_letter)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULL)
 		ON CONFLICT (exam_id, student_id, subject_id)
-		DO UPDATE SET marks_obtained=$4, max_marks=$5, is_absent=$6, remarks=$7, updated_at=NOW()
+		DO UPDATE SET marks_obtained=$4, max_marks=$5, is_absent=$6, remarks=$7, grade_letter=NULL, updated_at=NOW()
 		RETURNING id, created_at, updated_at`,
 		mark.ExamID, mark.StudentID, mark.SubjectID, mark.MarksObtained, mark.MaxMarks, mark.IsAbsent, mark.Remarks,
 	)
@@ -241,7 +246,7 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 
 	if len(examIDs) > 0 {
 		rows, err := r.pool.Query(ctx, `
-			SELECT id, exam_id, subject_id, marks_obtained, max_marks, is_absent
+			SELECT id, exam_id, subject_id, marks_obtained, max_marks, is_absent, COALESCE(grade_letter,'')
 			FROM exam_marks WHERE student_id=$1 AND exam_id = ANY($2)`, studentID, examIDs)
 		if err != nil {
 			return nil, err
@@ -249,7 +254,7 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 		var markIDs []uuid.UUID
 		for rows.Next() {
 			var mk domain.ExamMark
-			if err := rows.Scan(&mk.ID, &mk.ExamID, &mk.SubjectID, &mk.MarksObtained, &mk.MaxMarks, &mk.IsAbsent); err != nil {
+			if err := rows.Scan(&mk.ID, &mk.ExamID, &mk.SubjectID, &mk.MarksObtained, &mk.MaxMarks, &mk.IsAbsent, &mk.GradeLetter); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -321,6 +326,9 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 				cell.IsAbsent = mk.IsAbsent
 				cell.Obtained = mk.MarksObtained
 				cell.MaxMarks = mk.MaxMarks
+				if mk.GradeLetter != "" && !mk.IsAbsent {
+					cell.GradeLetter = mk.GradeLetter
+				}
 				if cvs := componentsByMarkID[mk.ID]; len(cvs) > 0 {
 					byKey := make(map[string]ReportCardComponentValue, len(cvs))
 					for _, cv := range cvs {
@@ -360,6 +368,11 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 			row.OverallPercent = subObtained / float64(subMax) * 100
 		}
 		row.Grade = gradeForTemplate(rc.Template, row.OverallPercent)
+		for _, cell := range row.ByExam {
+			if cell.GradeLetter != "" {
+				row.IsGraded, row.Grade = true, cell.GradeLetter // latest exam's letter wins
+			}
+		}
 		rc.Subjects = append(rc.Subjects, row)
 		// Co-scholastic subjects are graded individually but excluded from
 		// the overall total, same convention as the existing single-exam

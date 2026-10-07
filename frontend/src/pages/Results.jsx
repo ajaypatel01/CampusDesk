@@ -22,6 +22,8 @@ const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', Clipboard
 const TEACHER_TABS = ['marks', 'marksheet']
 // The results dashboard (whole class, one exam) is for the school's admins and the owner.
 const RESULT_SHEET_ROLES = ['super_admin', 'school_admin']
+// Grading-only (co-scholastic) subjects get one of these instead of marks.
+const GRADE_LETTERS = ['A', 'B', 'C', 'D']
 
 function Results() {
   const { user } = useOutletContext() || {}
@@ -371,7 +373,12 @@ function Results() {
     if (!selectedExamId || !selectedStudentId) return
     setMarkSaving(true); setMarkMsg('')
     try {
-      const marksArr = markSubjects.map(sub => {
+      // A grading-only subject with no grade picked is left out, so it is
+      // never saved as 0 marks.
+      const marksArr = markSubjects.filter(sub => {
+        const entry = marks[sub.id] || {}
+        return !sub.is_co_scholastic || entry.is_absent || entry.grade_letter
+      }).map(sub => {
         const entry = marks[sub.id] || {}
         const base = {
           exam_id: selectedExamId,
@@ -380,6 +387,9 @@ function Results() {
           max_marks: sub.max_marks,
           is_absent: entry.is_absent || false,
           remarks: '',
+        }
+        if (sub.is_co_scholastic) {
+          return { ...base, grade_letter: entry.is_absent ? '' : entry.grade_letter }
         }
         const subComponents = fieldsFor(sub)
         if (subComponents.length > 0) {
@@ -809,7 +819,20 @@ function Results() {
                         </label>
                       </div>
 
-                      {components.length > 0 ? (
+                      {sub.is_co_scholastic ? (
+                        <label className="marks-component-field">
+                          <span>Grade <span className="data-table__muted">(grading only)</span></span>
+                          <select
+                            className="marks-input"
+                            disabled={isAbsent}
+                            value={marks[sub.id]?.grade_letter || ''}
+                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], grade_letter: e.target.value } }))}
+                          >
+                            <option value="">Select grade...</option>
+                            {GRADE_LETTERS.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </label>
+                      ) : components.length > 0 ? (
                         <div className="mark-fields-grid">
                           {components.map(c => (
                             <label key={c.key} className="marks-component-field">
@@ -842,7 +865,9 @@ function Results() {
                       )}
 
                       <div className="mark-subject-card__total">
-                        {components.length > 0 ? `Total: ${componentTotal(sub)} / ${fieldsMax}` : `Out of ${sub.max_marks}`}
+                        {sub.is_co_scholastic
+                          ? 'Graded A–D, not counted in the total'
+                          : components.length > 0 ? `Total: ${componentTotal(sub)} / ${fieldsMax}` : `Out of ${sub.max_marks}`}
                       </div>
 
                       {/* Teachers only enter marks; admins change fields per exam under Exams > Marks format */}
@@ -916,10 +941,10 @@ function Results() {
                         {row.subject_name}
                         {row.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
                       </td>
-                      <td className="data-table__muted">{row.max_marks}</td>
-                      <td className="data-table__muted">{row.passing_marks}</td>
-                      <td>{row.is_absent ? 'Absent' : row.marks_obtained}</td>
-                      <td className="data-table__muted">{row.is_absent ? '-' : row.percentage?.toFixed(1) + '%'}</td>
+                      <td className="data-table__muted">{row.grade_letter ? '-' : row.max_marks}</td>
+                      <td className="data-table__muted">{row.grade_letter ? '-' : row.passing_marks}</td>
+                      <td>{row.is_absent ? 'Absent' : row.grade_letter ? '-' : row.marks_obtained}</td>
+                      <td className="data-table__muted">{row.is_absent || row.grade_letter ? '-' : row.percentage?.toFixed(1) + '%'}</td>
                       <td><span className="badge badge--muted">{row.grade}</span></td>
                       <td>
                         <span className={`badge badge--${row.status === 'Pass' ? 'success' : row.status === 'Fail' ? 'danger' : 'muted'}`}>
@@ -1061,12 +1086,12 @@ function Results() {
                         </td>
                         {sub.by_exam.map((cell, i) => (
                           <Fragment key={i}>
-                            <td>{cell.is_absent ? 'Absent' : cell.obtained}</td>
+                            <td>{cell.is_absent ? 'Absent' : cell.grade_letter ? <strong>{cell.grade_letter}</strong> : cell.obtained}</td>
                             <td className="data-table__muted">{cell.max_marks}</td>
                           </Fragment>
                         ))}
-                        <td>{sub.overall_obtained} / {sub.overall_max}</td>
-                        <td className="data-table__muted">{sub.overall_percent?.toFixed(1)}%</td>
+                        <td>{sub.is_graded ? '-' : `${sub.overall_obtained} / ${sub.overall_max}`}</td>
+                        <td className="data-table__muted">{sub.is_graded ? '-' : `${sub.overall_percent?.toFixed(1)}%`}</td>
                         <td>{sub.grade ? <span className="badge badge--muted">{sub.grade}</span> : '-'}</td>
                       </tr>
                     ))}
