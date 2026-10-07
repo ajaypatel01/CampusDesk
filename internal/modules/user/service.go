@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
@@ -296,7 +297,8 @@ func (s *Service) RequestPasswordReset(ctx context.Context, emailAddr string) er
 	}
 	link := fmt.Sprintf("%s/reset-password?token=%s", strings.TrimRight(s.frontendURL, "/"), token)
 	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
-	body := fmt.Sprintf(`<p>Hi %s,</p><p>Click the link below to reset your CampusDesk password. This link expires in 30 minutes and can only be used once.</p><p><a href="%s">%s</a></p><p>If you didn't request this, you can ignore this email.</p>`, name, link, link)
+	body := fmt.Sprintf(`<p>Hi %s,</p><p>Click the link below to reset your CampusDesk password. This link expires in 30 minutes and can only be used once.</p><p><a href="%s">%s</a></p><p>If you didn't request this, you can ignore this email.</p>`,
+		html.EscapeString(name), html.EscapeString(link), html.EscapeString(link))
 	if err := s.emailClient.SendText(u.Email, name, "Reset your CampusDesk password", body); err != nil {
 		return fmt.Errorf("send reset email: %w", err)
 	}
