@@ -228,12 +228,12 @@ func (r *Repository) PublishExam(ctx context.Context, id uuid.UUID, publish bool
 
 func (r *Repository) UpsertMark(ctx context.Context, m *domain.ExamMark) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO exam_marks (exam_id, student_id, subject_id, marks_obtained, max_marks, is_absent, remarks)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO exam_marks (exam_id, student_id, subject_id, marks_obtained, max_marks, is_absent, remarks, grade_letter)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''))
 		ON CONFLICT (exam_id, student_id, subject_id)
-		DO UPDATE SET marks_obtained=$4, max_marks=$5, is_absent=$6, remarks=$7, updated_at=NOW()
+		DO UPDATE SET marks_obtained=$4, max_marks=$5, is_absent=$6, remarks=$7, grade_letter=NULLIF($8,''), updated_at=NOW()
 		RETURNING id, created_at, updated_at`,
-		m.ExamID, m.StudentID, m.SubjectID, m.MarksObtained, m.MaxMarks, m.IsAbsent, m.Remarks,
+		m.ExamID, m.StudentID, m.SubjectID, m.MarksObtained, m.MaxMarks, m.IsAbsent, m.Remarks, m.GradeLetter,
 	)
 	if err := row.Scan(&m.ID, &m.CreatedAt, &m.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -254,6 +254,9 @@ type MarksheetRow struct {
 	GradePoint     float64   `json:"grade_point"`
 	Status         string    `json:"status"` // Pass / Fail / Absent
 	IsCoScholastic bool      `json:"is_co_scholastic"`
+	// GradeLetter is set when a grading-only subject was given a letter
+	// (A/B/C/D) instead of marks; it is then also the row's Grade.
+	GradeLetter string `json:"grade_letter,omitempty"`
 }
 
 type StudentMarksheet struct {
@@ -306,7 +309,7 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT sub.id, sub.name, COALESCE(sub.code,''), em.max_marks, sub.passing_marks,
-			em.marks_obtained, em.is_absent, COALESCE(em.remarks,''), sub.is_co_scholastic
+			em.marks_obtained, em.is_absent, COALESCE(em.remarks,''), sub.is_co_scholastic, COALESCE(em.grade_letter,'')
 		FROM exam_marks em
 		JOIN subjects sub ON sub.id = em.subject_id
 		WHERE em.exam_id=$1 AND em.student_id=$2
@@ -320,7 +323,7 @@ func (r *Repository) GetStudentMarksheet(ctx context.Context, examID, studentID 
 		var row MarksheetRow
 		var remarks string
 		if err := rows.Scan(&row.SubjectID, &row.SubjectName, &row.SubjectCode, &row.MaxMarks, &row.PassingMarks,
-			&row.MarksObtained, &row.IsAbsent, &remarks, &row.IsCoScholastic); err != nil {
+			&row.MarksObtained, &row.IsAbsent, &remarks, &row.IsCoScholastic, &row.GradeLetter); err != nil {
 			return nil, err
 		}
 		ms.Rows = append(ms.Rows, row)
@@ -357,6 +360,13 @@ func scoreMarksheet(ms *StudentMarksheet, override *float64) {
 
 	for i := range ms.Rows {
 		row := &ms.Rows[i]
+		if row.GradeLetter != "" && !row.IsAbsent {
+			// A letter-graded subject has no marks: it shows its letter and
+			// never counts toward the total, percentage, CGPA or result.
+			row.Grade = row.GradeLetter
+			row.Status = "Graded"
+			continue
+		}
 		if row.IsAbsent {
 			row.Status = "Absent"
 			row.Grade = "AB"
@@ -498,4 +508,46 @@ func gradeFromPercent(pct float64) (grade string, gp float64) {
 	default:
 		return "F", 0.0
 	}
+}
+
+// GradeLetters are the grades a grading-only subject can be given.
+var GradeLetters = []string{"A", "B", "C", "D"}
+
+// SubjectIsCoScholastic reports whether a subject is grading-only.
+func (r *Repository) SubjectIsCoScholastic(ctx context.Context, subjectID uuid.UUID) (bool, error) {
+	var cs bool
+	err := r.pool.QueryRow(ctx, `SELECT is_co_scholastic FROM subjects WHERE id=$1`, subjectID).Scan(&cs)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, apperr.ErrNotFound
+	}
+	return cs, err
+}
+
+// UpsertGradeMark saves a grading-only subject's letter grade (or absence)
+// with no marks, and drops any per-field values left from an earlier
+// marks-based entry so they can't show on the report card.
+func (r *Repository) UpsertGradeMark(ctx context.Context, m *domain.ExamMark) error {
+	m.MarksObtained, m.MaxMarks, m.Components = 0, 0, nil
+	if m.IsAbsent {
+		m.GradeLetter = ""
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	row := tx.QueryRow(ctx, `
+		INSERT INTO exam_marks (exam_id, student_id, subject_id, marks_obtained, max_marks, is_absent, remarks, grade_letter)
+		VALUES ($1,$2,$3,0,0,$4,$5,NULLIF($6,''))
+		ON CONFLICT (exam_id, student_id, subject_id)
+		DO UPDATE SET marks_obtained=0, max_marks=0, is_absent=$4, remarks=$5, grade_letter=NULLIF($6,''), updated_at=NOW()
+		RETURNING id, created_at, updated_at`,
+		m.ExamID, m.StudentID, m.SubjectID, m.IsAbsent, m.Remarks, m.GradeLetter)
+	if err := row.Scan(&m.ID, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		return database.MapError(err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM exam_mark_components WHERE exam_mark_id=$1`, m.ID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

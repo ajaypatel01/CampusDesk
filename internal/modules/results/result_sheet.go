@@ -29,7 +29,9 @@ type ResultSheetCell struct {
 	MaxMarks int     `json:"max_marks"`
 	IsAbsent bool    `json:"is_absent"`
 	Grade    string  `json:"grade"`
-	Status   string  `json:"status"` // Pass / Fail / Absent
+	Status   string  `json:"status"` // Pass / Fail / Absent / Graded
+	// GradeLetter is the A/B/C/D grade of a letter-graded subject (no marks).
+	GradeLetter string `json:"grade_letter,omitempty"`
 }
 
 type ResultSheetStudent struct {
@@ -121,7 +123,7 @@ func (r *Repository) GetResultSheet(ctx context.Context, examID uuid.UUID) (*Res
 	// Every mark in the exam, in one query, grouped into a marksheet per student.
 	markRows, err := r.pool.Query(ctx, `
 		SELECT em.student_id, sub.id, sub.name, COALESCE(sub.code,''), em.max_marks, sub.passing_marks,
-			em.marks_obtained, em.is_absent, sub.is_co_scholastic
+			em.marks_obtained, em.is_absent, sub.is_co_scholastic, COALESCE(em.grade_letter,'')
 		FROM exam_marks em
 		JOIN subjects sub ON sub.id = em.subject_id
 		WHERE em.exam_id = $1
@@ -134,7 +136,7 @@ func (r *Repository) GetResultSheet(ctx context.Context, examID uuid.UUID) (*Res
 		var studentID uuid.UUID
 		var row MarksheetRow
 		if err := markRows.Scan(&studentID, &row.SubjectID, &row.SubjectName, &row.SubjectCode, &row.MaxMarks,
-			&row.PassingMarks, &row.MarksObtained, &row.IsAbsent, &row.IsCoScholastic); err != nil {
+			&row.PassingMarks, &row.MarksObtained, &row.IsAbsent, &row.IsCoScholastic, &row.GradeLetter); err != nil {
 			markRows.Close()
 			return nil, err
 		}
@@ -183,6 +185,7 @@ func (r *Repository) GetResultSheet(ctx context.Context, examID uuid.UUID) (*Res
 		for _, row := range ms.Rows {
 			st.Marks[row.SubjectID.String()] = ResultSheetCell{
 				Obtained: row.MarksObtained, MaxMarks: row.MaxMarks, IsAbsent: row.IsAbsent, Grade: row.Grade, Status: row.Status,
+				GradeLetter: row.GradeLetter,
 			}
 		}
 	}

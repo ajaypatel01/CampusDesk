@@ -205,7 +205,9 @@ func writeExamComponentTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, examIdx i
 			pdf.CellFormat(compW, 6, formatMarks(v), "1", 0, "C", false, 0, "")
 		}
 		total := formatMarks(cell.Obtained)
-		if !uniform || len(components) == 0 {
+		if cell.GradeLetter != "" {
+			total = cell.GradeLetter
+		} else if !uniform || len(components) == 0 {
 			total = fmt.Sprintf("%s/%d", total, cell.MaxMarks)
 		}
 		pdf.CellFormat(totalW, 6, total, "1", 1, "C", false, 0, "")
@@ -260,8 +262,13 @@ func writeOverallTable(pdf *fpdf.Fpdf, w float64, rc ReportCard, theme pdfTheme)
 	pdf.SetFont("Arial", "", 8)
 	for _, sub := range rc.Subjects {
 		pdf.CellFormat(subjectW, 6, sub.SubjectName, "1", 0, "L", false, 0, "")
-		pdf.CellFormat(otherW, 6, fmt.Sprintf("%s / %d", formatMarks(sub.OverallObtained), sub.OverallMax), "1", 0, "C", false, 0, "")
-		pdf.CellFormat(otherW, 6, fmt.Sprintf("%.1f%%", sub.OverallPercent), "1", 0, "C", false, 0, "")
+		if sub.IsGraded {
+			pdf.CellFormat(otherW, 6, "-", "1", 0, "C", false, 0, "")
+			pdf.CellFormat(otherW, 6, "-", "1", 0, "C", false, 0, "")
+		} else {
+			pdf.CellFormat(otherW, 6, fmt.Sprintf("%s / %d", formatMarks(sub.OverallObtained), sub.OverallMax), "1", 0, "C", false, 0, "")
+			pdf.CellFormat(otherW, 6, fmt.Sprintf("%.1f%%", sub.OverallPercent), "1", 0, "C", false, 0, "")
+		}
 		writeGradeCell(pdf, otherW, 6, sub.Grade, theme)
 	}
 

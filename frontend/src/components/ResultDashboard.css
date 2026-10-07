@@ -56,6 +56,8 @@ html[data-theme="dark"] .rd {
 .rd-hbar__track::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--gray-300); }
 .rd-hbar__fill { height: 14px; background: var(--rd-series); border-radius: 0 4px 4px 0; max-width: calc(100% - 52px); }
 .rd-hbar__value { margin-left: 6px; font-size: 0.8rem; color: var(--gray-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rd-hbar__letters { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--gray-600); font-variant-numeric: tabular-nums; }
+.rd-letter strong { color: var(--gray-900); margin-right: 2px; }
 .rd-hbar__meta { font-size: 0.8rem; color: var(--gray-500); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Grade columns: 4px rounded top, square on the baseline, count on the cap. */
