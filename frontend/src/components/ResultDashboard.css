@@ -1,0 +1,108 @@
+/* Results dashboard. Chart colors are role tokens defined once per theme;
+   the bar blue is validated against this app's surfaces (#fff light, #1f2937 dark). */
+.rd {
+  --rd-series: #2a78d6;
+  --rd-critical: #d03b3b;
+  transition: opacity 0.15s;
+}
+html[data-theme="dark"] .rd {
+  --rd-series: #3987e5;
+  --rd-critical: #e66767;
+}
+.rd--refreshing { opacity: 0.6; }
+
+.rd-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.rd-filters__actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+.rd-muted { color: var(--gray-400); font-weight: 400; }
+
+/* KPI row */
+.rd-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.rd-tile {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-width: 0;
+}
+.rd-tile--hero { grid-column: span 2; }
+.rd-tile__label { font-size: 0.8rem; color: var(--gray-500); }
+.rd-tile__hero { font-size: 48px; line-height: 1.1; font-weight: 600; color: var(--gray-900); margin: 4px 0; }
+.rd-tile__value { font-size: 28px; line-height: 1.2; font-weight: 600; color: var(--gray-900); margin: 4px 0; }
+.rd-tile__of { font-size: 16px; font-weight: 400; color: var(--gray-400); }
+.rd-tile__sub { font-size: 0.8rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cards */
+.rd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.rd-card {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px;
+  min-width: 0;
+}
+.rd-card--wide { margin-bottom: 8px; }
+.rd-card__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rd-card__title { font-size: 0.95rem; font-weight: 600; color: var(--gray-900); display: flex; align-items: center; gap: 6px; margin: 0; }
+.rd-card__subtitle { font-size: 0.8rem; color: var(--gray-500); margin: 2px 0 12px; }
+
+/* Subject bars: thin, 4px rounded end, square at the baseline, value at the tip. */
+.rd-hbars { display: flex; flex-direction: column; gap: 10px; }
+.rd-hbar { display: grid; grid-template-columns: minmax(80px, 140px) 1fr auto; align-items: center; gap: 10px; border-radius: 6px; outline: none; }
+.rd-hbar:hover .rd-hbar__fill, .rd-hbar:focus-visible .rd-hbar__fill { filter: brightness(1.12); }
+.rd-hbar:focus-visible { box-shadow: 0 0 0 2px var(--primary-100); }
+.rd-hbar__name { font-size: 0.85rem; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-hbar__track { position: relative; height: 18px; display: flex; align-items: center; }
+.rd-hbar__track::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--gray-300); }
+.rd-hbar__fill { height: 14px; background: var(--rd-series); border-radius: 0 4px 4px 0; max-width: calc(100% - 52px); }
+.rd-hbar__value { margin-left: 6px; font-size: 0.8rem; color: var(--gray-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rd-hbar__letters { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--gray-600); font-variant-numeric: tabular-nums; }
+.rd-letter strong { color: var(--gray-900); margin-right: 2px; }
+.rd-hbar__meta { font-size: 0.8rem; color: var(--gray-500); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Grade columns: 4px rounded top, square on the baseline, count on the cap. */
+.rd-cols { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; align-items: end; height: 190px; }
+.rd-col { display: flex; flex-direction: column; align-items: center; height: 100%; border-radius: 6px; outline: none; }
+.rd-col:hover .rd-col__bar, .rd-col:focus-visible .rd-col__bar { filter: brightness(1.12); }
+.rd-col:focus-visible { box-shadow: 0 0 0 2px var(--primary-100); }
+.rd-col__plot { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-bottom: 1px solid var(--gray-300); }
+.rd-col__bar { width: min(24px, 70%); background: var(--rd-series); border-radius: 4px 4px 0 0; min-height: 0; }
+.rd-col__value { font-size: 0.8rem; color: var(--gray-700); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.rd-col__label { font-size: 0.8rem; color: var(--gray-500); padding-top: 6px; }
+
+/* Lists */
+.rd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rd-list__item { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); font-size: 0.875rem; }
+.rd-list__item:last-child { border-bottom: none; }
+.rd-list__rank { font-weight: 600; color: var(--gray-500); text-align: center; }
+.rd-list__tag { font-size: 0.75rem; font-weight: 600; color: var(--gray-500); }
+.rd-list__name { color: var(--gray-800); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-list__value { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--gray-800); }
+
+/* Full sheet table */
+.rd-sheet { max-height: 70vh; overflow: auto; }
+.rd-sheet__table th, .rd-sheet__table td { white-space: nowrap; }
+.rd-sheet__table thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; }
+.rd-sticky { position: sticky; background: var(--surface); z-index: 1; }
+.rd-sheet__table thead .rd-sticky { z-index: 3; }
+.rd-sticky--rank { left: 0; min-width: 56px; width: 56px; }
+.rd-sticky--name { left: 56px; min-width: 180px; border-right: 1px solid var(--gray-200); }
+.rd-num { text-align: right; font-variant-numeric: tabular-nums; }
+.rd-th-sub { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--gray-400); }
+.rd-fail { color: var(--rd-critical); font-weight: 600; }
+.rd-absent { color: var(--gray-500); font-weight: 600; }
+.rd-row--empty td { color: var(--gray-400); }
+
+/* Status ink last, so it wins over the gray sub/tag text it sits in. */
+.rd-tile__sub.rd-status--critical,
+.rd-list__tag.rd-status--critical,
+.rd-status--critical { color: var(--rd-critical); display: inline-flex; align-items: center; gap: 4px; }
+
+@media (max-width: 900px) {
+  .rd-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .rd-tile--hero { grid-column: span 1; }
+  .rd-hbar { grid-template-columns: 90px 1fr; }
+  .rd-hbar__meta { grid-column: 2; }
+}
