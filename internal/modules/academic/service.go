@@ -2,6 +2,7 @@ package academic
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -47,6 +48,9 @@ type SectionInput struct {
 	Name              string     `json:"name"`
 	Capacity          int        `json:"capacity"`
 	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id"`
+	// ViceTeacherIDs: vice class teachers (any number), same access as the
+	// class teacher.
+	ViceTeacherIDs []uuid.UUID `json:"vice_teacher_ids"`
 }
 
 // SectionUpdateInput mirrors SectionInput minus the identifiers that never
@@ -56,6 +60,10 @@ type SectionUpdateInput struct {
 	Name              string     `json:"name"`
 	Capacity          int        `json:"capacity"`
 	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id"`
+	// ViceTeacherIDs replaces the vice class teachers when sent; when the
+	// field is left out the current ones are kept, so an older client that
+	// doesn't know about vice teachers can't clear them by saving.
+	ViceTeacherIDs *[]uuid.UUID `json:"vice_teacher_ids"`
 }
 
 func (s *Service) CreateYear(ctx context.Context, in YearInput) (*domain.AcademicYear, error) {
@@ -128,10 +136,46 @@ func (s *Service) CreateSection(ctx context.Context, in SectionInput) (*domain.C
 		SchoolID: in.SchoolID, AcademicYearID: in.AcademicYearID, GradeLevelID: in.GradeLevelID,
 		Name: strings.TrimSpace(in.Name), Capacity: cap, HomeroomTeacherID: in.HomeroomTeacherID,
 	}
+	vice, err := s.cleanViceTeachers(ctx, in.SchoolID, in.HomeroomTeacherID, in.ViceTeacherIDs)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.repo.CreateSection(ctx, c); err != nil {
 		return nil, err
 	}
-	return c, nil
+	if len(vice) > 0 {
+		if err := s.repo.SetSectionViceTeachers(ctx, c.ID, vice); err != nil {
+			return nil, err
+		}
+	}
+	return s.repo.GetSection(ctx, c.ID)
+}
+
+// cleanViceTeachers drops duplicates and the class teacher himself/herself
+// from a vice list, and checks every one is an active teacher at the school.
+func (s *Service) cleanViceTeachers(ctx context.Context, schoolID uuid.UUID, classTeacher *uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
+	seen := map[uuid.UUID]bool{}
+	out := []uuid.UUID{}
+	for _, id := range ids {
+		if id == uuid.Nil || seen[id] || (classTeacher != nil && *classTeacher == id) {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	ok, err := s.repo.TeachersInSchool(ctx, schoolID, out)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range out {
+		if !ok[id] {
+			return nil, fmt.Errorf("%w: every vice class teacher must be an active teacher at this school", apperr.ErrInvalidInput)
+		}
+	}
+	return out, nil
 }
 
 func (s *Service) ListSections(ctx context.Context, schoolID, yearID uuid.UUID) ([]domain.ClassSection, error) {
@@ -152,8 +196,25 @@ func (s *Service) UpdateSection(ctx context.Context, id uuid.UUID, in SectionUpd
 	if cap <= 0 {
 		cap = 30
 	}
+	current, err := s.repo.GetSection(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	viceIn := current.ViceTeacherIDs
+	if in.ViceTeacherIDs != nil {
+		viceIn = *in.ViceTeacherIDs
+	}
+	// Re-cleaned even when unchanged, so a vice teacher who has just been
+	// made the class teacher isn't listed twice.
+	vice, err := s.cleanViceTeachers(ctx, current.SchoolID, in.HomeroomTeacherID, viceIn)
+	if err != nil {
+		return nil, err
+	}
 	c := &domain.ClassSection{ID: id, Name: strings.TrimSpace(in.Name), Capacity: cap, HomeroomTeacherID: in.HomeroomTeacherID}
 	if err := s.repo.UpdateSection(ctx, c); err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetSectionViceTeachers(ctx, id, vice); err != nil {
 		return nil, err
 	}
 	return s.repo.GetSection(ctx, id)

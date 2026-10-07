@@ -142,6 +142,8 @@ function TeacherDetail() {
   if (!user) return <p className="empty-text">User not found</p>
 
   const assignedSections = sections.filter(s => s.homeroom_teacher_id === user.id)
+  // Sections where this teacher is a vice class teacher (managed in Settings > Grades & Sections).
+  const viceSections = sections.filter(s => (s.vice_teacher_ids || []).includes(user.id))
   const gradeMap = Object.fromEntries(grades.map(g => [g.id, g.name]))
   // Sections available to assign: not already this teacher's own.
   const assignableSections = sections.filter(s => s.grade_level_id === assignGradeId && s.homeroom_teacher_id !== user.id)
@@ -257,7 +259,7 @@ function TeacherDetail() {
           </div>
           {!currentYear ? (
             <p className="empty-text">Select an academic year to see assignments</p>
-          ) : assignedSections.length === 0 ? (
+          ) : assignedSections.length === 0 && viceSections.length === 0 ? (
             <div className="td-empty-assign">
               <Users size={32} />
               <p>No class sections assigned as homeroom teacher{canAssignSections ? ' -- use "Assign Section" above to add one' : ''}</p>
@@ -279,6 +281,15 @@ function TeacherDetail() {
                       <X size={14} />
                     </button>
                   )}
+                </div>
+              ))}
+              {viceSections.map(s => (
+                <div key={s.id} className="td-section-card" title="Vice class teacher: change in Settings > Grades & Sections">
+                  <div className="td-section-card__grade">{gradeMap[s.grade_level_id] || 'Grade'}</div>
+                  <div className="td-section-card__info">
+                    <span className="td-section-card__name">Section {s.name}</span>
+                    <span className="td-section-card__cap">Vice class teacher</span>
+                  </div>
                 </div>
               ))}
             </div>

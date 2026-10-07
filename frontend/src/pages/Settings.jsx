@@ -51,7 +51,7 @@ function Settings() {
 
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [editingSectionId, setEditingSectionId] = useState(null)
-  const [sectionForm, setSectionForm] = useState({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
+  const [sectionForm, setSectionForm] = useState({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '', vice_teacher_ids: [] })
 
   const [saving, setSaving] = useState(false)
 
@@ -193,11 +193,14 @@ function Settings() {
     setSaving(true)
     try {
       const homeroomTeacherId = sectionForm.homeroom_teacher_id || null
+      // The class teacher can't also be a vice class teacher.
+      const viceTeacherIds = sectionForm.vice_teacher_ids.filter(id => id !== homeroomTeacherId)
       if (editingSectionId) {
         await academicApi.updateSection(editingSectionId, {
           name: sectionForm.name,
           capacity: parseInt(sectionForm.capacity, 10) || 30,
           homeroom_teacher_id: homeroomTeacherId,
+          vice_teacher_ids: viceTeacherIds,
         })
       } else {
         await academicApi.createSection({
@@ -205,11 +208,12 @@ function Settings() {
           grade_level_id: sectionForm.grade_level_id, name: sectionForm.name,
           capacity: parseInt(sectionForm.capacity, 10) || 30,
           homeroom_teacher_id: homeroomTeacherId,
+          vice_teacher_ids: viceTeacherIds,
         })
       }
       setShowSectionModal(false)
       setEditingSectionId(null)
-      setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
+      setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '', vice_teacher_ids: [] })
       const res = await academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id })
       setSections(res.items || [])
     } catch (err) { alert(err.message) }
@@ -221,6 +225,7 @@ function Settings() {
     setSectionForm({
       grade_level_id: s.grade_level_id, name: s.name,
       capacity: String(s.capacity), homeroom_teacher_id: s.homeroom_teacher_id || '',
+      vice_teacher_ids: s.vice_teacher_ids || [],
     })
     setShowSectionModal(true)
   }
@@ -441,7 +446,7 @@ function Settings() {
                         className="btn btn--primary btn--sm"
                         onClick={() => {
                           setEditingSectionId(null)
-                          setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '' })
+                          setSectionForm({ grade_level_id: '', name: '', capacity: '30', homeroom_teacher_id: '', vice_teacher_ids: [] })
                           setShowSectionModal(true)
                         }}
                       >
@@ -488,6 +493,7 @@ function Settings() {
                               style={{ cursor: 'pointer', border: 'none' }}
                             >
                               {s.name} ({s.capacity}){teacher ? ` · ${teacher.first_name} ${teacher.last_name}` : ' · No class teacher'}
+                              {(s.vice_teacher_ids || []).length > 0 && ` + ${s.vice_teacher_ids.length} vice`}
                             </button>
                           )
                         })}
@@ -691,7 +697,28 @@ function Settings() {
                   {teachers.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
                 </select>
               </label>
-              <p className="settings-list__meta">The class teacher gets edit access to their own class&apos;s results.</p>
+              <div className="form-field">
+                <span>Vice Class Teachers</span>
+                <div className="vice-teacher-list" style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', padding: '6px 10px' }}>
+                  {teachers.filter(t => t.id !== sectionForm.homeroom_teacher_id).map(t => (
+                    <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={sectionForm.vice_teacher_ids.includes(t.id)}
+                        onChange={e => setSectionForm({
+                          ...sectionForm,
+                          vice_teacher_ids: e.target.checked
+                            ? [...sectionForm.vice_teacher_ids, t.id]
+                            : sectionForm.vice_teacher_ids.filter(id => id !== t.id),
+                        })}
+                      />
+                      {t.first_name} {t.last_name}
+                    </label>
+                  ))}
+                  {teachers.length === 0 && <span className="settings-list__meta">No teachers yet</span>}
+                </div>
+              </div>
+              <p className="settings-list__meta">The class teacher and vice class teachers all get edit access to this class&apos;s results.</p>
               <div className="modal__actions">
                 <button type="button" className="btn btn--outline" onClick={() => { setShowSectionModal(false); setEditingSectionId(null) }}>Cancel</button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving...' : (editingSectionId ? 'Save Changes' : 'Add Section')}</button>

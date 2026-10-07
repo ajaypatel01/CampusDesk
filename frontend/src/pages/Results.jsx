@@ -111,7 +111,8 @@ function Results() {
         academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id }),
       ]).then(([gradeRes, sectionRes]) => {
         const allGrades = gradeRes.items || []
-        const ownSections = (sectionRes.items || []).filter(s => s.homeroom_teacher_id === user.id)
+        // Class teacher or a vice class teacher of the section -- same access.
+        const ownSections = (sectionRes.items || []).filter(s => s.homeroom_teacher_id === user.id || (s.vice_teacher_ids || []).includes(user.id))
         const myGrades = new Set(ownSections.map(s => s.grade_level_id))
         // Strictly their own class section(s) only, same as the backend now
         // enforces -- a teacher not yet assigned as any section's class
