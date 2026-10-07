@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
+	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/pagination"
 	"github.com/go-chi/chi/v5"
@@ -19,11 +20,60 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// adminSchool returns the school a school_admin caller is limited to, or nil
+// for a super_admin, who manages every school. The /users routes only admit
+// these two roles (see module.go).
+func adminSchool(r *http.Request) (*uuid.UUID, error) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		return nil, apperr.ErrUnauthorized
+	}
+	if claims.Role == string(domain.RoleSuperAdmin) {
+		return nil, nil
+	}
+	id, err := uuid.Parse(claims.SchoolID)
+	if err != nil {
+		return nil, apperr.ErrForbidden
+	}
+	return &id, nil
+}
+
+// managedUser loads the user {id} if the caller may manage them: a
+// super_admin may manage anyone, a school_admin only their own school's
+// users and never a super_admin. Anyone else's account reads as not found.
+func (h *Handler) managedUser(r *http.Request, id uuid.UUID) (*domain.User, error) {
+	school, err := adminSchool(r)
+	if err != nil {
+		return nil, err
+	}
+	u, err := h.svc.Get(r.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+	if school != nil && (u.Role == domain.RoleSuperAdmin || u.SchoolID == nil || *u.SchoolID != *school) {
+		return nil, apperr.ErrNotFound
+	}
+	return u, nil
+}
+
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var in CreateInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
+	}
+	school, err := adminSchool(r)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	if school != nil {
+		// A school_admin adds users to their own school only, and can't create a super_admin.
+		if in.Role == domain.RoleSuperAdmin {
+			httpx.Error(w, http.StatusForbidden, "only a super admin can create super admin accounts")
+			return
+		}
+		in.SchoolID = school
 	}
 	u, err := h.svc.Create(r.Context(), in)
 	if err != nil {
@@ -39,7 +89,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	u, err := h.svc.Get(r.Context(), id)
+	u, err := h.managedUser(r, id)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -58,6 +108,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
+	if _, err := h.managedUser(r, id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
 	u, err := h.svc.Update(r.Context(), id, in)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -70,6 +124,10 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if _, err := h.managedUser(r, id); err != nil {
+		httpx.WriteServiceError(w, err)
 		return
 	}
 	if err := h.svc.Delete(r.Context(), id); err != nil {
@@ -89,6 +147,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		schoolID = &id
+	}
+	school, err := adminSchool(r)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	if school != nil {
+		schoolID = school // a school_admin only ever lists their own school
 	}
 	status := domain.UserStatus(r.URL.Query().Get("status"))
 	items, total, err := h.svc.List(r.Context(), schoolID, status, p.Limit, p.Offset)
@@ -193,6 +259,10 @@ func (h *Handler) Approve(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
 		return
 	}
+	if _, err := h.managedUser(r, id); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
 	u, err := h.svc.Approve(r.Context(), id)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -206,6 +276,10 @@ func (h *Handler) Reject(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if _, err := h.managedUser(r, id); err != nil {
+		httpx.WriteServiceError(w, err)
 		return
 	}
 	u, err := h.svc.Reject(r.Context(), id)
