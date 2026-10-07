@@ -451,7 +451,7 @@ func (r *Repository) DeleteTotalOverride(ctx context.Context, examID, studentID 
 func (r *Repository) TeacherOwnsGrade(ctx context.Context, teacherID, gradeLevelID uuid.UUID) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE grade_level_id=$1 AND homeroom_teacher_id=$2)`,
+		`SELECT EXISTS(SELECT 1 FROM class_sections cs WHERE cs.grade_level_id=$1 AND (cs.homeroom_teacher_id = $2 OR EXISTS (SELECT 1 FROM class_section_vice_teachers v WHERE v.class_section_id = cs.id AND v.user_id = $2)))`,
 		gradeLevelID, teacherID,
 	).Scan(&exists)
 	return exists, err
@@ -461,7 +461,7 @@ func (r *Repository) TeacherOwnsGrade(ctx context.Context, teacherID, gradeLevel
 func (r *Repository) TeacherOwnsGradeInYear(ctx context.Context, teacherID, academicYearID, gradeLevelID uuid.UUID) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM class_sections WHERE grade_level_id=$1 AND academic_year_id=$2 AND homeroom_teacher_id=$3)`,
+		`SELECT EXISTS(SELECT 1 FROM class_sections cs WHERE cs.grade_level_id=$1 AND cs.academic_year_id=$2 AND (cs.homeroom_teacher_id = $3 OR EXISTS (SELECT 1 FROM class_section_vice_teachers v WHERE v.class_section_id = cs.id AND v.user_id = $3)))`,
 		gradeLevelID, academicYearID, teacherID,
 	).Scan(&exists)
 	return exists, err
@@ -475,7 +475,7 @@ func (r *Repository) TeacherOwnsStudent(ctx context.Context, teacherID, academic
 		`SELECT EXISTS(
 			SELECT 1 FROM enrollments e
 			JOIN class_sections cs ON cs.id = e.class_section_id
-			WHERE e.student_id=$1 AND e.academic_year_id=$2 AND cs.homeroom_teacher_id=$3
+			WHERE e.student_id=$1 AND e.academic_year_id=$2 AND (cs.homeroom_teacher_id = $3 OR EXISTS (SELECT 1 FROM class_section_vice_teachers v WHERE v.class_section_id = cs.id AND v.user_id = $3))
 		)`,
 		studentID, academicYearID, teacherID,
 	).Scan(&exists)

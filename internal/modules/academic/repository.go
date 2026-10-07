@@ -135,7 +135,8 @@ func (r *Repository) CreateSection(ctx context.Context, c *domain.ClassSection) 
 
 func (r *Repository) ListSections(ctx context.Context, schoolID, yearID uuid.UUID) ([]domain.ClassSection, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, school_id, academic_year_id, grade_level_id, name, capacity, homeroom_teacher_id, created_at, updated_at
+		SELECT id, school_id, academic_year_id, grade_level_id, name, capacity, homeroom_teacher_id, created_at, updated_at,
+			COALESCE(ARRAY(SELECT v.user_id::text FROM class_section_vice_teachers v WHERE v.class_section_id = class_sections.id ORDER BY v.created_at), '{}')
 		FROM class_sections WHERE school_id=$1 AND academic_year_id=$2 ORDER BY name`,
 		schoolID, yearID,
 	)
@@ -146,9 +147,11 @@ func (r *Repository) ListSections(ctx context.Context, schoolID, yearID uuid.UUI
 	var items []domain.ClassSection
 	for rows.Next() {
 		var c domain.ClassSection
-		if err := rows.Scan(&c.ID, &c.SchoolID, &c.AcademicYearID, &c.GradeLevelID, &c.Name, &c.Capacity, &c.HomeroomTeacherID, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var vice []string
+		if err := rows.Scan(&c.ID, &c.SchoolID, &c.AcademicYearID, &c.GradeLevelID, &c.Name, &c.Capacity, &c.HomeroomTeacherID, &c.CreatedAt, &c.UpdatedAt, &vice); err != nil {
 			return nil, err
 		}
+		c.ViceTeacherIDs = parseUUIDs(vice)
 		items = append(items, c)
 	}
 	return items, rows.Err()
@@ -169,10 +172,13 @@ func (r *Repository) UpdateSection(ctx context.Context, c *domain.ClassSection) 
 
 func (r *Repository) GetSection(ctx context.Context, id uuid.UUID) (*domain.ClassSection, error) {
 	var c domain.ClassSection
+	var vice []string
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, school_id, academic_year_id, grade_level_id, name, capacity, homeroom_teacher_id, created_at, updated_at
+		SELECT id, school_id, academic_year_id, grade_level_id, name, capacity, homeroom_teacher_id, created_at, updated_at,
+			COALESCE(ARRAY(SELECT v.user_id::text FROM class_section_vice_teachers v WHERE v.class_section_id = class_sections.id ORDER BY v.created_at), '{}')
 		FROM class_sections WHERE id=$1`, id,
-	).Scan(&c.ID, &c.SchoolID, &c.AcademicYearID, &c.GradeLevelID, &c.Name, &c.Capacity, &c.HomeroomTeacherID, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.SchoolID, &c.AcademicYearID, &c.GradeLevelID, &c.Name, &c.Capacity, &c.HomeroomTeacherID, &c.CreatedAt, &c.UpdatedAt, &vice)
+	c.ViceTeacherIDs = parseUUIDs(vice)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -180,4 +186,55 @@ func (r *Repository) GetSection(ctx context.Context, id uuid.UUID) (*domain.Clas
 		return nil, fmt.Errorf("get section: %w", err)
 	}
 	return &c, nil
+}
+
+func parseUUIDs(ss []string) []uuid.UUID {
+	out := make([]uuid.UUID, 0, len(ss))
+	for _, s := range ss {
+		if id, err := uuid.Parse(s); err == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// SetSectionViceTeachers replaces a section's vice class teachers.
+func (r *Repository) SetSectionViceTeachers(ctx context.Context, sectionID uuid.UUID, userIDs []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `DELETE FROM class_section_vice_teachers WHERE class_section_id=$1`, sectionID); err != nil {
+		return err
+	}
+	for _, id := range userIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO class_section_vice_teachers (class_section_id, user_id) VALUES ($1,$2)`, sectionID, id); err != nil {
+			return database.MapError(err)
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// TeachersInSchool returns which of userIDs are active teachers at schoolID.
+func (r *Repository) TeachersInSchool(ctx context.Context, schoolID uuid.UUID, userIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	ids := make([]string, len(userIDs))
+	for i, id := range userIDs {
+		ids[i] = id.String()
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT id FROM users WHERE id = ANY($1::uuid[]) AND school_id = $2 AND role = 'teacher' AND is_active`, ids, schoolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ok := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ok[id] = true
+	}
+	return ok, rows.Err()
 }

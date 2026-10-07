@@ -36,5 +36,8 @@ type ClassSection struct {
 	Name              string     `json:"name"`
 	Capacity          int        `json:"capacity"`
 	HomeroomTeacherID *uuid.UUID `json:"homeroom_teacher_id,omitempty"`
+	// ViceTeacherIDs are the section's vice class teachers: same access to
+	// its students as the class teacher.
+	ViceTeacherIDs []uuid.UUID `json:"vice_teacher_ids"`
 	Timestamps
 }
