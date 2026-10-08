@@ -416,3 +416,7 @@ export const permissionsApi = {
   getMatrix: (userId) => request(`/permissions/users/${userId}`),
   setMatrix: (userId, overrides) => request(`/permissions/users/${userId}`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
 }
+
+export const auditApi = {
+  list: (params = {}) => request(`/audit-log${qs(params)}`),
+}

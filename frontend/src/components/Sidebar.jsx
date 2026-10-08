@@ -23,6 +23,7 @@ import {
   Wallet,
   PieChart,
   ClipboardCheck,
+  History,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -53,6 +54,7 @@ const navItems = [
   { to: '/id-cards', icon: CreditCard, label: 'ID Cards', deny: ['registrar', 'parent', 'teacher'] },
   { to: '/payroll', icon: Wallet, label: 'Payroll', only: ['super_admin'] },
   { to: '/my-salary', icon: Wallet, label: 'My Salary', only: ['teacher'] },
+  { to: '/activity', icon: History, label: 'Activity Log', only: ['super_admin', 'school_admin'] },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
