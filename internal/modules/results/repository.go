@@ -551,3 +551,52 @@ func (r *Repository) UpsertGradeMark(ctx context.Context, m *domain.ExamMark) er
 	}
 	return tx.Commit(ctx)
 }
+
+// SavedMark is one subject's mark as stored, for pre-filling the marks entry
+// form: per-field values are in Components (field key -> marks obtained).
+type SavedMark struct {
+	SubjectID     uuid.UUID          `json:"subject_id"`
+	MarksObtained float64            `json:"marks_obtained"`
+	MaxMarks      int                `json:"max_marks"`
+	IsAbsent      bool               `json:"is_absent"`
+	GradeLetter   string             `json:"grade_letter,omitempty"`
+	Components    map[string]float64 `json:"components,omitempty"`
+}
+
+// StudentExamMarks returns every mark saved for one student in one exam.
+func (r *Repository) StudentExamMarks(ctx context.Context, examID, studentID uuid.UUID) ([]SavedMark, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT em.subject_id, COALESCE(em.marks_obtained, 0), COALESCE(em.max_marks, 0), em.is_absent,
+			COALESCE(em.grade_letter, ''), emc.component_key, emc.obtained
+		FROM exam_marks em
+		LEFT JOIN exam_mark_components emc ON emc.exam_mark_id = em.id
+		WHERE em.exam_id = $1 AND em.student_id = $2
+		ORDER BY em.subject_id`, examID, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SavedMark{}
+	index := map[uuid.UUID]int{}
+	for rows.Next() {
+		var m SavedMark
+		var key *string
+		var obtained *float64
+		if err := rows.Scan(&m.SubjectID, &m.MarksObtained, &m.MaxMarks, &m.IsAbsent, &m.GradeLetter, &key, &obtained); err != nil {
+			return nil, err
+		}
+		i, seen := index[m.SubjectID]
+		if !seen {
+			i = len(items)
+			index[m.SubjectID] = i
+			items = append(items, m)
+		}
+		if key != nil && obtained != nil {
+			if items[i].Components == nil {
+				items[i].Components = map[string]float64{}
+			}
+			items[i].Components[*key] = *obtained
+		}
+	}
+	return items, rows.Err()
+}

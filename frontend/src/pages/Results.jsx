@@ -63,7 +63,11 @@ function Results() {
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [students, setStudents] = useState([])
   const [markSubjects, setMarkSubjects] = useState([])
-  const [marks, setMarks] = useState({}) // subjectId → { marks_obtained, is_absent }
+  const [marks, setMarks] = useState({}) // subjectId → { marks_obtained, is_absent, grade_letter, components }
+  // Subjects changed since the saved marks were loaded -- only these are saved,
+  // so saving one subject can never overwrite the others.
+  const [touched, setTouched] = useState(() => new Set())
+  const [marksLoading, setMarksLoading] = useState(false)
   const [markSaving, setMarkSaving] = useState(false)
   const [markMsg, setMarkMsg] = useState('')
   // The selected exam's fields per subject (its own format, or the subject's fields).
@@ -346,13 +350,44 @@ function Results() {
     setAddingComponentFor(null); setEditingField(null); setFormatExamId(null); setEditingExam(null)
   }
 
-  // Start blank whenever the exam or student changes, so one student's
-  // numbers can never be saved against the next.
+  // Clear the form whenever the exam or student changes, so one student's
+  // numbers can never be saved against the next; the effect below then
+  // fills in what is already saved for the new pair.
   function pickMarksExam(id) {
-    setSelectedExamId(id); setMarks({}); setMarkMsg('')
+    setSelectedExamId(id); setMarks({}); setTouched(new Set()); setMarkMsg('')
   }
   function pickMarksStudent(id) {
-    setSelectedStudentId(id); setMarks({}); setMarkMsg('')
+    setSelectedStudentId(id); setMarks({}); setTouched(new Set()); setMarkMsg('')
+  }
+
+  useEffect(() => {
+    if (!selectedExamId || !selectedStudentId) return
+    let cancelled = false
+    setMarksLoading(true)
+    resultsApi.studentExamMarks(selectedExamId, selectedStudentId)
+      .then(res => {
+        if (cancelled) return
+        const loaded = {}
+        for (const m of res.items || []) {
+          loaded[m.subject_id] = {
+            is_absent: m.is_absent,
+            grade_letter: m.grade_letter || '',
+            marks_obtained: m.is_absent || m.grade_letter ? '' : String(m.marks_obtained),
+            components: Object.fromEntries(Object.entries(m.components || {}).map(([k, v]) => [k, String(v)])),
+          }
+        }
+        setMarks(loaded)
+        setTouched(new Set())
+      })
+      .catch(err => { if (!cancelled) setMarkMsg('Error: could not load saved marks (' + err.message + '). Reload before saving.') })
+      .finally(() => { if (!cancelled) setMarksLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedExamId, selectedStudentId])
+
+  // Changes one subject's entry and remembers that it changed.
+  function editMark(subjectId, change) {
+    setMarks(prev => ({ ...prev, [subjectId]: change(prev[subjectId] || {}) }))
+    setTouched(prev => new Set(prev).add(subjectId))
   }
 
   function loadExamFormats(examId) {
@@ -374,9 +409,11 @@ function Results() {
     if (!selectedExamId || !selectedStudentId) return
     setMarkSaving(true); setMarkMsg('')
     try {
-      // A grading-only subject with no grade picked is left out, so it is
-      // never saved as 0 marks.
+      // Only subjects changed in this form are saved; the rest keep what is
+      // already stored. A grading-only subject with no grade picked is left
+      // out, so it is never saved as 0 marks.
       const marksArr = markSubjects.filter(sub => {
+        if (!touched.has(sub.id)) return false
         const entry = marks[sub.id] || {}
         return !sub.is_co_scholastic || entry.is_absent || entry.grade_letter
       }).map(sub => {
@@ -400,8 +437,14 @@ function Results() {
         }
         return { ...base, marks_obtained: parseFloat(entry.marks_obtained || 0) }
       })
+      if (marksArr.length === 0) {
+        setMarkMsg('Nothing changed -- no marks to save.')
+        setMarkSaving(false)
+        return
+      }
       await resultsApi.bulkUpsertMarks(marksArr)
-      setMarkMsg('Marks saved successfully.')
+      setTouched(new Set())
+      setMarkMsg(`Saved ${marksArr.length} subject${marksArr.length === 1 ? '' : 's'}.`)
     } catch (err) { setMarkMsg('Error: ' + err.message) }
     setMarkSaving(false)
   }
@@ -799,7 +842,10 @@ function Results() {
                 : 'add one under the Exams tab above first.'}
             </p>
           )}
-          {selectedExamId && selectedStudentId && markSubjects.length > 0 && (
+          {selectedExamId && selectedStudentId && markSubjects.length > 0 && marksLoading && (
+            <p className="loading-text">Loading saved marks...</p>
+          )}
+          {selectedExamId && selectedStudentId && markSubjects.length > 0 && !marksLoading && (
             <form onSubmit={handleSaveMarks}>
               <div className="mark-subject-cards">
                 {markSubjects.map(sub => {
@@ -814,7 +860,7 @@ function Results() {
                           <input
                             type="checkbox"
                             checked={isAbsent}
-                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], is_absent: e.target.checked } }))}
+                            onChange={e => editMark(sub.id, entry => ({ ...entry, is_absent: e.target.checked }))}
                           />
                           Absent
                         </label>
@@ -827,7 +873,7 @@ function Results() {
                             className="marks-input"
                             disabled={isAbsent}
                             value={marks[sub.id]?.grade_letter || ''}
-                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], grade_letter: e.target.value } }))}
+                            onChange={e => editMark(sub.id, entry => ({ ...entry, grade_letter: e.target.value }))}
                           >
                             <option value="">Select grade...</option>
                             {GRADE_LETTERS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -843,10 +889,7 @@ function Results() {
                                 className="marks-input"
                                 disabled={isAbsent}
                                 value={marks[sub.id]?.components?.[c.key] || ''}
-                                onChange={e => setMarks(prev => ({
-                                  ...prev,
-                                  [sub.id]: { ...prev[sub.id], components: { ...prev[sub.id]?.components, [c.key]: e.target.value } },
-                                }))}
+                                onChange={e => editMark(sub.id, entry => ({ ...entry, components: { ...entry.components, [c.key]: e.target.value } }))}
                               />
                             </label>
                           ))}
@@ -860,7 +903,7 @@ function Results() {
                             disabled={isAbsent}
                             value={marks[sub.id]?.marks_obtained || ''}
                             placeholder={`out of ${sub.max_marks}`}
-                            onChange={e => setMarks(prev => ({ ...prev, [sub.id]: { ...prev[sub.id], marks_obtained: e.target.value } }))}
+                            onChange={e => editMark(sub.id, entry => ({ ...entry, marks_obtained: e.target.value }))}
                           />
                         </label>
                       )}
@@ -885,8 +928,8 @@ function Results() {
                 })}
               </div>
               {markMsg && <p className={`doc-msg ${markMsg.startsWith('Error') ? 'doc-msg--error' : 'doc-msg--ok'}`} style={{ marginTop: '12px' }}>{markMsg}</p>}
-              <button type="submit" className="btn btn--primary" style={{ marginTop: '12px' }} disabled={markSaving}>
-                {markSaving ? 'Saving...' : 'Save Marks'}
+              <button type="submit" className="btn btn--primary" style={{ marginTop: '12px' }} disabled={markSaving || touched.size === 0}>
+                {markSaving ? 'Saving...' : touched.size > 0 ? `Save Marks (${touched.size} changed)` : 'Save Marks'}
               </button>
             </form>
           )}

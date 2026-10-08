@@ -257,6 +257,7 @@ export const resultsApi = {
   resetExamSubjectFormat: (examId, subjectId) => request(`/exams/${examId}/mark-formats/${subjectId}`, { method: 'DELETE' }),
 
   upsertMark: (body) => request('/exam-marks', { method: 'POST', body: JSON.stringify(body) }),
+  studentExamMarks: (examId, studentId) => request(`/exam-marks${qs({ exam_id: examId, student_id: studentId })}`),
   bulkUpsertMarks: (marks) => request('/exam-marks/bulk', { method: 'POST', body: JSON.stringify({ marks }) }),
 
   // Whole-class marks for one exam (admins and the owner only).
