@@ -48,6 +48,9 @@ function Results() {
   const [subjects, setSubjects] = useState([])
   const [showSubjectForm, setShowSubjectForm] = useState(false)
   const [subjectForm, setSubjectForm] = useState({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0, is_co_scholastic: false })
+  // The subject being edited: its id and a copy of its fields.
+  const [editingSubject, setEditingSubject] = useState(null)
+  const [subjectSaving, setSubjectSaving] = useState(false)
 
   // Exams
   const [exams, setExams] = useState([])
@@ -175,6 +178,25 @@ function Results() {
       setSubjectForm({ name: '', code: '', max_marks: 100, passing_marks: 33, sort_order: 0, is_co_scholastic: false })
       reloadSubjects()
     } catch (err) { alert(err.message) }
+  }
+
+  async function handleSaveSubject(e) {
+    e.preventDefault()
+    const sub = editingSubject
+    setSubjectSaving(true)
+    try {
+      await resultsApi.updateSubject(sub.id, {
+        name: sub.name.trim(), code: sub.code || '',
+        max_marks: parseInt(sub.max_marks, 10) || 0, passing_marks: parseInt(sub.passing_marks, 10) || 0,
+        sort_order: parseInt(sub.sort_order, 10) || 0, is_co_scholastic: !!sub.is_co_scholastic,
+      })
+      setEditingSubject(null)
+      reloadSubjects()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSubjectSaving(false)
+    }
   }
 
   async function handleDeleteSubject(id) {
@@ -650,12 +672,55 @@ function Results() {
                         <span>Max <strong>{s.max_marks}</strong></span>
                         <span>Pass <strong>{s.passing_marks}</strong></span>
                         {!isTeacher && (
+                          <button
+                            className="btn btn--outline btn--sm" title="Edit subject" aria-label={`Edit ${s.name}`}
+                            onClick={() => setEditingSubject({ id: s.id, name: s.name, code: s.code || '', max_marks: String(s.max_marks), passing_marks: String(s.passing_marks), sort_order: String(s.sort_order || 0), is_co_scholastic: !!s.is_co_scholastic })}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {!isTeacher && (
                           <button className="btn btn--outline btn--sm" onClick={() => handleDeleteSubject(s.id)} title="Delete subject">
                             <Trash2 size={14} />
                           </button>
                         )}
                       </div>
                     </div>
+
+                    {editingSubject?.id === s.id && (
+                      <form className="subject-form" onSubmit={handleSaveSubject} style={{ marginBottom: '12px' }}>
+                        <div className="form-row">
+                          <label className="form-field"><span>Name *</span><input required value={editingSubject.name} onChange={e => setEditingSubject({ ...editingSubject, name: e.target.value })} /></label>
+                          <label className="form-field"><span>Code</span><input value={editingSubject.code} onChange={e => setEditingSubject({ ...editingSubject, code: e.target.value })} /></label>
+                        </div>
+                        <div className="form-row">
+                          <label className="form-field"><span>Total (max) marks *</span><input type="number" min="1" required={!editingSubject.is_co_scholastic} disabled={editingSubject.is_co_scholastic} value={editingSubject.max_marks} onChange={e => setEditingSubject({ ...editingSubject, max_marks: e.target.value })} /></label>
+                          <label className="form-field"><span>Passing marks</span><input type="number" min="0" max={editingSubject.max_marks || undefined} disabled={editingSubject.is_co_scholastic} value={editingSubject.passing_marks} onChange={e => setEditingSubject({ ...editingSubject, passing_marks: e.target.value })} /></label>
+                          <label className="form-field"><span>Sort order</span><input type="number" min="0" value={editingSubject.sort_order} onChange={e => setEditingSubject({ ...editingSubject, sort_order: e.target.value })} /></label>
+                        </div>
+                        <label className="form-field--checkbox">
+                          <input type="checkbox" checked={editingSubject.is_co_scholastic} onChange={e => setEditingSubject({ ...editingSubject, is_co_scholastic: e.target.checked })} />
+                          <span>Grading only (A–D instead of marks)</span>
+                        </label>
+                        {!editingSubject.is_co_scholastic && String(editingSubject.max_marks) !== String(s.max_marks) && (
+                          <p className="doc-msg" style={{ marginTop: '6px' }}>
+                            Marks already entered for {s.name} in exams that aren&apos;t published will be counted out of {editingSubject.max_marks || '?'} instead of {s.max_marks}. Published exams don&apos;t change.
+                            {components.length > 0 && ' This subject has its own fields, so its total comes from the fields.'}
+                          </p>
+                        )}
+                        {editingSubject.is_co_scholastic !== !!s.is_co_scholastic && (
+                          <p className="doc-msg doc-msg--error" style={{ marginTop: '6px' }}>
+                            {editingSubject.is_co_scholastic
+                              ? 'Marks already entered for this subject will no longer count -- teachers will pick a grade (A–D) instead.'
+                              : 'Grades already picked for this subject will no longer show -- teachers will enter marks instead.'}
+                          </p>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button type="submit" className="btn btn--primary btn--sm" disabled={subjectSaving}>{subjectSaving ? 'Saving...' : 'Save'}</button>
+                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setEditingSubject(null)}>Cancel</button>
+                        </div>
+                      </form>
+                    )}
 
                     <div className="subject-card__fields">
                       <div className="subject-card__fields-label">Custom Fields</div>
