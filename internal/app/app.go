@@ -40,6 +40,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -93,7 +94,18 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	api := chi.NewRouter()
 	api.Use(middleware.StripSlashes)
 
-	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, user.OTPSender{Client: waClient, Template: cfg.WhatsApp.OTPTemplate, Language: cfg.WhatsApp.OTPLanguage}, cfg.FrontendURL)
+	otpSenders := map[uuid.UUID]string{}
+	for school, numberID := range cfg.WhatsApp.OTPSchoolSenders {
+		id, err := uuid.Parse(school)
+		if err != nil {
+			log.Printf("warn: WHATSAPP_OTP_SENDERS: %q is not a school id, skipped", school)
+			continue
+		}
+		otpSenders[id] = numberID
+	}
+	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, user.OTPSender{
+		Client: waClient, Template: cfg.WhatsApp.OTPTemplate, Language: cfg.WhatsApp.OTPLanguage, SchoolSenders: otpSenders,
+	}, cfg.FrontendURL)
 	schoolMod := school.New(pool)
 	permsMod := permissions.New(pool)
 

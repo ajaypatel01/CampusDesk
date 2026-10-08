@@ -14,6 +14,7 @@ import (
 
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
+	"github.com/google/uuid"
 )
 
 // OTPSender delivers one-time codes over WhatsApp using an approved
@@ -22,9 +23,29 @@ type OTPSender struct {
 	Client   *whatsapp.Client
 	Template string
 	Language string
+	// SchoolSenders maps a school to the Phone number ID its codes are sent
+	// from, so parents and staff see their own school's number. Other
+	// schools use Client's default number.
+	SchoolSenders map[uuid.UUID]string
 }
 
-func (o OTPSender) enabled() bool { return o.Client.Enabled() && o.Template != "" }
+func (o OTPSender) enabled() bool {
+	return o.Client.HasToken() && o.Template != "" && (o.Client.Enabled() || len(o.SchoolSenders) > 0)
+}
+
+// clientFor returns the client that sends for schoolID, or nil if that
+// school has no number and there's no default.
+func (o OTPSender) clientFor(schoolID *uuid.UUID) *whatsapp.Client {
+	if schoolID != nil {
+		if id, ok := o.SchoolSenders[*schoolID]; ok {
+			return o.Client.From(id)
+		}
+	}
+	if o.Client.Enabled() {
+		return o.Client
+	}
+	return nil
+}
 
 const (
 	otpLength      = 6
@@ -132,9 +153,11 @@ func (s *Service) otpHash(phone, purpose, code string) string {
 }
 
 // sendOTP creates a new code for phone (10 digits) and sends it on
-// WhatsApp. Any earlier unused code for the same purpose stops working.
-func (s *Service) sendOTP(ctx context.Context, phone, purpose string) error {
-	if !s.otp.enabled() {
+// WhatsApp from schoolID's number. Any earlier unused code for the same
+// purpose stops working.
+func (s *Service) sendOTP(ctx context.Context, phone, purpose string, schoolID *uuid.UUID) error {
+	client := s.otp.clientFor(schoolID)
+	if !s.otp.enabled() || client == nil {
 		return errOTPNotConfigured
 	}
 	now := time.Now()
@@ -153,7 +176,7 @@ func (s *Service) sendOTP(ctx context.Context, phone, purpose string) error {
 	if err := s.repo.CreateOTP(ctx, phone, purpose, s.otpHash(phone, purpose, code), now.Add(otpTTL)); err != nil {
 		return err
 	}
-	if err := s.otp.Client.SendAuthCode("91"+phone, s.otp.Template, s.otp.Language, code); err != nil {
+	if err := client.SendAuthCode("91"+phone, s.otp.Template, s.otp.Language, code); err != nil {
 		return fmt.Errorf("send whatsapp otp: %w", err)
 	}
 	return nil

@@ -32,6 +32,20 @@ func New(phoneNumberID, accessToken, apiVersion string) *Client {
 	}
 }
 
+// From returns a copy of the client that sends from another number of the
+// same WhatsApp Business account (same access token).
+func (c *Client) From(phoneNumberID string) *Client {
+	cp := *c
+	cp.phoneNumberID = phoneNumberID
+	return &cp
+}
+
+// HasToken reports whether an access token is set, whether or not a
+// default sending number is.
+func (c *Client) HasToken() bool {
+	return c != nil && c.accessToken != ""
+}
+
 func (c *Client) Enabled() bool {
 	return c != nil && c.phoneNumberID != "" && c.accessToken != ""
 }
