@@ -59,17 +59,52 @@ func (r *Repository) ListSubjects(ctx context.Context, schoolID, gradeLevelID uu
 	return items, rows.Err()
 }
 
+// UpdateSubject saves a subject. When its max marks change, marks already
+// entered as one number in exams that are not published yet move to the new
+// maximum, so totals and percentages stay right -- unless some saved mark is
+// above the new maximum, which is refused. Published exams keep theirs.
 func (r *Repository) UpdateSubject(ctx context.Context, s *domain.Subject) error {
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE subjects SET name=$2, code=$3, max_marks=$4, passing_marks=$5, sort_order=$6, is_co_scholastic=$7, updated_at=NOW()
-		WHERE id=$1`, s.ID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	defer tx.Rollback(ctx)
+
+	var oldMax int
+	err = tx.QueryRow(ctx, `SELECT max_marks FROM subjects WHERE id=$1 FOR UPDATE`, s.ID).Scan(&oldMax)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.ErrNotFound
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE subjects SET name=$2, code=$3, max_marks=$4, passing_marks=$5, sort_order=$6, is_co_scholastic=$7, updated_at=NOW()
+		WHERE id=$1`, s.ID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic); err != nil {
+		return err
+	}
+
+	if s.MaxMarks != oldMax && !s.IsCoScholastic {
+		// Single-number marks of this subject in unpublished exams.
+		const affected = `
+			FROM exam_marks em JOIN exams e ON e.id = em.exam_id
+			WHERE em.subject_id = $1 AND NOT e.is_published AND em.grade_letter IS NULL
+			  AND NOT EXISTS (SELECT 1 FROM exam_mark_components emc WHERE emc.exam_mark_id = em.id)`
+		var above int
+		if err := tx.QueryRow(ctx, `SELECT COUNT(*) `+affected+` AND em.marks_obtained > $2`, s.ID, s.MaxMarks).Scan(&above); err != nil {
+			return err
+		}
+		if above > 0 {
+			return fmt.Errorf("%w: %d saved mark(s) for %s are above %d -- correct them first, or choose a higher maximum",
+				apperr.ErrInvalidInput, above, s.Name, s.MaxMarks)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE exam_marks SET max_marks = $2, updated_at = NOW()
+			WHERE id IN (SELECT em.id `+affected+`)`, s.ID, s.MaxMarks); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) DeleteSubject(ctx context.Context, id uuid.UUID) error {

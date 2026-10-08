@@ -188,6 +188,21 @@ func (m *Module) UpdateSubject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.ID = id
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" {
+		httpx.Error(w, http.StatusBadRequest, "subject name is required")
+		return
+	}
+	if !in.IsCoScholastic {
+		if in.MaxMarks <= 0 {
+			httpx.Error(w, http.StatusBadRequest, "max marks must be more than 0")
+			return
+		}
+		if in.PassingMarks < 0 || in.PassingMarks > in.MaxMarks {
+			httpx.Error(w, http.StatusBadRequest, "passing marks must be between 0 and the max marks")
+			return
+		}
+	}
 	if err := m.repo.UpdateSubject(r.Context(), &in); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
