@@ -16,19 +16,9 @@ type Config struct {
 	Email    EmailConfig
 	Storage  StorageConfig
 	WhatsApp WhatsAppConfig
-	SMSOTP   SMSOTPConfig
 	// FrontendURL is the base URL of the deployed web app, used to build
 	// links that get emailed out (e.g. a password reset link).
 	FrontendURL string
-}
-
-// SMSOTPConfig configures MSG91 OTP delivery (see internal/platform/smsotp).
-// Until AuthKey/TemplateID are set, that client's Enabled() is false and
-// every OTP endpoint returns a clear "not configured" error.
-type SMSOTPConfig struct {
-	AuthKey    string
-	SenderID   string
-	TemplateID string
 }
 
 type StorageConfig struct {
@@ -40,10 +30,18 @@ type StorageConfig struct {
 	UseSSL          bool
 }
 
+// WhatsAppConfig configures the WhatsApp Cloud API. Until PhoneNumberID
+// and AccessToken are set, WhatsApp sending (including OTP login) is off.
 type WhatsAppConfig struct {
 	PhoneNumberID string
 	AccessToken   string
 	APIVersion    string
+	// BaseURL is only overridden for local testing against a fake API.
+	BaseURL string
+	// OTPTemplate is an approved Authentication-category template with a
+	// copy-code button; OTPLanguage is its language code.
+	OTPTemplate string
+	OTPLanguage string
 }
 
 type EmailConfig struct {
@@ -116,11 +114,9 @@ func Load() (*Config, error) {
 			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
 			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
-		},
-		SMSOTP: SMSOTPConfig{
-			AuthKey:    os.Getenv("MSG91_AUTH_KEY"),
-			SenderID:   os.Getenv("MSG91_SENDER_ID"),
-			TemplateID: os.Getenv("MSG91_OTP_TEMPLATE_ID"),
+			BaseURL:       getEnv("WHATSAPP_API_BASE_URL", "https://graph.facebook.com"),
+			OTPTemplate:   getEnv("WHATSAPP_OTP_TEMPLATE", "campusdesk_otp"),
+			OTPLanguage:   getEnv("WHATSAPP_OTP_LANGUAGE", "en"),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
 	}, nil

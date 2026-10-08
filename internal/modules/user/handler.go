@@ -367,13 +367,14 @@ func (h *Handler) ConfirmPhoneVerification(w http.ResponseWriter, r *http.Reques
 // whether a number is registered the way the email reset flow does).
 func (h *Handler) RequestOTPLogin(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Phone string `json:"phone"`
+		Phone    string `json:"phone"`
+		Audience string `json:"audience"` // "staff", "parent" or "" (see Service.findOTPLogin)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
-	if err := h.svc.RequestOTPLogin(r.Context(), in.Phone); err != nil {
+	if err := h.svc.RequestOTPLogin(r.Context(), in.Phone, in.Audience); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
@@ -382,14 +383,15 @@ func (h *Handler) RequestOTPLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Phone string `json:"phone"`
-		OTP   string `json:"otp"`
+		Phone    string `json:"phone"`
+		OTP      string `json:"otp"`
+		Audience string `json:"audience"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
-	resp, err := h.svc.VerifyOTPLogin(r.Context(), in.Phone, in.OTP)
+	resp, err := h.svc.VerifyOTPLogin(r.Context(), in.Phone, in.OTP, in.Audience)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return

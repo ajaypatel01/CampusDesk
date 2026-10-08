@@ -5,7 +5,6 @@ import (
 
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
-	"github.com/ajaypatel01/CampusDesk/internal/platform/smsotp"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -16,9 +15,9 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool, jwtSecret string, emailClient *email.Client, smsClient *smsotp.Client, frontendURL string) *Module {
+func New(pool *pgxpool.Pool, jwtSecret string, emailClient *email.Client, otp OTPSender, frontendURL string) *Module {
 	repo := NewRepository(pool)
-	svc := NewService(repo, jwtSecret, emailClient, smsClient, frontendURL)
+	svc := NewService(repo, jwtSecret, emailClient, otp, frontendURL)
 	return &Module{repo: repo, handler: NewHandler(svc)}
 }
 
@@ -65,9 +64,8 @@ func (m *Module) MountPublic(r chi.Router) {
 	r.Post("/auth/register", m.handler.Register)
 	r.Post("/auth/password-reset/request", m.handler.RequestPasswordReset)
 	r.Post("/auth/password-reset/confirm", m.handler.ConfirmPasswordReset)
-	// OTP login and phone-based password reset -- both return a clear
-	// "not configured" error until MSG91_AUTH_KEY/MSG91_OTP_TEMPLATE_ID are
-	// set (see internal/platform/smsotp).
+	// WhatsApp OTP login and phone-based password reset -- both return a
+	// clear "not configured" error until WhatsApp is set up (see otp.go).
 	r.Post("/auth/otp/send", m.handler.RequestOTPLogin)
 	r.Post("/auth/otp/verify", m.handler.VerifyOTPLogin)
 	r.Post("/auth/password-reset/otp-request", m.handler.RequestPasswordResetOTP)

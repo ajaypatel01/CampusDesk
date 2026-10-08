@@ -123,7 +123,7 @@ function Login({ onLogin }) {
         ) : (
           <form className="login-form" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
             <label className="login-field">
-              <span>Phone Number</span>
+              <span>WhatsApp Number</span>
               <input
                 type="tel"
                 required
@@ -131,7 +131,7 @@ function Login({ onLogin }) {
                 disabled={otpSent}
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                placeholder="+91 99999 99999"
+                placeholder="98765 43210"
               />
             </label>
             {otpSent && (
@@ -164,7 +164,7 @@ function Login({ onLogin }) {
         <p className="login-switch" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           {mode === 'password' ? (
             <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('otp')}>
-              <Smartphone size={14} /> Login with OTP instead
+              <Smartphone size={14} /> Login with WhatsApp OTP instead
             </button>
           ) : (
             <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('password')}>
