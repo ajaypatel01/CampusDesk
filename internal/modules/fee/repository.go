@@ -264,7 +264,7 @@ func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, li
 			(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee)
 				- COALESCE(SUM(fp.amount) FILTER (WHERE fp.voided = FALSE), 0) AS balance_remaining
 		%s %s
-		GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name
+		GROUP BY sfa.id, s.first_name, s.last_name, s.student_code, gl.name, gl.sort_order
 		%s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d`, countBase, where, having, buildFeeAccountOrder(f.SortBy, f.SortOrder), argN, argN+1)
