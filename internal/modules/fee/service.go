@@ -472,6 +472,31 @@ func todayIST() time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+// parsePaymentDate reads a payment date (YYYY-MM-DD, or a timestamp) as a
+// calendar day and refuses one in the future.
+func parsePaymentDate(raw string) (time.Time, error) {
+	var payDate time.Time
+	for _, layout := range []string{"2006-01-02", time.RFC3339, "02/01/2006", "2006-01-02T15:04:05Z"} {
+		if t, err := time.Parse(layout, raw); err == nil {
+			payDate = t
+			break
+		}
+	}
+	if payDate.IsZero() {
+		return time.Time{}, fmt.Errorf("%w: payment date must be a date like 2026-09-25", apperr.ErrInvalidInput)
+	}
+	// payment_date is a DATE column: keep just the calendar day, so a sent
+	// timestamp's time of day can't push it past "today".
+	y, m, d := payDate.Date()
+	payDate = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	// A payment can't be from the future. A day/month mix-up (e.g. 09/12
+	// read as 9 Dec instead of 12 Sep) otherwise lands silently in the ledger.
+	if payDate.After(todayIST()) {
+		return time.Time{}, fmt.Errorf("%w: payment date %s is in the future -- check the day and month", apperr.ErrInvalidInput, payDate.Format("02 Jan 2006"))
+	}
+	return payDate, nil
+}
+
 func (s *Service) RecordPayment(ctx context.Context, in RecordPaymentInput) (*domain.FeePayment, error) {
 	if in.StudentFeeAccountID == uuid.Nil || in.Amount <= 0 {
 		return nil, apperr.ErrInvalidInput
@@ -487,30 +512,13 @@ func (s *Service) RecordPayment(ctx context.Context, in RecordPaymentInput) (*do
 	if _, err := s.repo.GetFeeAccountByID(ctx, in.StudentFeeAccountID); err != nil {
 		return nil, err
 	}
-	var payDate time.Time
+	payDate := todayIST()
 	if in.PaymentDate != "" {
-		for _, layout := range []string{"2006-01-02", time.RFC3339, "02/01/2006", "2006-01-02T15:04:05Z"} {
-			if t, err := time.Parse(layout, in.PaymentDate); err == nil {
-				payDate = t
-				break
-			}
+		d, err := parsePaymentDate(in.PaymentDate)
+		if err != nil {
+			return nil, err
 		}
-		if payDate.IsZero() {
-			return nil, apperr.ErrInvalidInput
-		}
-	} else {
-		payDate = todayIST()
-	}
-	// payment_date is a DATE column: keep just the calendar day, so a sent
-	// timestamp's time of day can't push it past "today".
-	{
-		y, m, d := payDate.Date()
-		payDate = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-	}
-	// A payment can't be from the future. A day/month mix-up (e.g. 09/12
-	// read as 9 Dec instead of 12 Sep) otherwise lands silently in the ledger.
-	if payDate.After(todayIST()) {
-		return nil, fmt.Errorf("%w: payment date %s is in the future -- check the day and month", apperr.ErrInvalidInput, payDate.Format("02 Jan 2006"))
+		payDate = d
 	}
 	p := &domain.FeePayment{
 		StudentFeeAccountID: in.StudentFeeAccountID,
@@ -567,6 +575,36 @@ func (s *Service) MovePayment(ctx context.Context, paymentID, targetAcademicYear
 		return nil, err
 	}
 	if err := s.repo.MovePayment(ctx, paymentID, targetAccount.ID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetPaymentByID(ctx, paymentID)
+}
+
+// EditPaymentDate corrects the date of a payment that is not voided.
+// schoolID, when set, is the school the caller is limited to: a payment in
+// another school reads as not found.
+func (s *Service) EditPaymentDate(ctx context.Context, paymentID uuid.UUID, schoolID *uuid.UUID, rawDate string) (*domain.FeePayment, error) {
+	payDate, err := parsePaymentDate(rawDate)
+	if err != nil {
+		return nil, err
+	}
+	payment, err := s.repo.GetPaymentByID(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if schoolID != nil {
+		account, err := s.repo.GetFeeAccountByID(ctx, payment.StudentFeeAccountID)
+		if err != nil {
+			return nil, err
+		}
+		if account.SchoolID != *schoolID {
+			return nil, apperr.ErrNotFound
+		}
+	}
+	if payment.Voided {
+		return nil, fmt.Errorf("%w: this payment is voided -- its date can't be changed", apperr.ErrInvalidInput)
+	}
+	if err := s.repo.UpdatePaymentDate(ctx, paymentID, payDate); err != nil {
 		return nil, err
 	}
 	return s.repo.GetPaymentByID(ctx, paymentID)

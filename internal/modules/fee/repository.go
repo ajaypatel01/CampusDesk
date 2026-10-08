@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
@@ -432,6 +433,18 @@ func (r *Repository) VoidPayment(ctx context.Context, id uuid.UUID) error {
 // MovePayment reassigns a payment to a different fee account -- for
 // correcting a payment recorded against the wrong academic year (the caller
 // has already verified the target account belongs to the same student).
+// UpdatePaymentDate changes a non-voided payment's date.
+func (r *Repository) UpdatePaymentDate(ctx context.Context, id uuid.UUID, date time.Time) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE fee_payments SET payment_date=$2, updated_at=NOW() WHERE id=$1 AND voided=FALSE`, id, date)
+	if err != nil {
+		return database.MapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) MovePayment(ctx context.Context, id, newAccountID uuid.UUID) error {
 	tag, err := r.pool.Exec(ctx, `UPDATE fee_payments SET student_fee_account_id=$2, updated_at=NOW() WHERE id=$1 AND voided=FALSE`, id, newAccountID)
 	if err != nil {
