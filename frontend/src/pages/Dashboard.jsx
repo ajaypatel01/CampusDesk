@@ -4,6 +4,7 @@ import { Users, IndianRupee, UserCog, GraduationCap, TrendingUp, AlertCircle } f
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, usersApi, feesApi } from '../services/api'
 import './Dashboard.css'
+import { studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
 
 function Dashboard() {
   const { user } = useOutletContext() || {}
@@ -136,7 +137,7 @@ function Dashboard() {
                         {s.first_name} {s.last_name}
                       </Link>
                     </td>
-                    <td><span className={`badge badge--${s.status === 'active' ? 'success' : 'muted'}`}>{s.status}</span></td>
+                    <td><span className={`badge badge--${studentStatusBadge(s.status)}`}>{studentStatusLabel(s.status)}</span></td>
                     <td className="data-table__muted">{s.gender || '-'}</td>
                   </tr>
                 ))}

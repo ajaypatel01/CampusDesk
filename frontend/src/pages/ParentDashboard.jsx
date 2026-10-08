@@ -4,6 +4,7 @@ import { useSchool } from '../services/SchoolContext'
 import { studentsApi, homeworkApi, resultsApi, feesApi } from '../services/api'
 import './ParentDashboard.css'
 import { formatDate } from '../utils/date'
+import { studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
 
 function fmtAmount(n) {
   return `₹${(n || 0).toLocaleString('en-IN')}`
@@ -135,7 +136,7 @@ function ParentDashboard() {
             <h2>{ward.first_name} {ward.last_name}</h2>
             <div className="parent-dashboard__meta">
               <span>Scholar No: <strong>{ward.student_code}</strong></span>
-              <span className={`badge badge--${ward.status === 'active' ? 'success' : 'muted'}`}>{ward.status}</span>
+              <span className={`badge badge--${studentStatusBadge(ward.status)}`}>{studentStatusLabel(ward.status)}</span>
             </div>
           </div>
         </div>

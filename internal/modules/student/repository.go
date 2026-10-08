@@ -51,6 +51,7 @@ type ListFilter struct {
 	// which students a class teacher may enter marks for.
 	ClassSectionIDs []string
 	PaymentStatus   string // "paid", "due", "partial"
+	RTE             string // "yes" (RTE students), "no" (everyone else), "" (all)
 	SortBy          string
 	SortOrder       string
 }
@@ -100,7 +101,7 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 	args := []interface{}{f.SchoolID}
 	argN := 2
 
-	hasFeeJoin := f.AcademicYearID != uuid.Nil || f.GradeLevel != "" || f.PaymentStatus != ""
+	hasFeeJoin := f.AcademicYearID != uuid.Nil || f.GradeLevel != "" || f.PaymentStatus != "" || f.RTE != ""
 
 	joins := " FROM students s"
 	if hasFeeJoin {
@@ -149,6 +150,12 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 			where += fmt.Sprintf(" AND gl.name = $%d", argN)
 			args = append(args, f.GradeLevel)
 			argN++
+		}
+		switch f.RTE {
+		case "yes":
+			where += " AND sfa.is_rte = TRUE"
+		case "no":
+			where += " AND (sfa.id IS NULL OR sfa.is_rte = FALSE)"
 		}
 		switch f.PaymentStatus {
 		case "paid":
@@ -216,9 +223,10 @@ func buildOrderClause(sortBy, sortOrder string) string {
 	for i := range args {
 		args[i] = sortOrder
 	}
-	// Transferred students sink to the bottom regardless of the chosen sort, same as
-	// inactive teachers do in the Teachers list.
-	return "(s.status = 'transferred'), " + fmt.Sprintf(pattern, args...)
+	// Students who have left (transferred, or left without a TC) sink to the
+	// bottom regardless of the chosen sort, same as inactive teachers do in
+	// the Teachers list.
+	return "(s.status IN ('transferred', 'left_without_tc')), " + fmt.Sprintf(pattern, args...)
 }
 
 func (r *Repository) Update(ctx context.Context, s *domain.Student) error {

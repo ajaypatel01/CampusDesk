@@ -4,6 +4,7 @@ import { Search, ChevronLeft, ChevronRight, Filter, X, Download } from 'lucide-r
 import { useSchool } from '../services/SchoolContext'
 import { feesApi, academicApi } from '../services/api'
 import SortHeader from '../components/SortHeader'
+import useSessionState from '../hooks/useSessionState'
 import './Fees.css'
 
 function Fees() {
@@ -16,14 +17,16 @@ function Fees() {
   const [summary, setSummary] = useState(null)
   const [grades, setGrades] = useState([])
 
-  const [search, setSearch] = useState('')
-  const [gradeFilter, setGradeFilter] = useState('')
-  const [paymentStatus, setPaymentStatus] = useState('')
-  const [minBalance, setMinBalance] = useState('')
-  const [maxBalance, setMaxBalance] = useState('')
-  const [sortBy, setSortBy] = useState('name')
-  const [sortOrder, setSortOrder] = useState('asc')
-  const [offset, setOffset] = useState(0)
+  // Filters, sort and page are kept for this tab, so sorting by balance,
+  // opening a student and pressing Back returns to the same list.
+  const [search, setSearch] = useSessionState('fees.search', '')
+  const [gradeFilter, setGradeFilter] = useSessionState('fees.grade', '')
+  const [paymentStatus, setPaymentStatus] = useSessionState('fees.payment', '')
+  const [minBalance, setMinBalance] = useSessionState('fees.minBalance', '')
+  const [maxBalance, setMaxBalance] = useSessionState('fees.maxBalance', '')
+  const [sortBy, setSortBy] = useSessionState('fees.sortBy', 'name')
+  const [sortOrder, setSortOrder] = useSessionState('fees.sortOrder', 'asc')
+  const [offset, setOffset] = useSessionState('fees.offset', 0)
   const limit = 20
 
   function handleSort(field) {

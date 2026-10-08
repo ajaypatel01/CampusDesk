@@ -191,8 +191,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Category:      r.URL.Query().Get("category"),
 		GradeLevel:    r.URL.Query().Get("grade_level"),
 		PaymentStatus: r.URL.Query().Get("payment_status"),
+		RTE:           r.URL.Query().Get("rte"),
 		SortBy:        r.URL.Query().Get("sort_by"),
 		SortOrder:     r.URL.Query().Get("sort_order"),
+	}
+	if f.RTE != "" && f.RTE != "yes" && f.RTE != "no" {
+		httpx.Error(w, http.StatusBadRequest, "rte must be yes or no")
+		return
 	}
 	if ayID := r.URL.Query().Get("academic_year_id"); ayID != "" {
 		yearID, err := uuid.Parse(ayID)
