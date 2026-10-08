@@ -350,7 +350,7 @@ func (s *Service) LogoutEverywhere(ctx context.Context, userID uuid.UUID) error 
 // RequestPhoneVerification sends a WhatsApp code to phone. The number
 // isn't saved yet -- only ConfirmPhoneVerification, after a correct code,
 // actually sets users.phone_number.
-func (s *Service) RequestPhoneVerification(ctx context.Context, phone string) error {
+func (s *Service) RequestPhoneVerification(ctx context.Context, phone string, schoolID *uuid.UUID) error {
 	phone, err := normalizePhone(phone)
 	if err != nil {
 		return err
@@ -358,7 +358,7 @@ func (s *Service) RequestPhoneVerification(ctx context.Context, phone string) er
 	if _, err := s.repo.GetByPhone(ctx, phone); err == nil {
 		return fmt.Errorf("%w: that phone number is already in use on another account", apperr.ErrConflict)
 	}
-	return s.sendOTP(ctx, phone, otpPurposeVerifyPhone)
+	return s.sendOTP(ctx, phone, otpPurposeVerifyPhone, schoolID)
 }
 
 // ConfirmPhoneVerification checks the code and, if correct, sets
@@ -451,12 +451,16 @@ func (s *Service) RequestOTPLogin(ctx context.Context, phone, audience string) e
 	if err != nil {
 		return err
 	}
+	schoolID := &t.schoolID
 	if t.user != nil {
 		if err := checkLoginable(t.user); err != nil {
 			return err
 		}
+		if len(t.guardians) == 0 {
+			schoolID = t.user.SchoolID
+		}
 	}
-	return s.sendOTP(ctx, phone, otpPurposeLogin)
+	return s.sendOTP(ctx, phone, otpPurposeLogin, schoolID)
 }
 
 // VerifyOTPLogin mints a JWT exactly like Login, after checking the code --
@@ -546,10 +550,11 @@ func (s *Service) RequestPasswordResetOTP(ctx context.Context, phone string) err
 	if err != nil {
 		return err
 	}
-	if _, err := s.repo.GetByPhone(ctx, phone); err != nil {
+	u, err := s.repo.GetByPhone(ctx, phone)
+	if err != nil {
 		return nil // unknown number: report success anyway, same reasoning as the email flow
 	}
-	return s.sendOTP(ctx, phone, otpPurposeReset)
+	return s.sendOTP(ctx, phone, otpPurposeReset, u.SchoolID)
 }
 
 func (s *Service) ConfirmPasswordResetOTP(ctx context.Context, phone, otp, newPassword string) error {

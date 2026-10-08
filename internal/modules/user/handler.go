@@ -322,7 +322,13 @@ func (h *Handler) RequestPhoneVerification(w http.ResponseWriter, r *http.Reques
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
-	if err := h.svc.RequestPhoneVerification(r.Context(), in.Phone); err != nil {
+	var schoolID *uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil {
+		if id, err := uuid.Parse(claims.SchoolID); err == nil {
+			schoolID = &id
+		}
+	}
+	if err := h.svc.RequestPhoneVerification(r.Context(), in.Phone, schoolID); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}

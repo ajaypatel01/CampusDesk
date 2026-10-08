@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -42,6 +43,9 @@ type WhatsAppConfig struct {
 	// copy-code button; OTPLanguage is its language code.
 	OTPTemplate string
 	OTPLanguage string
+	// OTPSchoolSenders: school id -> Phone number ID that school's codes
+	// are sent from (WHATSAPP_OTP_SENDERS="<school id>=<phone number id>,...").
+	OTPSchoolSenders map[string]string
 }
 
 type EmailConfig struct {
@@ -111,12 +115,13 @@ func Load() (*Config, error) {
 			UseSSL:          getEnv("S3_USE_SSL", "true") == "true",
 		},
 		WhatsApp: WhatsAppConfig{
-			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
-			AccessToken:   os.Getenv("WHATSAPP_ACCESS_TOKEN"),
-			APIVersion:    getEnv("WHATSAPP_API_VERSION", "v19.0"),
-			BaseURL:       getEnv("WHATSAPP_API_BASE_URL", "https://graph.facebook.com"),
-			OTPTemplate:   getEnv("WHATSAPP_OTP_TEMPLATE", "campusdesk_otp"),
-			OTPLanguage:   getEnv("WHATSAPP_OTP_LANGUAGE", "en"),
+			PhoneNumberID:    os.Getenv("WHATSAPP_PHONE_NUMBER_ID"),
+			AccessToken:      os.Getenv("WHATSAPP_ACCESS_TOKEN"),
+			APIVersion:       getEnv("WHATSAPP_API_VERSION", "v19.0"),
+			BaseURL:          getEnv("WHATSAPP_API_BASE_URL", "https://graph.facebook.com"),
+			OTPTemplate:      getEnv("WHATSAPP_OTP_TEMPLATE", "campusdesk_otp"),
+			OTPLanguage:      getEnv("WHATSAPP_OTP_LANGUAGE", "en"),
+			OTPSchoolSenders: parsePairs(os.Getenv("WHATSAPP_OTP_SENDERS")),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
 	}, nil
@@ -124,6 +129,22 @@ func Load() (*Config, error) {
 
 func (c *Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
+}
+
+// parsePairs reads "a=1,b=2" into a map, skipping malformed entries.
+func parsePairs(s string) map[string]string {
+	out := map[string]string{}
+	for _, part := range strings.Split(s, ",") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		k, v := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
+		if k != "" && v != "" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {
