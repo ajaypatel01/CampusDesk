@@ -67,6 +67,8 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}/mark-formats/{subjectId}", m.ResetExamSubjectFormat)
 	})
 	r.Route("/exam-marks", func(r chi.Router) {
+		// One student's saved marks in an exam, to pre-fill the entry form.
+		r.With(httpx.BlockRoles("parent"), view).Get("/", m.ListStudentExamMarks)
 		r.With(httpx.BlockRoles("parent"), write).Post("/", m.UpsertMark)
 		r.With(httpx.BlockRoles("parent"), write).Post("/bulk", m.BulkUpsertMarks)
 	})
@@ -774,6 +776,34 @@ func (m *Module) bulkUpsert(ctx context.Context, marks []domain.ExamMark) (int, 
 }
 
 // ---- Marksheet handlers ----
+
+// ListStudentExamMarks returns what is already saved for a student in an
+// exam, so the marks entry form opens with it filled in.
+func (m *Module) ListStudentExamMarks(w http.ResponseWriter, r *http.Request) {
+	examID, err := uuid.Parse(r.URL.Query().Get("exam_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "exam_id required")
+		return
+	}
+	studentID, err := uuid.Parse(r.URL.Query().Get("student_id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "student_id required")
+		return
+	}
+	if ok, err := m.teacherCanAccessExamStudent(r.Context(), httpx.ClaimsFromContext(r.Context()), examID, studentID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	} else if !ok {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
+	items, err := m.repo.StudentExamMarks(r.Context(), examID, studentID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
 
 func (m *Module) GetMarksheet(w http.ResponseWriter, r *http.Request) {
 	examID, err := uuid.Parse(r.URL.Query().Get("exam_id"))
