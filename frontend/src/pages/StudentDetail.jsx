@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useOutletContext } from 'react-router-dom'
-import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee } from 'lucide-react'
+import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee, ArrowRightLeft } from 'lucide-react'
 import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import './StudentDetail.css'
 import { formatDate } from '../utils/date'
+import { STUDENT_STATUSES, studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
+
+const EMPTY_GUARDIAN = { first_name: '', last_name: '', phone: '', email: '', relation: '', aadhar_number: '' }
 
 const FEE_EDITOR_ROLES = ['super_admin', 'school_admin', 'registrar']
 const SCHOLAR_NO_EDITOR_ROLES = ['registrar', 'super_admin']
@@ -25,7 +28,13 @@ function StudentDetail() {
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [showGuardianModal, setShowGuardianModal] = useState(false)
-  const [guardianForm, setGuardianForm] = useState({ first_name: '', last_name: '', phone: '', email: '', relation: '', aadhar_number: '' })
+  const [guardianForm, setGuardianForm] = useState(EMPTY_GUARDIAN)
+  // null while adding a guardian; the guardian's id while editing one.
+  const [editingGuardianId, setEditingGuardianId] = useState(null)
+  const [guardianSaving, setGuardianSaving] = useState(false)
+  const [showClassModal, setShowClassModal] = useState(false)
+  const [classForm, setClassForm] = useState({ grade_level_id: '', class_section_id: '' })
+  const [classSaving, setClassSaving] = useState(false)
   const [feeEditing, setFeeEditing] = useState(false)
   const [feeForm, setFeeForm] = useState({})
   const [feeSaving, setFeeSaving] = useState(false)
@@ -176,19 +185,83 @@ function StudentDetail() {
     }
   }
 
-  async function handleAddGuardian(e) {
+  function openAddGuardian() {
+    setEditingGuardianId(null)
+    setGuardianForm(EMPTY_GUARDIAN)
+    setShowGuardianModal(true)
+  }
+
+  function openEditGuardian(g) {
+    setEditingGuardianId(g.id)
+    setGuardianForm({
+      first_name: g.first_name || '', last_name: g.last_name || '', phone: g.phone || '',
+      email: g.email || '', relation: g.relation || '', aadhar_number: g.aadhar_number || '',
+    })
+    setShowGuardianModal(true)
+  }
+
+  async function handleSaveGuardian(e) {
     e.preventDefault()
+    setGuardianSaving(true)
     try {
-      const g = await guardiansApi.create(guardianForm)
-      await guardiansApi.link({ student_id: id, guardian_id: g.id, is_primary: guardians.length === 0 })
+      if (editingGuardianId) {
+        await guardiansApi.update(editingGuardianId, guardianForm)
+      } else {
+        const g = await guardiansApi.create(guardianForm)
+        await guardiansApi.link({ student_id: id, guardian_id: g.id, is_primary: guardians.length === 0 })
+      }
       const res = await guardiansApi.list(id)
       setGuardians(res.items || [])
       setShowGuardianModal(false)
-      setGuardianForm({ first_name: '', last_name: '', phone: '', email: '', relation: '', aadhar_number: '' })
+      setGuardianForm(EMPTY_GUARDIAN)
+      setEditingGuardianId(null)
     } catch (err) {
       alert(err.message)
+    } finally {
+      setGuardianSaving(false)
     }
   }
+
+  function openClassModal() {
+    setClassForm({ grade_level_id: feeSummary?.grade_level_id || '', class_section_id: sectionId || '' })
+    setShowClassModal(true)
+  }
+
+  // Moves the student to another class (and section) for the current year.
+  // With no fee account yet this also creates it, from the class's fee structure.
+  async function handleChangeClass(e) {
+    e.preventDefault()
+    if (!classForm.grade_level_id || !currentYear) return
+    setClassSaving(true)
+    try {
+      await studentsApi.moveGrade(id, {
+        to_academic_year_id: currentYear.id,
+        to_grade_level_id: classForm.grade_level_id,
+        class_section_id: classForm.class_section_id || undefined,
+      })
+      const [fee, sec] = await Promise.all([
+        feesApi.studentSummary(id, currentYear.id).catch(() => null),
+        studentsApi.getSection(id, currentYear.id).catch(() => ({})),
+      ])
+      setFeeSummary(fee)
+      if (fee) {
+        setFeeForm({
+          tuition_fee: fee.tuition_fee, discount_amount: fee.discount_amount,
+          discount_reason: fee.discount_reason || '', van_fee: fee.van_fee,
+          previous_year_dues: fee.previous_year_dues, late_fee: fee.late_fee, grade_level_id: fee.grade_level_id,
+          is_rte: fee.is_rte || false,
+        })
+      }
+      setSectionId(sec.class_section_id || null)
+      setShowClassModal(false)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setClassSaving(false)
+    }
+  }
+
+  const classModalSections = sections.filter(sec => sec.grade_level_id === classForm.grade_level_id)
 
   if (loading) return <p className="loading-text">Loading...</p>
   if (!student) return <p className="empty-text">Student not found</p>
@@ -206,7 +279,7 @@ function StudentDetail() {
         <div className="student-detail__title">
           <h1>{student.first_name} {student.last_name}</h1>
           <span className="student-detail__code">{student.student_code}</span>
-          <span className={`badge badge--${student.status === 'active' ? 'success' : 'muted'}`}>{student.status}</span>
+          <span className={`badge badge--${studentStatusBadge(student.status)}`}>{studentStatusLabel(student.status)}</span>
         </div>
         <div className="student-detail__actions">
           {editing ? (
@@ -241,7 +314,7 @@ function StudentDetail() {
             <Field label="Address" value={f.address} editing={editing} onChange={v => setForm({ ...form, address: v })} />
             <Field label="Caste" value={f.caste} editing={editing} onChange={v => setForm({ ...form, caste: v })} />
             <Field label="Category" value={f.category} editing={editing} onChange={v => setForm({ ...form, category: v })} />
-            <Field label="Status" value={f.status} editing={editing} onChange={v => setForm({ ...form, status: v })} type="select" options={['active', 'inactive', 'graduated', 'transferred']} />
+            <Field label="Status" value={editing ? f.status : studentStatusLabel(f.status)} editing={editing} onChange={v => setForm({ ...form, status: v })} type="select" options={STUDENT_STATUSES} />
             {f.status === 'inactive' && (
               editing ? (
                 <>
@@ -296,7 +369,7 @@ function StudentDetail() {
         <div className="detail-card">
           <div className="detail-card__header">
             <h3>Guardians</h3>
-            <button className="btn btn--outline btn--sm" onClick={() => setShowGuardianModal(true)}>
+            <button className="btn btn--outline btn--sm" onClick={openAddGuardian}>
               <UserPlus size={14} /> Add
             </button>
           </div>
@@ -315,11 +388,26 @@ function StudentDetail() {
                     </div>
                   </div>
                   {g.is_primary && <span className="badge badge--info">Primary</span>}
+                  <button className="btn btn--outline btn--sm guardian-item__edit" onClick={() => openEditGuardian(g)} aria-label={`Edit ${g.first_name} ${g.last_name}`}>
+                    <Edit2 size={13} /> Edit
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {!feeSummary && currentYear && (
+          <div className="detail-card">
+            <div className="detail-card__header">
+              <h3>Class ({currentYear.name})</h3>
+              {canEditFees && (
+                <button className="btn btn--primary btn--sm" onClick={openClassModal}><ArrowRightLeft size={14} /> Assign class</button>
+              )}
+            </div>
+            <p className="empty-text">No class set for {currentYear.name} yet.</p>
+          </div>
+        )}
 
         {feeSummary && (
           <div className="detail-card">
@@ -332,7 +420,10 @@ function StudentDetail() {
                     <button className="btn btn--primary btn--sm" onClick={handleSaveFee} disabled={feeSaving}><Save size={14} /> {feeSaving ? 'Saving...' : 'Save'}</button>
                   </>
                 ) : (
-                  <button className="btn btn--outline btn--sm" onClick={() => setFeeEditing(true)}><Edit2 size={14} /> Edit Fees</button>
+                  <>
+                    <button className="btn btn--outline btn--sm" onClick={openClassModal}><ArrowRightLeft size={14} /> Change class</button>
+                    <button className="btn btn--outline btn--sm" onClick={() => setFeeEditing(true)}><Edit2 size={14} /> Edit Fees</button>
+                  </>
                 ))}
                 <Link to={`/fees`} className="btn btn--outline btn--sm">View All Fees</Link>
               </div>
@@ -417,11 +508,48 @@ function StudentDetail() {
 
       <CustomFieldsSection entityType="student" entityId={student.id} schoolId={currentSchool?.id} user={user} />
 
+      {showClassModal && (
+        <div className="modal-overlay" onClick={() => setShowClassModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>{feeSummary ? 'Change class' : 'Assign class'}</h2>
+            <form className="modal__form" onSubmit={handleChangeClass}>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Class ({currentYear?.name}) *</span>
+                  <select required value={classForm.grade_level_id} onChange={e => setClassForm({ grade_level_id: e.target.value, class_section_id: '' })}>
+                    <option value="">Select...</option>
+                    {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Section</span>
+                  <select value={classForm.class_section_id} onChange={e => setClassForm({ ...classForm, class_section_id: e.target.value })} disabled={!classForm.grade_level_id || classModalSections.length === 0}>
+                    <option value="">{classForm.grade_level_id && classModalSections.length === 0 ? 'No sections for this class' : 'Not assigned'}</option>
+                    {classModalSections.map(sec => <option key={sec.id} value={sec.id}>{sec.name}</option>)}
+                  </select>
+                </label>
+              </div>
+              <p className="empty-text">
+                {feeSummary
+                  ? 'Tuition and van fee change to the new class\'s fee structure. Discount, previous dues and payments stay as they are.'
+                  : 'This sets the student\'s fees from the class\'s fee structure for the year.'}
+              </p>
+              <div className="modal__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setShowClassModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={classSaving || !classForm.grade_level_id}>
+                  {classSaving ? 'Saving...' : feeSummary ? 'Move student' : 'Assign class'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showGuardianModal && (
         <div className="modal-overlay" onClick={() => setShowGuardianModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Guardian</h2>
-            <form className="modal__form" onSubmit={handleAddGuardian}>
+            <h2>{editingGuardianId ? 'Edit Guardian' : 'Add Guardian'}</h2>
+            <form className="modal__form" onSubmit={handleSaveGuardian}>
               <div className="form-row">
                 <label className="form-field">
                   <span>First Name *</span>
@@ -442,13 +570,21 @@ function StudentDetail() {
                   <input value={guardianForm.phone} onChange={e => setGuardianForm({ ...guardianForm, phone: e.target.value })} />
                 </label>
               </div>
-              <label className="form-field">
-                <span>Aadhar Number</span>
-                <input value={guardianForm.aadhar_number} onChange={e => setGuardianForm({ ...guardianForm, aadhar_number: e.target.value })} maxLength={12} />
-              </label>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Email</span>
+                  <input type="email" value={guardianForm.email} onChange={e => setGuardianForm({ ...guardianForm, email: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>Aadhar Number</span>
+                  <input value={guardianForm.aadhar_number} onChange={e => setGuardianForm({ ...guardianForm, aadhar_number: e.target.value })} maxLength={12} />
+                </label>
+              </div>
               <div className="modal__actions">
                 <button type="button" className="btn btn--outline" onClick={() => setShowGuardianModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary">Add Guardian</button>
+                <button type="submit" className="btn btn--primary" disabled={guardianSaving}>
+                  {guardianSaving ? 'Saving...' : editingGuardianId ? 'Save' : 'Add Guardian'}
+                </button>
               </div>
             </form>
           </div>
@@ -465,7 +601,10 @@ function Field({ label, value, editing, onChange, type = 'text', options, placeh
         <div className="detail-field">
           <span className="detail-field__label">{label}</span>
           <select className="detail-field__input" value={value || ''} onChange={e => onChange(e.target.value)}>
-            {options.map(o => <option key={o} value={o}>{o || 'Select'}</option>)}
+            {options.map(o => {
+              const opt = typeof o === 'string' ? { value: o, label: o } : o
+              return <option key={opt.value} value={opt.value}>{opt.label || 'Select'}</option>
+            })}
           </select>
         </div>
       )

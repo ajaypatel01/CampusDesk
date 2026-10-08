@@ -175,6 +175,15 @@
   margin-left: auto;
 }
 
+.guardian-item__edit {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.guardian-item .badge + .guardian-item__edit {
+  margin-left: 0;
+}
+
 @media (max-width: 768px) {
   .student-detail__grid {
     grid-template-columns: 1fr;

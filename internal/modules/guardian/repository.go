@@ -23,9 +23,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, g *domain.Guardian) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO guardians (first_name, last_name, email, phone, relation, user_id)
-		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at, updated_at`,
-		g.FirstName, g.LastName, g.Email, g.Phone, g.Relation, g.UserID,
+		INSERT INTO guardians (first_name, last_name, email, phone, relation, aadhar_number, user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at, updated_at`,
+		g.FirstName, g.LastName, g.Email, g.Phone, g.Relation, g.AadharNumber, g.UserID,
 	)
 	if err := row.Scan(&g.ID, &g.CreatedAt, &g.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -104,4 +104,44 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Guardia
 		return nil, fmt.Errorf("get guardian: %w", err)
 	}
 	return &g, nil
+}
+
+// Update edits a guardian's contact details. It leaves user_id alone, so a
+// parent's portal login keeps working after their details change.
+func (r *Repository) Update(ctx context.Context, g *domain.Guardian) error {
+	err := r.pool.QueryRow(ctx, `
+		UPDATE guardians SET first_name=$2, last_name=$3, email=$4, phone=$5, relation=$6,
+			aadhar_number=$7, updated_at=NOW()
+		WHERE id=$1 RETURNING created_at, updated_at`,
+		g.ID, g.FirstName, g.LastName, g.Email, g.Phone, g.Relation, g.AadharNumber,
+	).Scan(&g.CreatedAt, &g.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.ErrNotFound
+	}
+	return database.MapError(err)
+}
+
+// StudentSchoolID returns the school a student belongs to.
+func (r *Repository) StudentSchoolID(ctx context.Context, studentID uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx, `SELECT school_id FROM students WHERE id=$1`, studentID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, apperr.ErrNotFound
+	}
+	return id, err
+}
+
+// GuardianSchools reports whether a guardian is linked to a student of
+// schoolID, and whether they are linked to any student at all. Guardians
+// have no school of their own -- they belong to a school through the
+// students they are linked to.
+func (r *Repository) GuardianSchools(ctx context.Context, guardianID, schoolID uuid.UUID) (inSchool, linked bool, err error) {
+	err = r.pool.QueryRow(ctx, `
+		SELECT
+			EXISTS (SELECT 1 FROM student_guardians sg JOIN students s ON s.id = sg.student_id
+			        WHERE sg.guardian_id = $1 AND s.school_id = $2),
+			EXISTS (SELECT 1 FROM student_guardians WHERE guardian_id = $1)`,
+		guardianID, schoolID,
+	).Scan(&inSchool, &linked)
+	return inSchool, linked, err
 }

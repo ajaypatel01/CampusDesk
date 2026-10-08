@@ -6,6 +6,8 @@ import { studentsApi, academicApi } from '../services/api'
 import SortHeader from '../components/SortHeader'
 import './Students.css'
 import { formatDate } from '../utils/date'
+import useSessionState from '../hooks/useSessionState'
+import { STUDENT_STATUSES, studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
 
 function Students() {
   const { currentSchool, currentYear } = useSchool()
@@ -14,21 +16,26 @@ function Students() {
   const [loading, setLoading] = useState(true)
   const [grades, setGrades] = useState([])
 
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [gradeFilter, setGradeFilter] = useState('')
-  const [paymentStatus, setPaymentStatus] = useState('')
-  const [sortBy, setSortBy] = useState('name')
-  const [sortOrder, setSortOrder] = useState('asc')
-  const [offset, setOffset] = useState(0)
+  // Filters, sort and page are kept for this tab, so they are still set
+  // after opening a student and coming back.
+  const [search, setSearch] = useSessionState('students.search', '')
+  const [statusFilter, setStatusFilter] = useSessionState('students.status', '')
+  const [categoryFilter, setCategoryFilter] = useSessionState('students.category', '')
+  const [gradeFilter, setGradeFilter] = useSessionState('students.grade', '')
+  const [paymentStatus, setPaymentStatus] = useSessionState('students.payment', '')
+  const [rteFilter, setRteFilter] = useSessionState('students.rte', '')
+  const [sortBy, setSortBy] = useSessionState('students.sortBy', 'name')
+  const [sortOrder, setSortOrder] = useSessionState('students.sortOrder', 'asc')
+  const [offset, setOffset] = useSessionState('students.offset', 0)
 
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     student_code: '', first_name: '', last_name: '', gender: '', date_of_birth: '',
     phone: '', email: '', address: '', admission_date: '', caste: '', category: '',
-    aadhar_number: '', status: 'active',
+    aadhar_number: '', status: 'active', grade_level_id: '', class_section_id: '',
   })
+  // Sections of the current year, for the class picker in Add Student.
+  const [yearSections, setYearSections] = useState([])
 
   const [showImportModal, setShowImportModal] = useState(false)
   const [importFile, setImportFile] = useState(null)
@@ -72,6 +79,7 @@ function Students() {
       category: categoryFilter || undefined,
       grade_level: gradeFilter || undefined,
       payment_status: paymentStatus || undefined,
+      rte: rteFilter || undefined,
       academic_year_id: currentYear?.id || undefined,
       sort_by: sortBy || undefined,
       sort_order: sortOrder || undefined,
@@ -81,7 +89,15 @@ function Students() {
       .then(res => { setStudents(res.items || []); setTotal(res.total || 0) })
       .catch(() => { setStudents([]); setTotal(0) })
       .finally(() => setLoading(false))
-  }, [currentSchool, currentYear, search, statusFilter, categoryFilter, gradeFilter, paymentStatus, sortBy, sortOrder, offset])
+  }, [currentSchool, currentYear, search, statusFilter, categoryFilter, gradeFilter, paymentStatus, rteFilter, sortBy, sortOrder, offset])
+
+  useEffect(() => {
+    if (!currentSchool || !currentYear) { setYearSections([]); return }
+    academicApi.listSections({ school_id: currentSchool.id, academic_year_id: currentYear.id })
+      .then(res => setYearSections(res.items || []))
+      .catch(() => setYearSections([]))
+  }, [currentSchool, currentYear])
+  const newStudentSections = yearSections.filter(sec => sec.grade_level_id === form.grade_level_id)
 
   function handleSort(field) {
     if (sortBy === field) {
@@ -93,13 +109,14 @@ function Students() {
     setOffset(0)
   }
 
-  const activeFilterCount = [statusFilter, categoryFilter, gradeFilter, paymentStatus].filter(Boolean).length
+  const activeFilterCount = [statusFilter, categoryFilter, gradeFilter, paymentStatus, rteFilter].filter(Boolean).length
 
   function clearFilters() {
     setStatusFilter('')
     setCategoryFilter('')
     setGradeFilter('')
     setPaymentStatus('')
+    setRteFilter('')
     setSearch('')
     setSortBy('name')
     setSortOrder('asc')
@@ -115,16 +132,32 @@ function Students() {
     e.preventDefault()
     setSaving(true)
     try {
+      const { grade_level_id: gradeLevelId, class_section_id: classSectionId, ...studentFields } = form
       const body = {
-        ...form,
+        ...studentFields,
         school_id: currentSchool.id,
         date_of_birth: toISODate(form.date_of_birth),
         admission_date: toISODate(form.admission_date),
       }
-      await studentsApi.create(body)
+      const created = await studentsApi.create(body)
+      // A student's class for the year is their fee account; moving them into
+      // the chosen class creates it (from that class's fee structure).
+      if (gradeLevelId && currentYear) {
+        try {
+          await studentsApi.moveGrade(created.id, {
+            to_academic_year_id: currentYear.id,
+            to_grade_level_id: gradeLevelId,
+            class_section_id: classSectionId || undefined,
+          })
+        } catch (err) {
+          alert(`Student added, but the class could not be set: ${err.message}. Set it from the student's page.`)
+        }
+      }
       setShowModal(false)
-      setForm({ student_code: '', first_name: '', last_name: '', gender: '', date_of_birth: '', phone: '', email: '', address: '', admission_date: '', caste: '', category: '', aadhar_number: '', status: 'active' })
+      setForm({ student_code: '', first_name: '', last_name: '', gender: '', date_of_birth: '', phone: '', email: '', address: '', admission_date: '', caste: '', category: '', aadhar_number: '', status: 'active', grade_level_id: '', class_section_id: '' })
       setOffset(0)
+      const res = await studentsApi.list({ school_id: currentSchool.id, academic_year_id: currentYear?.id || undefined, limit, offset: 0 })
+      setStudents(res.items || []); setTotal(res.total || 0)
     } catch (err) {
       alert(err.message)
     } finally {
@@ -265,10 +298,7 @@ function Students() {
           <Filter size={16} />
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOffset(0) }}>
             <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="graduated">Graduated</option>
-            <option value="transferred">Transferred</option>
+            {STUDENT_STATUSES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
           </select>
         </div>
         <div className="filter-select">
@@ -296,6 +326,15 @@ function Students() {
               <option value="due">Balance Due</option>
               <option value="partial">Partial Paid</option>
               <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+        )}
+        {currentYear && (
+          <div className="filter-select">
+            <select value={rteFilter} onChange={e => { setRteFilter(e.target.value); setOffset(0) }}>
+              <option value="">RTE &amp; non-RTE</option>
+              <option value="yes">RTE only</option>
+              <option value="no">Non-RTE only</option>
             </select>
           </div>
         )}
@@ -339,7 +378,7 @@ function Students() {
                   </td>
                   <td className="data-table__muted">{s.gender || '-'}</td>
                   <td className="data-table__muted">{s.phone || '-'}</td>
-                  <td><span className={`badge badge--${s.status === 'active' ? 'success' : 'muted'}`}>{s.status}</span></td>
+                  <td><span className={`badge badge--${studentStatusBadge(s.status)}`}>{studentStatusLabel(s.status)}</span></td>
                   <td className="data-table__muted">{s.grade_level_name || '-'}</td>
                   <td className="data-table__muted">{formatDate(s.admission_date)}</td>
                 </tr>
@@ -426,6 +465,24 @@ function Students() {
                 <span>Address *</span>
                 <textarea required rows={2} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
               </label>
+              {currentYear && (
+                <div className="form-row">
+                  <label className="form-field">
+                    <span>Class ({currentYear.name})</span>
+                    <select value={form.grade_level_id} onChange={e => setForm({ ...form, grade_level_id: e.target.value, class_section_id: '' })}>
+                      <option value="">Set later</option>
+                      {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="form-field">
+                    <span>Section</span>
+                    <select value={form.class_section_id} onChange={e => setForm({ ...form, class_section_id: e.target.value })} disabled={!form.grade_level_id || newStudentSections.length === 0}>
+                      <option value="">{form.grade_level_id && newStudentSections.length === 0 ? 'No sections for this class' : 'Not assigned'}</option>
+                      {newStudentSections.map(sec => <option key={sec.id} value={sec.id}>{sec.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
               <div className="modal__actions">
                 <button type="button" className="btn btn--outline" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>

@@ -25,7 +25,7 @@ var importColumns = []string{
 	"Aadhar Number", "Samagra ID", "PEN Number", "APAAR ID", "Enrollment Number",
 	"Admission Class", "Admission Year", "Previous School",
 	"Bank Name", "Bank IFSC", "Bank Account Number", "Bank Holder Name", "Bank Branch",
-	"Status (active/inactive/graduated/transferred)",
+	"Status (active/inactive/graduated/transferred/left_without_tc/defaulted)",
 }
 
 const importTemplateDataRows = 500 // how many blank rows get the dropdown validation applied
@@ -88,7 +88,7 @@ func GenerateImportTemplate() ([]byte, error) {
 	}
 	statusDV := excelize.NewDataValidation(true)
 	statusDV.SetSqref(fmt.Sprintf("%s2:%s%d", statusCol, statusCol, importTemplateDataRows))
-	if err := statusDV.SetDropList([]string{"active", "inactive", "graduated", "transferred"}); err != nil {
+	if err := statusDV.SetDropList([]string{"active", "inactive", "graduated", "transferred", "left_without_tc", "defaulted"}); err != nil {
 		return nil, err
 	}
 	if err := f.AddDataValidation(importSheetName, statusDV); err != nil {
@@ -231,10 +231,10 @@ func parseImportRow(rowNum int, row []string) ImportRow {
 
 	status := strings.ToLower(cellAt(row, 24))
 	switch status {
-	case "", "active", "inactive", "graduated", "transferred":
+	case "", "active", "inactive", "graduated", "transferred", "left_without_tc", "defaulted":
 		// ok
 	default:
-		return ImportRow{RowNumber: rowNum, ParseErr: fmt.Sprintf("Status must be active/inactive/graduated/transferred, got %q", status)}
+		return ImportRow{RowNumber: rowNum, ParseErr: fmt.Sprintf("Status must be active/inactive/graduated/transferred/left_without_tc/defaulted, got %q", status)}
 	}
 
 	return ImportRow{

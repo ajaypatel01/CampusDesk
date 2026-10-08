@@ -123,6 +123,7 @@ export const guardiansApi = {
   get: (id) => request(`/guardians/${id}`),
   create: (body) => request('/guardians', { method: 'POST', body: JSON.stringify(body) }),
   link: (body) => request('/guardians/link', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => request(`/guardians/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 export const usersApi = {

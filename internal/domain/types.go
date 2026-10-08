@@ -9,6 +9,11 @@ const (
 	StudentStatusInactive    StudentStatus = "inactive"
 	StudentStatusGraduated   StudentStatus = "graduated"
 	StudentStatusTransferred StudentStatus = "transferred"
+	// StudentStatusLeftWithoutTC is a student who stopped coming without
+	// taking a Transfer Certificate ("inactive" is left with a TC).
+	StudentStatusLeftWithoutTC StudentStatus = "left_without_tc"
+	// StudentStatusDefaulted marks a fee defaulter.
+	StudentStatusDefaulted StudentStatus = "defaulted"
 )
 
 type UserRole string
