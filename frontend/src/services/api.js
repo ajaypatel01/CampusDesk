@@ -205,6 +205,7 @@ export const feesApi = {
   // same student -- for correcting a payment entered under the wrong year.
   // Registrar/super_admin only; the target year's fee account must exist.
   movePayment: (id, academicYearId) => request(`/fee-payments/${id}/move`, { method: 'PUT', body: JSON.stringify({ academic_year_id: academicYearId }) }),
+  editPaymentDate: (id, paymentDate) => request(`/fee-payments/${id}/date`, { method: 'PUT', body: JSON.stringify({ payment_date: paymentDate }) }),
 
   schoolSummary: (params) => request(`/fee-summary${qs(params)}`),
   studentSummary: (studentId, yearId) => request(`/fee-summary/student/${studentId}${qs({ academic_year_id: yearId })}`),

@@ -64,6 +64,9 @@ func (m *Module) Mount(r chi.Router) {
 			// its amount/date, so it's scoped more tightly than canEditFees --
 			// registrar and super_admin only, not school_admin.
 			r.With(httpx.RequireRole("super_admin", "registrar"), write).Put("/{id}/move", h.MovePayment)
+			// Correcting a payment's date (e.g. a day/month mix-up): the same
+			// two roles. The amount is never editable -- void and re-record.
+			r.With(httpx.RequireRole("super_admin", "registrar"), write).Put("/{id}/date", h.EditPaymentDate)
 		})
 
 		r.Route("/fee-receipts", func(r chi.Router) {

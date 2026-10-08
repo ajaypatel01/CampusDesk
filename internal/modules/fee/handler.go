@@ -358,6 +358,37 @@ func (h *Handler) MovePayment(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, p)
 }
 
+// EditPaymentDate corrects a payment's date (owner and registrars only, see module.go).
+func (h *Handler) EditPaymentDate(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		PaymentDate string `json:"payment_date"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	var schoolID *uuid.UUID
+	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil && claims.Role != "super_admin" {
+		sid, err := uuid.Parse(claims.SchoolID)
+		if err != nil {
+			httpx.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+		schoolID = &sid
+	}
+	p, err := h.svc.EditPaymentDate(r.Context(), id, schoolID, in.PaymentDate)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, p)
+}
+
 // ---- Summaries ----
 
 func (h *Handler) SchoolFeeSummary(w http.ResponseWriter, r *http.Request) {

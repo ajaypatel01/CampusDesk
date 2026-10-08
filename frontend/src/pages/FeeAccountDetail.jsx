@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useOutletContext } from 'react-router-dom'
-import { ArrowLeft, Plus, XCircle, IndianRupee, Download, MessageCircle, ArrowLeftRight } from 'lucide-react'
+import { ArrowLeft, Plus, XCircle, IndianRupee, Download, MessageCircle, ArrowLeftRight, CalendarDays } from 'lucide-react'
 import { feesApi, academicApi } from '../services/api'
 import { useConfig } from '../services/ConfigContext'
 import './FeeAccountDetail.css'
@@ -25,6 +25,9 @@ function FeeAccountDetail() {
   const [years, setYears] = useState([])
   const [moveYearId, setMoveYearId] = useState('')
   const [moving, setMoving] = useState(false)
+  // Correcting a payment's date: the same two roles as moving it.
+  const [dateEdit, setDateEdit] = useState(null) // { id, date }
+  const [dateSaving, setDateSaving] = useState(false)
 
   async function loadAccount() {
     setLoading(true)
@@ -118,6 +121,21 @@ function FeeAccountDetail() {
       alert(err.message)
     } finally {
       setMoving(false)
+    }
+  }
+
+  async function handleSaveDate(e) {
+    e.preventDefault()
+    if (!dateEdit?.date) return
+    setDateSaving(true)
+    try {
+      await feesApi.editPaymentDate(dateEdit.id, dateEdit.date)
+      setDateEdit(null)
+      loadAccount()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setDateSaving(false)
     }
   }
 
@@ -245,6 +263,11 @@ function FeeAccountDetail() {
                           <XCircle size={14} />
                         </button>
                         {canMovePayment && (
+                          <button className="btn btn--outline btn--sm" onClick={() => setDateEdit({ id: p.id, date: (p.payment_date || '').split('T')[0] })} title="Edit payment date" aria-label="Edit payment date">
+                            <CalendarDays size={14} />
+                          </button>
+                        )}
+                        {canMovePayment && (
                           <button className="btn btn--outline btn--sm" onClick={() => openMovePayment(p.id)} title="Move to a different year">
                             <ArrowLeftRight size={14} />
                           </button>
@@ -312,6 +335,29 @@ function FeeAccountDetail() {
                 <button type="button" className="btn btn--outline" onClick={() => setShowPaymentModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>
                   {saving ? 'Saving...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {dateEdit && (
+        <div className="modal-overlay" onClick={() => setDateEdit(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Edit Payment Date</h2>
+            <p className="empty-text">
+              Correct the date this payment was received. The amount can&apos;t be changed here --
+              void the payment and record it again instead.
+            </p>
+            <form className="modal__form" onSubmit={handleSaveDate}>
+              <label className="form-field">
+                <span>Payment Date *</span>
+                <input type="date" required max={todayIST()} value={dateEdit.date} onChange={e => setDateEdit({ ...dateEdit, date: e.target.value })} />
+              </label>
+              <div className="modal__actions">
+                <button type="button" className="btn btn--outline" onClick={() => setDateEdit(null)}>Cancel</button>
+                <button type="submit" className="btn btn--primary" disabled={dateSaving || !dateEdit.date}>
+                  {dateSaving ? 'Saving...' : 'Save Date'}
                 </button>
               </div>
             </form>
