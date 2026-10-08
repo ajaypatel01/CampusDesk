@@ -100,3 +100,18 @@
 .parent-dashboard__fee-clear {
   color: var(--success, #16a34a);
 }
+
+/* Results hidden by the school's fee lock */
+.parent-dashboard__locked {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--warning-light);
+  color: var(--gray-800);
+  border: 1px solid var(--warning);
+}
+.parent-dashboard__locked svg { color: var(--warning); flex-shrink: 0; margin-top: 2px; }
+.parent-dashboard__locked p { margin: 4px 0 0; font-size: 0.875rem; }

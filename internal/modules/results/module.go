@@ -348,6 +348,8 @@ func (m *Module) CreateExam(w http.ResponseWriter, r *http.Request) {
 		ExamDate       string    `json:"exam_date"`
 		WeightPercent  int       `json:"weight_percent"`
 		IsPublished    bool      `json:"is_published"`
+		FeeLockEnabled bool      `json:"fee_lock_enabled"`
+		FeeLockMinDue  int       `json:"fee_lock_min_due"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
@@ -360,6 +362,12 @@ func (m *Module) CreateExam(w http.ResponseWriter, r *http.Request) {
 		Name:           in.Name,
 		WeightPercent:  in.WeightPercent,
 		IsPublished:    in.IsPublished,
+		FeeLockEnabled: in.FeeLockEnabled,
+		FeeLockMinDue:  in.FeeLockMinDue,
+	}
+	if e.FeeLockMinDue < 0 {
+		httpx.Error(w, http.StatusBadRequest, "fee lock amount can't be negative")
+		return
 	}
 	if in.ExamDate != "" {
 		d, err := time.Parse("2006-01-02", in.ExamDate)
@@ -527,6 +535,9 @@ func (m *Module) UpdateExam(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name"`
 		ExamDate      string `json:"exam_date"`
 		WeightPercent int    `json:"weight_percent"`
+		// Optional: left out, the exam keeps its current fee lock.
+		FeeLockEnabled *bool `json:"fee_lock_enabled"`
+		FeeLockMinDue  *int  `json:"fee_lock_min_due"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json")
@@ -547,6 +558,16 @@ func (m *Module) UpdateExam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	e.WeightPercent = in.WeightPercent
+	if in.FeeLockEnabled != nil {
+		e.FeeLockEnabled = *in.FeeLockEnabled
+	}
+	if in.FeeLockMinDue != nil {
+		if *in.FeeLockMinDue < 0 {
+			httpx.Error(w, http.StatusBadRequest, "fee lock amount can't be negative")
+			return
+		}
+		e.FeeLockMinDue = *in.FeeLockMinDue
+	}
 	e.ExamDate = nil
 	if in.ExamDate != "" {
 		d, err := time.Parse("2006-01-02", in.ExamDate)
@@ -613,8 +634,32 @@ func (m *Module) PublishExam(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Publish bool `json:"publish"`
+		// Optional: set the fee lock in the same step as publishing.
+		FeeLockEnabled *bool `json:"fee_lock_enabled"`
+		FeeLockMinDue  *int  `json:"fee_lock_min_due"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
+	if body.FeeLockEnabled != nil || body.FeeLockMinDue != nil {
+		e, err := m.repo.GetExamByID(r.Context(), id)
+		if err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+		if body.FeeLockEnabled != nil {
+			e.FeeLockEnabled = *body.FeeLockEnabled
+		}
+		if body.FeeLockMinDue != nil {
+			if *body.FeeLockMinDue < 0 {
+				httpx.Error(w, http.StatusBadRequest, "fee lock amount can't be negative")
+				return
+			}
+			e.FeeLockMinDue = *body.FeeLockMinDue
+		}
+		if err := m.repo.UpdateExam(r.Context(), e); err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+	}
 	if err := m.repo.PublishExam(r.Context(), id, body.Publish); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -838,6 +883,9 @@ func (m *Module) GetMarksheet(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 		return
 	}
+	if !m.parentMayViewExam(w, r, examID, studentID) {
+		return
+	}
 	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
@@ -862,6 +910,9 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !ok {
 		httpx.Error(w, http.StatusForbidden, "access denied: not your class")
+		return
+	}
+	if !m.parentMayViewExam(w, r, examID, studentID) {
 		return
 	}
 	ms, err := m.repo.GetStudentMarksheet(r.Context(), examID, studentID)
@@ -980,7 +1031,16 @@ func (m *Module) getReportCardForRequest(r *http.Request) (*ReportCard, error) {
 	} else if !ok {
 		return nil, apperr.ErrForbidden
 	}
-	rc, err := m.repo.GetReportCard(r.Context(), studentID, yearID)
+	claims := httpx.ClaimsFromContext(r.Context())
+	isParent := claims != nil && claims.Role == "parent"
+	if isParent {
+		if lock, err := m.reportCardFeeLock(r.Context(), studentID, yearID); err != nil {
+			return nil, err
+		} else if lock != nil {
+			return nil, lock
+		}
+	}
+	rc, err := m.repo.GetReportCard(r.Context(), studentID, yearID, isParent)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,6 +1074,11 @@ func (m *Module) GetReportCard(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusBadRequest, "student_id and academic_year_id required")
 			return
 		}
+		var lock *feeLockError
+		if errors.As(err, &lock) {
+			writeFeeLocked(w, lock.due)
+			return
+		}
 		if errors.Is(err, apperr.ErrForbidden) {
 			httpx.Error(w, http.StatusForbidden, "access denied: not your class")
 			return
@@ -1029,6 +1094,11 @@ func (m *Module) DownloadReportCard(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, apperr.ErrInvalidInput) {
 			httpx.Error(w, http.StatusBadRequest, "student_id and academic_year_id required")
+			return
+		}
+		var lock *feeLockError
+		if errors.As(err, &lock) {
+			writeFeeLocked(w, lock.due)
 			return
 		}
 		if errors.Is(err, apperr.ErrForbidden) {
@@ -1218,7 +1288,32 @@ func (m *Module) WardExams(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": items})
+	// Mark the exams whose results the fee lock hides from this parent, so
+	// the app can say so instead of opening them.
+	type wardExam struct {
+		domain.Exam
+		FeeLocked bool `json:"fee_locked"`
+		FeeDue    int  `json:"fee_due,omitempty"`
+	}
+	out := make([]wardExam, 0, len(items))
+	due, dueKnown := 0, false
+	for _, e := range items {
+		we := wardExam{Exam: e}
+		if e.FeeLockEnabled {
+			if !dueKnown {
+				if due, err = m.repo.FeeDue(r.Context(), studentID, yearID); err != nil {
+					httpx.WriteServiceError(w, err)
+					return
+				}
+				dueKnown = true
+			}
+			if due > e.FeeLockMinDue {
+				we.FeeLocked, we.FeeDue = true, due
+			}
+		}
+		out = append(out, we)
+	}
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{"items": out})
 }
 
 // parentCanAccessStudent restricts a parent to marksheets for their own ward(s) only.
@@ -1268,4 +1363,88 @@ func (m *Module) teacherCanAccessMarks(ctx context.Context, claims *httpx.Claims
 		}
 	}
 	return true, nil
+}
+
+// ---- Results fee lock ----
+
+// feeLockError is returned when a parent's fee due hides results from them.
+type feeLockError struct{ due int }
+
+func (e *feeLockError) Error() string { return fmt.Sprintf("results locked: %d due", e.due) }
+
+// writeFeeLocked tells a parent their results are locked, in words the app
+// can show as-is (older app versions just show the error text).
+func writeFeeLocked(w http.ResponseWriter, due int) {
+	httpx.JSON(w, http.StatusForbidden, map[string]interface{}{
+		"error":      fmt.Sprintf("Results are locked: ₹%s fee is due. Please pay at the school office to see the results.", rupees(due)),
+		"fee_locked": true,
+		"fee_due":    due,
+	})
+}
+
+// rupees formats an amount the Indian way, e.g. 125000 -> "1,25,000".
+func rupees(n int) string {
+	s := strconv.Itoa(n)
+	if len(s) <= 3 {
+		return s
+	}
+	head, tail := s[:len(s)-3], s[len(s)-3:]
+	var parts []string
+	for len(head) > 2 {
+		parts = append([]string{head[len(head)-2:]}, parts...)
+		head = head[:len(head)-2]
+	}
+	if head != "" {
+		parts = append([]string{head}, parts...)
+	}
+	return strings.Join(parts, ",") + "," + tail
+}
+
+// parentMayViewExam lets staff through untouched. For a parent it refuses an
+// exam that isn't published yet, and one whose fee lock applies to them,
+// writing the response itself; it returns false when it did.
+func (m *Module) parentMayViewExam(w http.ResponseWriter, r *http.Request, examID, studentID uuid.UUID) bool {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil || claims.Role != "parent" {
+		return true
+	}
+	e, err := m.repo.GetExamByID(r.Context(), examID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return false
+	}
+	if !e.IsPublished {
+		httpx.Error(w, http.StatusNotFound, "these results are not published yet")
+		return false
+	}
+	if !e.FeeLockEnabled {
+		return true
+	}
+	due, err := m.repo.FeeDue(r.Context(), studentID, e.AcademicYearID)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return false
+	}
+	if due > e.FeeLockMinDue {
+		writeFeeLocked(w, due)
+		return false
+	}
+	return true
+}
+
+// reportCardFeeLock returns a *feeLockError when any published, fee-locked
+// exam of the student's class hides the year's report card from a parent.
+func (m *Module) reportCardFeeLock(ctx context.Context, studentID, yearID uuid.UUID) (error, error) {
+	minDue, any, err := m.repo.StrictestFeeLock(ctx, studentID, yearID)
+	if err != nil || !any {
+		return nil, err
+	}
+	due, err := m.repo.FeeDue(ctx, studentID, yearID)
+	if err != nil {
+		return nil, err
+	}
+	if due > minDue {
+		return &feeLockError{due: due}, nil
+	}
+	return nil, nil
 }

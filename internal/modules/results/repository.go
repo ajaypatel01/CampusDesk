@@ -122,10 +122,12 @@ func (r *Repository) DeleteSubject(ctx context.Context, id uuid.UUID) error {
 
 func (r *Repository) CreateExam(ctx context.Context, e *domain.Exam) error {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO exams (school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		INSERT INTO exams (school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published,
+			fee_lock_enabled, fee_lock_min_due)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING id, created_at, updated_at`,
 		e.SchoolID, e.AcademicYearID, e.GradeLevelID, e.Name, e.ExamDate, e.WeightPercent, e.IsPublished,
+		e.FeeLockEnabled, e.FeeLockMinDue,
 	)
 	if err := row.Scan(&e.ID, &e.CreatedAt, &e.UpdatedAt); err != nil {
 		return database.MapError(err)
@@ -136,9 +138,9 @@ func (r *Repository) CreateExam(ctx context.Context, e *domain.Exam) error {
 func (r *Repository) GetExamByID(ctx context.Context, id uuid.UUID) (*domain.Exam, error) {
 	var e domain.Exam
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published, created_at, updated_at
+		SELECT id, school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published, fee_lock_enabled, fee_lock_min_due, created_at, updated_at
 		FROM exams WHERE id=$1`, id,
-	).Scan(&e.ID, &e.SchoolID, &e.AcademicYearID, &e.GradeLevelID, &e.Name, &e.ExamDate, &e.WeightPercent, &e.IsPublished, &e.CreatedAt, &e.UpdatedAt)
+	).Scan(&e.ID, &e.SchoolID, &e.AcademicYearID, &e.GradeLevelID, &e.Name, &e.ExamDate, &e.WeightPercent, &e.IsPublished, &e.FeeLockEnabled, &e.FeeLockMinDue, &e.CreatedAt, &e.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -149,7 +151,7 @@ func (r *Repository) GetExamByID(ctx context.Context, id uuid.UUID) (*domain.Exa
 // their grade from their enrollment rather than a client-supplied grade_level_id.
 func (r *Repository) WardExams(ctx context.Context, studentID, yearID uuid.UUID) ([]domain.Exam, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT ex.id, ex.school_id, ex.academic_year_id, ex.grade_level_id, ex.name, ex.exam_date, ex.weight_percent, ex.is_published, ex.created_at, ex.updated_at
+		SELECT DISTINCT ex.id, ex.school_id, ex.academic_year_id, ex.grade_level_id, ex.name, ex.exam_date, ex.weight_percent, ex.is_published, ex.fee_lock_enabled, ex.fee_lock_min_due, ex.created_at, ex.updated_at
 		FROM enrollments e
 		JOIN class_sections cs ON cs.id = e.class_section_id
 		JOIN exams ex ON ex.academic_year_id = e.academic_year_id AND ex.grade_level_id = cs.grade_level_id
@@ -163,7 +165,7 @@ func (r *Repository) WardExams(ctx context.Context, studentID, yearID uuid.UUID)
 	for rows.Next() {
 		var e domain.Exam
 		if err := rows.Scan(&e.ID, &e.SchoolID, &e.AcademicYearID, &e.GradeLevelID, &e.Name, &e.ExamDate,
-			&e.WeightPercent, &e.IsPublished, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			&e.WeightPercent, &e.IsPublished, &e.FeeLockEnabled, &e.FeeLockMinDue, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, e)
@@ -173,7 +175,7 @@ func (r *Repository) WardExams(ctx context.Context, studentID, yearID uuid.UUID)
 
 func (r *Repository) ListExams(ctx context.Context, schoolID, yearID, gradeLevelID uuid.UUID) ([]domain.Exam, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published, created_at, updated_at
+		SELECT id, school_id, academic_year_id, grade_level_id, name, exam_date, weight_percent, is_published, fee_lock_enabled, fee_lock_min_due, created_at, updated_at
 		FROM exams WHERE school_id=$1 AND academic_year_id=$2 AND grade_level_id=$3
 		ORDER BY exam_date NULLS LAST, name`, schoolID, yearID, gradeLevelID)
 	if err != nil {
@@ -184,7 +186,7 @@ func (r *Repository) ListExams(ctx context.Context, schoolID, yearID, gradeLevel
 	for rows.Next() {
 		var e domain.Exam
 		if err := rows.Scan(&e.ID, &e.SchoolID, &e.AcademicYearID, &e.GradeLevelID, &e.Name, &e.ExamDate,
-			&e.WeightPercent, &e.IsPublished, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			&e.WeightPercent, &e.IsPublished, &e.FeeLockEnabled, &e.FeeLockMinDue, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, e)
@@ -196,8 +198,9 @@ func (r *Repository) ListExams(ctx context.Context, schoolID, yearID, gradeLevel
 // year are fixed: marks, formats and report cards hang off them.
 func (r *Repository) UpdateExam(ctx context.Context, e *domain.Exam) error {
 	tag, err := r.pool.Exec(ctx, `
-		UPDATE exams SET name=$2, exam_date=$3, weight_percent=$4, updated_at=NOW() WHERE id=$1`,
-		e.ID, e.Name, e.ExamDate, e.WeightPercent)
+		UPDATE exams SET name=$2, exam_date=$3, weight_percent=$4, fee_lock_enabled=$5, fee_lock_min_due=$6,
+			updated_at=NOW() WHERE id=$1`,
+		e.ID, e.Name, e.ExamDate, e.WeightPercent, e.FeeLockEnabled, e.FeeLockMinDue)
 	if err != nil {
 		return database.MapError(err)
 	}
@@ -246,6 +249,39 @@ func (r *Repository) DeleteExam(ctx context.Context, id uuid.UUID) error {
 		return apperr.ErrNotFound
 	}
 	return nil
+}
+
+// FeeDue returns what is still owed on a student's fee account for a year
+// (0 when there is no account).
+func (r *Repository) FeeDue(ctx context.Context, studentID, yearID uuid.UUID) (int, error) {
+	var due int
+	err := r.pool.QueryRow(ctx, `
+		SELECT (sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee)
+			- COALESCE((SELECT SUM(fp.amount) FROM fee_payments fp WHERE fp.student_fee_account_id = sfa.id AND NOT fp.voided), 0)
+		FROM student_fee_accounts sfa WHERE sfa.student_id = $1 AND sfa.academic_year_id = $2`,
+		studentID, yearID).Scan(&due)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	return due, err
+}
+
+// StrictestFeeLock returns the lowest allowed due amount among the
+// published, fee-locked exams of the class a student is in for a year (by
+// their fee account), and whether there is any such exam.
+func (r *Repository) StrictestFeeLock(ctx context.Context, studentID, yearID uuid.UUID) (int, bool, error) {
+	var minDue *int
+	err := r.pool.QueryRow(ctx, `
+		SELECT MIN(e.fee_lock_min_due)
+		FROM student_fee_accounts sfa
+		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
+		JOIN exams e ON e.academic_year_id = sfa.academic_year_id AND e.grade_level_id = fs.grade_level_id
+		WHERE sfa.student_id = $1 AND sfa.academic_year_id = $2 AND e.is_published AND e.fee_lock_enabled`,
+		studentID, yearID).Scan(&minDue)
+	if err != nil || minDue == nil {
+		return 0, false, err
+	}
+	return *minDue, true, nil
 }
 
 func (r *Repository) PublishExam(ctx context.Context, id uuid.UUID, publish bool) error {

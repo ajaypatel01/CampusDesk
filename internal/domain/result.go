@@ -32,6 +32,10 @@ type Exam struct {
 	ExamDate       *time.Time `json:"exam_date,omitempty"`
 	WeightPercent  int        `json:"weight_percent"`
 	IsPublished    bool       `json:"is_published"`
+	// FeeLockEnabled hides this exam's results from parents whose fee
+	// balance for the year is more than FeeLockMinDue (staff still see them).
+	FeeLockEnabled bool `json:"fee_lock_enabled"`
+	FeeLockMinDue  int  `json:"fee_lock_min_due"`
 	Timestamps
 }
 
