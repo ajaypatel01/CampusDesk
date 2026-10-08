@@ -9,6 +9,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/config"
 	"github.com/ajaypatel01/CampusDesk/internal/modules"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/academic"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/auditlog"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/books"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/communications"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/customfields"
@@ -99,6 +100,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	// Public routes (no auth required)
 	api.Group(func(r chi.Router) {
+		r.Use(httpx.AuditActor) // records public writes (e.g. registration) without a user
 		health.New(pool).Mount(r)
 		userMod.MountPublic(r)   // /auth/login, /auth/register
 		schoolMod.MountPublic(r) // /schools/public — school picker for registration
@@ -107,6 +109,8 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	// Protected routes — JWT required
 	api.Group(func(r chi.Router) {
 		r.Use(httpx.JWTMiddleware(cfg.Auth.JWTSecret))
+		// Tags each write request with the logged-in user for the audit log.
+		r.Use(httpx.AuditActor)
 		// Rejects any token minted before the user's last "log out
 		// everywhere" -- must run right after JWT parsing, before anything
 		// else trusts the claims.
@@ -169,6 +173,7 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		tcvoucher.New(pool),
 		payroll.New(pool),
 		customfields.New(pool),
+		auditlog.New(pool),
 	}
 	for _, m := range mods {
 		log.Printf("mount module: %s", m.Name())

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ajaypatel01/CampusDesk/internal/platform/audit"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
@@ -82,5 +83,29 @@ func RequestLogger(next http.Handler) http.Handler {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(ww, r)
 		log.Printf("%s %s %d %s", r.Method, r.URL.Path, ww.Status(), time.Since(start))
+	})
+}
+
+// AuditActor marks write requests (anything but GET/HEAD/OPTIONS) with who
+// is making them, so the database's audit log can record it. Mount it after
+// JWTMiddleware on protected routes; on public routes it records the request
+// without a user.
+func AuditActor(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+		a := audit.Actor{
+			Request:   r.Method + " " + r.URL.Path,
+			RequestID: middleware.GetReqID(r.Context()),
+			IP:        r.RemoteAddr,
+			UserAgent: r.UserAgent(),
+		}
+		if claims := ClaimsFromContext(r.Context()); claims != nil {
+			a.UserID, a.Role, a.SchoolID = claims.Sub, claims.Role, claims.SchoolID
+		}
+		next.ServeHTTP(w, r.WithContext(audit.WithActor(r.Context(), a)))
 	})
 }

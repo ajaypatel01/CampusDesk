@@ -1,0 +1,20 @@
+.activity-page { padding: var(--space-6); max-width: 1400px; }
+.activity-date { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted); }
+.activity-date input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.activity-table td { vertical-align: top; }
+.activity-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.activity-changes { list-style: none; margin: 0; padding: 0; font-size: 0.82rem; display: flex; flex-direction: column; gap: 2px; }
+.activity-changes__field { color: var(--text-muted); }
+.activity-changes__old { color: var(--danger); text-decoration: line-through; }
+.activity-changes__new { color: var(--success-600, var(--success)); font-weight: 600; }
+.activity-device { font-size: 0.75rem; max-width: 220px; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .activity-page { padding: var(--space-4); }
+}
