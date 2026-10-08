@@ -19,6 +19,8 @@ func WriteServiceError(w http.ResponseWriter, err error) {
 		Error(w, http.StatusUnauthorized, err.Error())
 	case errors.Is(err, apperr.ErrForbidden):
 		Error(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, apperr.ErrTooMany):
+		Error(w, http.StatusTooManyRequests, err.Error())
 	default:
 		Error(w, http.StatusInternalServerError, "internal server error")
 	}

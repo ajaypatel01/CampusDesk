@@ -28,7 +28,6 @@ var conflictReasons = map[string]string{
 	"fee_installment_plans_fee_structure_id_installment_number_key":   "this fee structure already has an installment with this number",
 	"fee_structures_school_id_academic_year_id_grade_level_id_key":    "this grade already has a fee structure for this academic year",
 	"grade_levels_school_id_name_key":                                 "a grade with this name already exists in this school",
-	"idx_guardians_user_id":                                           "this login is already linked to another guardian",
 	"homework_submissions_assignment_id_student_id_key":               "this student already has a submission for this homework",
 	"marksheet_total_overrides_exam_id_student_id_key":                "this marksheet total has already been edited",
 	"password_reset_tokens_token_hash_key":                            "this password reset link was already issued -- request a new one",

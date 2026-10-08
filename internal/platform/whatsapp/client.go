@@ -15,6 +15,7 @@ type Client struct {
 	phoneNumberID string
 	accessToken   string
 	apiVersion    string
+	baseHost      string
 	httpClient    *http.Client
 }
 
@@ -26,6 +27,7 @@ func New(phoneNumberID, accessToken, apiVersion string) *Client {
 		phoneNumberID: phoneNumberID,
 		accessToken:   accessToken,
 		apiVersion:    apiVersion,
+		baseHost:      "https://graph.facebook.com",
 		httpClient:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -34,8 +36,16 @@ func (c *Client) Enabled() bool {
 	return c != nil && c.phoneNumberID != "" && c.accessToken != ""
 }
 
+// WithBaseURL points the client at another API host (local testing only).
+func (c *Client) WithBaseURL(host string) *Client {
+	if host != "" {
+		c.baseHost = strings.TrimRight(host, "/")
+	}
+	return c
+}
+
 func (c *Client) baseURL() string {
-	return fmt.Sprintf("https://graph.facebook.com/%s/%s", c.apiVersion, c.phoneNumberID)
+	return fmt.Sprintf("%s/%s/%s", c.baseHost, c.apiVersion, c.phoneNumberID)
 }
 
 // SendDocument uploads a PDF to Meta media storage then sends it to the recipient.
@@ -181,4 +191,29 @@ func sanitizePhone(phone string) string {
 	phone = strings.ReplaceAll(phone, "-", "")
 	phone = strings.TrimPrefix(phone, "+")
 	return phone
+}
+
+// SendAuthCode sends a one-time code through an Authentication-category
+// template with a copy-code button. Meta needs the code twice: once for the
+// {{1}} in the body and once for the button.
+func (c *Client) SendAuthCode(toPhone, templateName, language, code string) error {
+	if !c.Enabled() {
+		return fmt.Errorf("whatsapp client not configured")
+	}
+	codeParam := []map[string]string{{"type": "text", "text": code}}
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
+		"to":                sanitizePhone(toPhone),
+		"type":              "template",
+		"template": map[string]interface{}{
+			"name":     templateName,
+			"language": map[string]string{"code": language},
+			"components": []map[string]interface{}{
+				{"type": "body", "parameters": codeParam},
+				{"type": "button", "sub_type": "url", "index": "0", "parameters": codeParam},
+			},
+		},
+	}
+	return c.postMessages(payload)
 }

@@ -86,7 +86,7 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User
 // copied from a staff/guardian profile) never land here, only ones that
 // went through ConfirmPhoneVerification.
 func (r *Repository) GetByPhone(ctx context.Context, phone string) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, created_at, updated_at FROM users WHERE phone_number=$1`, phone)
+	return r.scanOne(ctx, `SELECT `+userColumns+` FROM users WHERE `+phoneMatches+` ORDER BY created_at LIMIT 1`, phone)
 }
 
 // SetPhoneNumber records a user's OTP-verified phone number. Returns
