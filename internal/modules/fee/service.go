@@ -625,12 +625,18 @@ func (s *Service) StudentFeeSummary(ctx context.Context, studentID, yearID uuid.
 	}
 	netTuition := fa.TuitionFee - fa.DiscountAmount
 	totalDue := netTuition + fa.VanFee + fa.PreviousYearDues + fa.LateFee
+	// The summary lists only payments that still count, newest first (it
+	// feeds "Recent Payments" and the parent's payment history); voided
+	// payments stay visible on the fee account and in the ledger.
 	var totalPaid int
-	for _, p := range payments {
-		if !p.Voided {
+	active := make([]domain.FeePayment, 0, len(payments))
+	for i := len(payments) - 1; i >= 0; i-- {
+		if p := payments[i]; !p.Voided {
 			totalPaid += p.Amount
+			active = append(active, p)
 		}
 	}
+	payments = active
 
 	return &StudentFeeSummaryResponse{
 		AccountID:        fa.ID,
