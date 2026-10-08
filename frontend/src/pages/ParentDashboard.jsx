@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { GraduationCap, BookOpen, BarChart2, Download, IndianRupee } from 'lucide-react'
+import { GraduationCap, BookOpen, BarChart2, Download, IndianRupee, Lock } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, homeworkApi, resultsApi, feesApi } from '../services/api'
 import './ParentDashboard.css'
@@ -86,12 +86,18 @@ function ParentDashboard() {
       .finally(() => setFeeLoading(false))
   }, [selectedWardId, currentYear])
 
+  // An exam the school has locked for unpaid fees: its results stay hidden
+  // and the parent is told how much is due instead.
+  const selectedExam = exams.find(ex => ex.id === examId)
+  const lockedExam = selectedExam?.fee_locked ? selectedExam : null
+  const [marksheetError, setMarksheetError] = useState('')
+
   function loadMarksheet() {
-    if (!examId || !selectedWardId) return
-    setMarksheetLoading(true)
+    if (!examId || !selectedWardId || lockedExam) return
+    setMarksheetLoading(true); setMarksheetError('')
     resultsApi.getMarksheet(examId, selectedWardId)
       .then(setMarksheet)
-      .catch(() => setMarksheet(null))
+      .catch(err => { setMarksheet(null); setMarksheetError(err.message || 'Could not load the results') })
       .finally(() => setMarksheetLoading(false))
   }
 
@@ -179,11 +185,11 @@ function ParentDashboard() {
           ) : (
             <>
               <div className="parent-dashboard__exam-row">
-                <select value={examId} onChange={e => setExamId(e.target.value)}>
+                <select value={examId} onChange={e => { setExamId(e.target.value); setMarksheet(null); setMarksheetError('') }}>
                   <option value="">Select exam</option>
-                  {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                  {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.name}{ex.fee_locked ? ' (locked)' : ''}</option>)}
                 </select>
-                <button className="btn btn--primary btn--sm" onClick={loadMarksheet} disabled={!examId || marksheetLoading}>
+                <button className="btn btn--primary btn--sm" onClick={loadMarksheet} disabled={!examId || marksheetLoading || !!lockedExam}>
                   {marksheetLoading ? 'Loading...' : 'View'}
                 </button>
                 {marksheet && (
@@ -192,6 +198,20 @@ function ParentDashboard() {
                   </button>
                 )}
               </div>
+
+              {lockedExam && (
+                <div className="parent-dashboard__locked" role="status">
+                  <Lock size={18} aria-hidden="true" />
+                  <div>
+                    <strong>Results are locked</strong>
+                    <p>
+                      ₹{Number(lockedExam.fee_due || 0).toLocaleString('en-IN')} fee is due. Please pay at the school office to see
+                      the {lockedExam.name} results. They unlock as soon as the payment is recorded.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!lockedExam && marksheetError && <p className="doc-msg doc-msg--error">{marksheetError}</p>}
 
               {marksheet && (
                 <div className="marksheet-preview">

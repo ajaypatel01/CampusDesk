@@ -168,7 +168,9 @@ func (r *Repository) UpsertMarkWithComponents(ctx context.Context, mark *domain.
 // combines up to 3 exams for that grade+year, and returns the full printable
 // report card (minus father/mother name, filled in by the caller from the
 // guardian module rather than duplicating that lookup here).
-func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearID uuid.UUID) (*ReportCard, error) {
+// GetReportCard builds a student's report card for the year. publishedOnly
+// leaves out exams that are not published yet (what parents get).
+func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearID uuid.UUID, publishedOnly bool) (*ReportCard, error) {
 	var rc ReportCard
 	rc.StudentID = studentID
 	rc.AcademicYearID = academicYearID
@@ -211,7 +213,8 @@ func (r *Repository) GetReportCard(ctx context.Context, studentID, academicYearI
 
 	examRows, err := r.pool.Query(ctx, `
 		SELECT id, name FROM exams WHERE school_id=$1 AND grade_level_id=$2 AND academic_year_id=$3
-		ORDER BY exam_date NULLS LAST, name`, schoolID, rc.GradeLevelID, academicYearID)
+		  AND (is_published OR NOT $4)
+		ORDER BY exam_date NULLS LAST, name`, schoolID, rc.GradeLevelID, academicYearID, publishedOnly)
 	if err != nil {
 		return nil, err
 	}

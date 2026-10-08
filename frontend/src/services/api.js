@@ -251,7 +251,8 @@ export const resultsApi = {
   // Edit name/date/weight; delete is refused while published or once marks are entered.
   updateExam: (id, body) => request(`/exams/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteExam: (id) => request(`/exams/${id}`, { method: 'DELETE' }),
-  publishExam: (id, publish) => request(`/exams/${id}/publish`, { method: 'POST', body: JSON.stringify({ publish }) }),
+  // extra may carry fee_lock_enabled / fee_lock_min_due, set in the same step.
+  publishExam: (id, publish, extra = {}) => request(`/exams/${id}/publish`, { method: 'POST', body: JSON.stringify({ publish, ...extra }) }),
   // Per-exam marks distribution for each subject (admins change it; teachers read it).
   listExamFormats: (examId) => request(`/exams/${examId}/mark-formats`),
   setExamSubjectFormat: (examId, subjectId, body) => request(`/exams/${examId}/mark-formats/${subjectId}`, { method: 'PUT', body: JSON.stringify(body) }),

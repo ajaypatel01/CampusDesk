@@ -58,7 +58,9 @@ function Results() {
   const [examForm, setExamForm] = useState({ name: '', exam_date: '', weight_percent: 100 })
   const [publishingId, setPublishingId] = useState(null)
   const [formatExamId, setFormatExamId] = useState(null) // exam whose marks format is open
-  const [editingExam, setEditingExam] = useState(null) // { id, name, exam_date, weight_percent } while a row is edited
+  const [editingExam, setEditingExam] = useState(null) // { id, name, exam_date, weight_percent, fee_lock_enabled, fee_lock_min_due } while a row is edited
+  // Publishing asks whether to hide results from parents with fees due.
+  const [publishDialog, setPublishDialog] = useState(null) // { exam, fee_lock_enabled, fee_lock_min_due }
   const [examSaving, setExamSaving] = useState(false)
 
   // Marks
@@ -233,6 +235,8 @@ function Results() {
       name: e.name,
       exam_date: e.exam_date ? e.exam_date.slice(0, 10) : '',
       weight_percent: String(e.weight_percent),
+      fee_lock_enabled: !!e.fee_lock_enabled,
+      fee_lock_min_due: String(e.fee_lock_min_due || 0),
     })
   }
 
@@ -244,6 +248,8 @@ function Results() {
         name: editingExam.name.trim(),
         exam_date: editingExam.exam_date || '',
         weight_percent: parseInt(editingExam.weight_percent, 10) || 0,
+        fee_lock_enabled: editingExam.fee_lock_enabled,
+        fee_lock_min_due: parseInt(editingExam.fee_lock_min_due, 10) || 0,
       })
       setEditingExam(null)
       await reloadExams()
@@ -273,11 +279,18 @@ function Results() {
   // admin un-publishing one hides them again without deleting anything, same
   // toggle either direction.
   async function handleTogglePublish(exam) {
-    const nextState = !exam.is_published
-    if (nextState && !window.confirm(`Publish "${exam.name}"? Parents will be able to see marks recorded against it.`)) return
+    if (!exam.is_published) {
+      setPublishDialog({ exam, fee_lock_enabled: !!exam.fee_lock_enabled, fee_lock_min_due: String(exam.fee_lock_min_due || 0) })
+      return
+    }
+    await setPublished(exam, false)
+  }
+
+  async function setPublished(exam, publish, extra = {}) {
     setPublishingId(exam.id)
     try {
-      await resultsApi.publishExam(exam.id, nextState)
+      await resultsApi.publishExam(exam.id, publish, extra)
+      setPublishDialog(null)
       const res = await resultsApi.listExams({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
       setExams(res.items || [])
     } catch (err) {
@@ -812,16 +825,23 @@ function Results() {
           )}
           <div className="table-card">
             <table className="data-table">
-              <thead><tr><th>Exam Name</th><th>Date</th><th>Weight</th><th>Published</th>{!isTeacher && <th></th>}</tr></thead>
+              <thead><tr><th>Exam Name</th><th>Date</th><th>Weight</th><th>Published</th><th>Fee lock</th>{!isTeacher && <th></th>}</tr></thead>
               <tbody>
                 {exams.length === 0 ? (
-                  <tr><td colSpan={isTeacher ? 4 : 5} className="data-table__empty">No exams yet</td></tr>
+                  <tr><td colSpan={isTeacher ? 5 : 6} className="data-table__empty">No exams yet</td></tr>
                 ) : exams.map(e => editingExam?.id === e.id ? (
                   <tr key={e.id}>
                     <td><input value={editingExam.name} onChange={ev => setEditingExam({ ...editingExam, name: ev.target.value })} placeholder="Exam name" /></td>
                     <td><input type="date" value={editingExam.exam_date} onChange={ev => setEditingExam({ ...editingExam, exam_date: ev.target.value })} /></td>
                     <td><input type="number" min="1" max="100" style={{ width: '70px' }} value={editingExam.weight_percent} onChange={ev => setEditingExam({ ...editingExam, weight_percent: ev.target.value })} /></td>
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <label className="form-field--checkbox" style={{ margin: 0 }}>
+                        <input type="checkbox" checked={editingExam.fee_lock_enabled} onChange={ev => setEditingExam({ ...editingExam, fee_lock_enabled: ev.target.checked })} />
+                        <span>Lock if due &gt; ₹</span>
+                        <input type="number" min="0" step="100" style={{ width: '90px' }} disabled={!editingExam.fee_lock_enabled} value={editingExam.fee_lock_min_due} onChange={ev => setEditingExam({ ...editingExam, fee_lock_min_due: ev.target.value })} aria-label="Lock when fee due is more than" />
+                      </label>
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn btn--primary btn--sm" onClick={handleSaveExam} disabled={examSaving || !editingExam.name.trim()}>
                         {examSaving ? 'Saving...' : 'Save'}
@@ -835,6 +855,11 @@ function Results() {
                     <td className="data-table__muted">{formatDate(e.exam_date)}</td>
                     <td>{e.weight_percent}%</td>
                     <td><span className={`badge badge--${e.is_published ? 'success' : 'muted'}`}>{e.is_published ? 'Published' : 'Draft'}</span></td>
+                    <td className="data-table__muted">
+                      {e.fee_lock_enabled
+                        ? (e.fee_lock_min_due > 0 ? `Due > ₹${Number(e.fee_lock_min_due).toLocaleString('en-IN')}` : 'Any due')
+                        : '—'}
+                    </td>
                     {!isTeacher && (
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <button className="btn btn--outline btn--sm" title="Edit exam" onClick={() => startEditExam(e)} style={{ marginRight: '6px' }}>
@@ -864,6 +889,39 @@ function Results() {
               </tbody>
             </table>
           </div>
+          {publishDialog && (
+            <div className="modal-overlay" onClick={() => setPublishDialog(null)}>
+              <div className="modal" onClick={ev => ev.stopPropagation()}>
+                <h2>Publish {publishDialog.exam.name}?</h2>
+                <p className="empty-text">Parents will be able to see the marks recorded for this exam.</p>
+                <label className="form-field--checkbox">
+                  <input type="checkbox" checked={publishDialog.fee_lock_enabled} onChange={ev => setPublishDialog({ ...publishDialog, fee_lock_enabled: ev.target.checked })} />
+                  <span>Hide results from parents who have fees due</span>
+                </label>
+                {publishDialog.fee_lock_enabled && (
+                  <label className="form-field" style={{ marginTop: '8px' }}>
+                    <span>Only when the due amount is more than (₹)</span>
+                    <input type="number" min="0" step="100" value={publishDialog.fee_lock_min_due} onChange={ev => setPublishDialog({ ...publishDialog, fee_lock_min_due: ev.target.value })} />
+                    <span className="data-table__muted" style={{ fontSize: '0.8rem' }}>
+                      0 = any amount due hides the results. Parents see &ldquo;Results are locked: ₹… fee is due. Please pay at the school office&rdquo;. Results unlock as soon as the payment is recorded.
+                    </span>
+                  </label>
+                )}
+                <div className="modal__actions">
+                  <button type="button" className="btn btn--outline" onClick={() => setPublishDialog(null)}>Cancel</button>
+                  <button
+                    type="button" className="btn btn--primary" disabled={publishingId === publishDialog.exam.id}
+                    onClick={() => setPublished(publishDialog.exam, true, {
+                      fee_lock_enabled: publishDialog.fee_lock_enabled,
+                      fee_lock_min_due: parseInt(publishDialog.fee_lock_min_due, 10) || 0,
+                    })}
+                  >
+                    {publishingId === publishDialog.exam.id ? 'Publishing...' : 'Publish'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {formatExamId && exams.some(e => e.id === formatExamId) && (
             <div style={{ marginTop: '16px' }}>
               <div className="results-section__header">
