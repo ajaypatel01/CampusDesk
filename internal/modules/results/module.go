@@ -59,7 +59,7 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteExam)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/{id}/publish", m.PublishExam)
 		// Whole-class result sheet for one exam: admins and the owner only.
-		r.With(httpx.RequireRole("super_admin", "school_admin", "registrar"), view).Get("/{id}/result-sheet", m.GetResultSheet)
+		r.With(httpx.RequireRole("super_admin", "school_admin", "registrar", "teacher"), view).Get("/{id}/result-sheet", m.GetResultSheet)
 		// Per-exam marks distribution for each subject. Teachers read it (to
 		// enter marks against it) for their own class; only admins change it.
 		r.With(httpx.BlockRoles("parent"), view).Get("/{id}/mark-formats", m.ListExamFormats)
@@ -606,8 +606,9 @@ func (m *Module) GetResultSheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Exams are fetched by id, so check the caller's school here: a school
-	// admin or registrar only sees their own school's sheets.
-	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil && claims.Role != "super_admin" && claims.SchoolID != "" {
+	// admin, registrar or teacher only sees their own school's sheets.
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims != nil && claims.Role != "super_admin" && claims.SchoolID != "" {
 		e, err := m.repo.GetExamByID(r.Context(), examID)
 		if err != nil {
 			httpx.WriteServiceError(w, err)
@@ -618,10 +619,35 @@ func (m *Module) GetResultSheet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// A class teacher sees only the students of their own section(s).
+	teacherID, restricted, err := m.teacherIDIfRestricted(r.Context(), claims)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var mine map[uuid.UUID]bool
+	if restricted {
+		e, err := m.repo.GetExamByID(r.Context(), examID)
+		if err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+		if mine, err = m.repo.TeacherStudentIDs(r.Context(), teacherID, e.AcademicYearID, e.GradeLevelID); err != nil {
+			httpx.WriteServiceError(w, err)
+			return
+		}
+		if len(mine) == 0 {
+			httpx.Error(w, http.StatusForbidden, "access denied: you are not the class teacher of this class")
+			return
+		}
+	}
 	sheet, err := m.repo.GetResultSheet(r.Context(), examID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
+	}
+	if restricted {
+		sheet.OnlyStudents(mine)
 	}
 	httpx.JSON(w, http.StatusOK, sheet)
 }

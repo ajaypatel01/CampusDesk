@@ -553,6 +553,31 @@ func (r *Repository) TeacherOwnsStudent(ctx context.Context, teacherID, academic
 	return exists, err
 }
 
+// TeacherStudentIDs returns the students enrolled, in academicYearID, in a
+// gradeLevelID section where teacherID is the class or vice class teacher.
+func (r *Repository) TeacherStudentIDs(ctx context.Context, teacherID, academicYearID, gradeLevelID uuid.UUID) (map[uuid.UUID]bool, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT e.student_id
+		FROM enrollments e
+		JOIN class_sections cs ON cs.id = e.class_section_id
+		WHERE e.academic_year_id = $1 AND cs.grade_level_id = $2
+		  AND (cs.homeroom_teacher_id = $3 OR EXISTS (SELECT 1 FROM class_section_vice_teachers v WHERE v.class_section_id = cs.id AND v.user_id = $3))`,
+		academicYearID, gradeLevelID, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids[id] = true
+	}
+	return ids, rows.Err()
+}
+
 // ExamAcademicYear returns the academic year an exam belongs to.
 func (r *Repository) ExamAcademicYear(ctx context.Context, examID uuid.UUID) (uuid.UUID, error) {
 	var yearID uuid.UUID
