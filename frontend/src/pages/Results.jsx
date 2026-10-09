@@ -17,11 +17,12 @@ function downloadBlob(blob, filename) {
 }
 
 const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', ClipboardList], ['marks','Enter Marks', Plus], ['marksheet','Marksheet', BarChart2], ['report-card','Report Card', GraduationCap], ['result-sheet','Result Dashboard', Table]]
-// Teachers only enter marks and view marksheets; subjects, exams and report
-// cards are managed by admins.
-const TEACHER_TABS = ['marks', 'marksheet']
-// The results dashboard (whole class, one exam) is for the owner, the school's admins and registrars.
-const RESULT_SHEET_ROLES = ['super_admin', 'school_admin', 'registrar']
+// Teachers enter marks, view marksheets and see their own class's results
+// dashboard; subjects, exams and report cards are managed by admins.
+const TEACHER_TABS = ['marks', 'marksheet', 'result-sheet']
+// The results dashboard (one class, one exam) is for the owner, the school's
+// admins, registrars, and class teachers (their own section only).
+const RESULT_SHEET_ROLES = ['super_admin', 'school_admin', 'registrar', 'teacher']
 // Grading-only (co-scholastic) subjects get one of these instead of marks.
 const GRADE_LETTERS = ['A', 'B', 'C', 'D']
 

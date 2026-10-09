@@ -196,6 +196,20 @@ func (r *Repository) GetResultSheet(ctx context.Context, examID uuid.UUID) (*Res
 
 // rankStudents ranks students with marks by percentage, highest first, with
 // ties sharing a rank (1, 2, 2, 4). Students without marks keep rank 0.
+// OnlyStudents keeps just the given students (a class teacher's own
+// section) and ranks them among themselves.
+func (sh *ResultSheet) OnlyStudents(keep map[uuid.UUID]bool) {
+	kept := make([]ResultSheetStudent, 0, len(keep))
+	for _, st := range sh.Students {
+		if keep[st.StudentID] {
+			st.Rank = 0
+			kept = append(kept, st)
+		}
+	}
+	rankStudents(kept)
+	sh.Students = kept
+}
+
 func rankStudents(students []ResultSheetStudent) {
 	order := make([]int, 0, len(students))
 	for i, st := range students {

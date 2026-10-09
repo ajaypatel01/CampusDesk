@@ -12,7 +12,8 @@ const pct = (n) => `${n.toFixed(1)}%`
 
 // Results dashboard for one class and exam: headline numbers, how each subject
 // went, the grade spread, who did best and who needs attention, then the full
-// class sheet. View only -- admins and the owner (the backend refuses others).
+// class sheet. View only -- for the owner, admins, registrars and class
+// teachers (the backend shows a class teacher only their own section).
 function ResultDashboard({ exams }) {
   const [examId, setExamId] = useState('')
   const [sheet, setSheet] = useState(null)
