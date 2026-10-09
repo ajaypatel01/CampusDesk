@@ -647,7 +647,7 @@ function Results() {
             <form className="results-inline-form" onSubmit={handleAddSubject}>
               <div className="form-row">
                 <label className="form-field"><span>Name *</span><input required value={subjectForm.name} onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })} placeholder="e.g. Mathematics" /></label>
-                <label className="form-field"><span>Code</span><input value={subjectForm.code} onChange={e => setSubjectForm({ ...subjectForm, code: e.target.value })} placeholder="MATH" /></label>
+                <label className="form-field"><span>Code (short, up to 20 letters)</span><input value={subjectForm.code} maxLength={20} onChange={e => setSubjectForm({ ...subjectForm, code: e.target.value })} placeholder="e.g. AI, MATH" /></label>
               </div>
               <div className="form-row">
                 <label className="form-field"><span>Max Marks</span><input type="number" min="1" value={subjectForm.max_marks} onChange={e => setSubjectForm({ ...subjectForm, max_marks: parseInt(e.target.value) })} /></label>
@@ -705,7 +705,7 @@ function Results() {
                       <form className="subject-form" onSubmit={handleSaveSubject} style={{ marginBottom: '12px' }}>
                         <div className="form-row">
                           <label className="form-field"><span>Name *</span><input required value={editingSubject.name} onChange={e => setEditingSubject({ ...editingSubject, name: e.target.value })} /></label>
-                          <label className="form-field"><span>Code</span><input value={editingSubject.code} onChange={e => setEditingSubject({ ...editingSubject, code: e.target.value })} /></label>
+                          <label className="form-field"><span>Code (short, up to 20 letters)</span><input value={editingSubject.code} maxLength={20} onChange={e => setEditingSubject({ ...editingSubject, code: e.target.value })} /></label>
                         </div>
                         <div className="form-row">
                           <label className="form-field"><span>Total (max) marks *</span><input type="number" min="1" required={!editingSubject.is_co_scholastic} disabled={editingSubject.is_co_scholastic} value={editingSubject.max_marks} onChange={e => setEditingSubject({ ...editingSubject, max_marks: e.target.value })} /></label>

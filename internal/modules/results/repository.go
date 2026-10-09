@@ -82,7 +82,7 @@ func (r *Repository) UpdateSubject(ctx context.Context, s *domain.Subject) error
 	if _, err := tx.Exec(ctx, `
 		UPDATE subjects SET name=$2, code=$3, max_marks=$4, passing_marks=$5, sort_order=$6, is_co_scholastic=$7, updated_at=NOW()
 		WHERE id=$1`, s.ID, s.Name, s.Code, s.MaxMarks, s.PassingMarks, s.SortOrder, s.IsCoScholastic); err != nil {
-		return err
+		return database.MapError(err)
 	}
 
 	if s.MaxMarks != oldMax && !s.IsCoScholastic {
