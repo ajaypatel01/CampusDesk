@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, RefreshCw, AlertTriangle, Trophy } from 'lucide-react'
+import { Download, RefreshCw, AlertTriangle, Trophy, ChevronDown } from 'lucide-react'
 import { resultsApi } from '../services/api'
 import './ResultDashboard.css'
 
@@ -74,7 +74,7 @@ function ResultDashboard({ exams }) {
     <div className={`rd ${loading && sheet ? 'rd--refreshing' : ''}`}>
       {/* One filter row scopes everything below. */}
       <div className="rd-filters">
-        <label className="form-field" style={{ margin: 0, minWidth: '220px' }}>
+        <label className="form-field rd-filters__exam">
           <span>Exam</span>
           <select value={examId} onChange={e => setExamId(e.target.value)}>
             {exams.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -148,10 +148,12 @@ function ResultDashboard({ exams }) {
                         ))}
                       </div>
                     ) : (
-                      <div className="rd-hbar__track" role="cell">
-                        {s.avgPct !== null && <div className="rd-hbar__fill" style={{ width: `${Math.max(s.avgPct, 1)}%` }} />}
-                        <span className="rd-hbar__value">{s.avgPct === null ? '–' : pct(s.avgPct)}</span>
-                      </div>
+                      <>
+                        <div className="rd-hbar__track" role="cell">
+                          {s.avgPct !== null && <div className="rd-hbar__fill" style={{ width: `${Math.min(Math.max(s.avgPct, 1), 100)}%` }} />}
+                        </div>
+                        <span className="rd-hbar__value" role="cell">{s.avgPct === null ? '–' : pct(s.avgPct)}</span>
+                      </>
                     )}
                     <div className="rd-hbar__meta" role="cell">
                       {s.letters && s.avgPct === null ? 'Graded' : s.sat ? `${s.passed}/${s.sat} passed` : 'No marks'}
@@ -189,7 +191,7 @@ function ResultDashboard({ exams }) {
                 {stats.top.map(st => (
                   <li key={st.student_id} className="rd-list__item">
                     <span className="rd-list__rank">{st.rank}</span>
-                    <span className="rd-list__name">{st.student_name}<span className="rd-muted"> · {st.student_code}</span></span>
+                    <span className="rd-list__name">{st.student_name}<span className="rd-muted rd-list__code"><span className="rd-list__sep"> · </span>{st.student_code}</span></span>
                     <span className="rd-list__value">{pct(st.percentage)}</span>
                   </li>
                 ))}
@@ -202,7 +204,7 @@ function ResultDashboard({ exams }) {
               {stats.attention.length === 0 ? (
                 <p className="rd-muted">Nobody failed or missed a subject.</p>
               ) : (
-                <ul className="rd-list">
+                <ul className="rd-list rd-list--attention">
                   {stats.attention.map(a => (
                     <li key={a.student.student_id} className="rd-list__item">
                       <span className={`rd-list__tag ${a.failed.length ? 'rd-status--critical' : ''}`}>{a.failed.length ? 'Fail' : 'Absent'}</span>
@@ -228,7 +230,7 @@ function ResultDashboard({ exams }) {
                 <h3 className="rd-card__title">Full class sheet</h3>
                 <p className="rd-card__subtitle">{sheet.grade_level_name} · {sheet.exam_name}</p>
               </div>
-              <label className="form-field" style={{ margin: 0, minWidth: '150px' }}>
+              <label className="form-field rd-sort">
                 <span>Sort by</span>
                 <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
                   <option value="rank">Rank</option>
@@ -237,6 +239,49 @@ function ResultDashboard({ exams }) {
                 </select>
               </label>
             </div>
+            {/* Phones: one card per student, subject marks folded away. */}
+            <ul className="rd-cards">
+              {sorted.map(st => (
+                <li key={st.student_id} className={`rd-scard ${st.has_marks ? '' : 'rd-row--empty'}`}>
+                  <details>
+                    <summary className="rd-scard__head">
+                      <span className="rd-scard__rank">{st.rank || '–'}</span>
+                      <span className="rd-scard__who">
+                        <span className="rd-scard__name">{st.student_name}</span>
+                        <span className="rd-muted rd-scard__code">{st.student_code}</span>
+                      </span>
+                      <span className="rd-scard__pct">{st.has_marks ? pct(st.percentage) : '–'}</span>
+                      <ChevronDown size={16} className="rd-scard__chev" aria-hidden="true" />
+                    </summary>
+                    {st.has_marks && (
+                      <div className="rd-scard__body">
+                        {sheet.subjects.map(sub => {
+                          const c = st.marks[sub.id]
+                          const fail = c && !c.is_absent && !c.grade_letter && c.status === 'Fail' && !sub.is_co_scholastic
+                          return (
+                            <div key={sub.id} className="rd-scard__mark">
+                              <span className="rd-scard__sub">{sub.name}{sub.is_co_scholastic && <span className="rd-muted"> · CS</span>}</span>
+                              <span className={`rd-num ${fail ? 'rd-fail' : ''} ${c?.is_absent ? 'rd-absent' : ''}`}>
+                                {!c ? '–' : c.is_absent ? 'AB' : c.grade_letter ? <strong>{c.grade_letter}</strong> : <>{fmt(c.obtained)}<span className="rd-muted">/{c.max_marks}</span></>}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </details>
+                  <div className="rd-scard__foot">
+                    {st.has_marks ? (
+                      <>
+                        <span className="rd-num"><strong>{fmt(st.total_obtained)}</strong><span className="rd-muted">/{st.total_max}</span>{st.is_total_overridden && <span className="rd-muted"> · edited</span>}</span>
+                        {st.grade && <span className="badge badge--muted">{st.grade}</span>}
+                        {st.result && <span className={`badge badge--${st.result === 'Pass' ? 'success' : 'danger'}`}>{st.result}</span>}
+                      </>
+                    ) : <span className="rd-muted">No marks</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
             <div className="table-card rd-sheet">
               <table className="data-table rd-sheet__table">
                 <thead>
