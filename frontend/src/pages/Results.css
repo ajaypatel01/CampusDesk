@@ -268,3 +268,11 @@
   font-size: 13px;
   color: var(--gray-500);
 }
+
+/* Phones: the layout already has a 16px gutter, and the tabs wrap so every
+   tab (e.g. Result Dashboard) is visible without sideways scrolling. */
+@media (max-width: 640px) {
+  .results-page { padding: 0; }
+  .results-page .docs-tabs { flex-wrap: wrap; overflow-x: visible; gap: 2px 4px; }
+  .results-page .docs-tab { padding: 8px 10px; font-size: 0.85rem; }
+}
