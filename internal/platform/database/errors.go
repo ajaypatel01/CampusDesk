@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
@@ -57,8 +58,18 @@ func MapError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return fmt.Errorf("%w: %s", apperr.ErrConflict, conflictReason(pgErr))
 	}
+	// 22001: text longer than its column allows, e.g. a 23-letter subject code.
+	if errors.As(err, &pgErr) && pgErr.Code == "22001" {
+		if m := maxLenRe.FindStringSubmatch(pgErr.Message); m != nil {
+			return fmt.Errorf("%w: a value is too long (at most %s characters)", apperr.ErrInvalidInput, m[1])
+		}
+		return fmt.Errorf("%w: a value is too long", apperr.ErrInvalidInput)
+	}
 	return err
 }
+
+// maxLenRe reads the limit out of "value too long for type character varying(20)".
+var maxLenRe = regexp.MustCompile(`\((\d+)\)`)
 
 // conflictReason is the reason for one unique violation: the known sentence
 // for its constraint, or one built from the table and its non-id columns.
