@@ -20,8 +20,8 @@ const ALL_TABS = [['subjects','Subjects', BookOpen], ['exams','Exams', Clipboard
 // Teachers only enter marks and view marksheets; subjects, exams and report
 // cards are managed by admins.
 const TEACHER_TABS = ['marks', 'marksheet']
-// The results dashboard (whole class, one exam) is for the school's admins and the owner.
-const RESULT_SHEET_ROLES = ['super_admin', 'school_admin']
+// The results dashboard (whole class, one exam) is for the owner, the school's admins and registrars.
+const RESULT_SHEET_ROLES = ['super_admin', 'school_admin', 'registrar']
 // Grading-only (co-scholastic) subjects get one of these instead of marks.
 const GRADE_LETTERS = ['A', 'B', 'C', 'D']
 

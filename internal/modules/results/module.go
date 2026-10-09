@@ -59,7 +59,7 @@ func (m *Module) Mount(r chi.Router) {
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Delete("/{id}", m.DeleteExam)
 		r.With(httpx.BlockRoles("teacher", "parent"), write).Post("/{id}/publish", m.PublishExam)
 		// Whole-class result sheet for one exam: admins and the owner only.
-		r.With(httpx.RequireRole("super_admin", "school_admin"), view).Get("/{id}/result-sheet", m.GetResultSheet)
+		r.With(httpx.RequireRole("super_admin", "school_admin", "registrar"), view).Get("/{id}/result-sheet", m.GetResultSheet)
 		// Per-exam marks distribution for each subject. Teachers read it (to
 		// enter marks against it) for their own class; only admins change it.
 		r.With(httpx.BlockRoles("parent"), view).Get("/{id}/mark-formats", m.ListExamFormats)
@@ -606,7 +606,7 @@ func (m *Module) GetResultSheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Exams are fetched by id, so check the caller's school here: a school
-	// admin only sees their own school's sheets.
+	// admin or registrar only sees their own school's sheets.
 	if claims := httpx.ClaimsFromContext(r.Context()); claims != nil && claims.Role != "super_admin" && claims.SchoolID != "" {
 		e, err := m.repo.GetExamByID(r.Context(), examID)
 		if err != nil {
