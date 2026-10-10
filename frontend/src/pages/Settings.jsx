@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, Check, X, UserCircle, Smartphone } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { schoolsApi, academicApi, feesApi, usersApi, staffApi } from '../services/api'
+import ChangePassword from '../components/ChangePassword'
 import './Settings.css'
 import { formatDate } from '../utils/date'
 
@@ -323,7 +324,9 @@ function Settings() {
                 </div>
               </div>
 
-              <div style={{ marginTop: '16px' }}>
+              <ChangePassword />
+
+              <div style={{ marginTop: '24px' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', marginBottom: '8px' }}><Smartphone size={16} /> Phone Number</h3>
                 {me?.phone_number ? (
                   <p className="empty-text">

@@ -232,6 +232,14 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*LoginResponse, err
 	if strings.TrimSpace(in.Email) == "" || in.Password == "" {
 		return nil, apperr.ErrInvalidInput
 	}
+	// A mobile number instead of an email: see phoneLogin.
+	if ident := strings.TrimSpace(in.Email); !strings.Contains(ident, "@") {
+		phone, err := normalizePhone(ident)
+		if err != nil {
+			return nil, apperr.ErrUnauthorized
+		}
+		return s.phoneLogin(ctx, phone, in.Password)
+	}
 	u, err := s.repo.GetByEmail(ctx, strings.ToLower(strings.TrimSpace(in.Email)))
 	if err != nil {
 		return nil, apperr.ErrUnauthorized

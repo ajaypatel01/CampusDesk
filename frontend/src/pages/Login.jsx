@@ -88,14 +88,16 @@ function Login({ onLogin }) {
         {mode === 'password' ? (
           <form className="login-form" onSubmit={handleSubmit}>
             <label className="login-field">
-              <span>Email</span>
+              <span>Email or mobile number</span>
               <input
-                type="email"
+                type="text"
+                inputMode="email"
+                autoComplete="username"
                 required
                 autoFocus
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="admin@school.com"
+                placeholder="you@school.com or 98765 43210"
               />
             </label>
             <label className="login-field">
