@@ -106,15 +106,20 @@ type guardianMatch struct {
 	SchoolID  uuid.UUID
 }
 
-// GuardiansByPhone returns the guardians of at least one student whose
-// phone field contains phone (10 digits) as one of its numbers.
+// GuardiansByPhone returns guardian records for phone (10 digits): those
+// whose own phone holds that number, and the guardians of a student whose
+// own phone holds it (many records were imported with the family's number
+// on the student rather than on a parent).
 func (r *Repository) GuardiansByPhone(ctx context.Context, phone string) ([]guardianMatch, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT DISTINCT ON (g.id) g.id, g.user_id, g.first_name, g.last_name, g.phone, s.school_id
+		SELECT DISTINCT ON (g.id) g.id, g.user_id, g.first_name, g.last_name,
+			coalesce(g.phone, '') || ' ' || coalesce(s.phone, ''), s.school_id
 		FROM guardians g
 		JOIN student_guardians sg ON sg.guardian_id = g.id
 		JOIN students s ON s.id = sg.student_id
-		WHERE regexp_replace(coalesce(g.phone, ''), '\D', '', 'g') LIKE '%' || $1 || '%'
+		WHERE s.status <> 'duplicate'
+		  AND (regexp_replace(coalesce(g.phone, ''), '\D', '', 'g') LIKE '%' || $1 || '%'
+		    OR regexp_replace(coalesce(s.phone, ''), '\D', '', 'g') LIKE '%' || $1 || '%')
 		ORDER BY g.id, sg.is_primary DESC`, phone)
 	if err != nil {
 		return nil, err
