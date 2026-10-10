@@ -307,7 +307,20 @@ export const customFieldsApi = {
 export const homeworkApi = {
   list: (params) => request(`/homework${qs(params)}`),
   get: (id) => request(`/homework/${id}`),
-  create: (body) => request('/homework', { method: 'POST', body: JSON.stringify(body) }),
+  // With a file (image or PDF) the homework is sent as a form.
+  create: (body, file) => {
+    if (!file) return request('/homework', { method: 'POST', body: JSON.stringify(body) })
+    const fd = new FormData()
+    Object.entries(body).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') fd.append(k, v) })
+    fd.append('file', file)
+    return fetch(`${BASE}/homework`, { method: 'POST', headers: authHeader(), body: fd }).then(async res => {
+      if (res.status === 413) throw new Error('File too large (at most 10 MB)')
+      let data = {}
+      try { data = await res.json() } catch (_) { /* not JSON */ }
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+      return data
+    })
+  },
   delete: (id) => request(`/homework/${id}`, { method: 'DELETE' }),
   listSubmissions: (id) => request(`/homework/${id}/submissions`),
   upsertSubmission: (id, body) => request(`/homework/${id}/submissions`, { method: 'POST', body: JSON.stringify(body) }),

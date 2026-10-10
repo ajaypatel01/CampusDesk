@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react'
-import { Plus, ChevronRight, ChevronDown, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { Plus, ChevronRight, ChevronDown, Trash2, Paperclip } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
-import { homeworkApi, academicApi, studentsApi, resultsApi } from '../services/api'
+import { homeworkApi, academicApi, studentsApi, resultsApi, classMediaApi } from '../services/api'
 import './Homework.css'
 import { formatDate } from '../utils/date'
 
 function Homework() {
   const { currentSchool, currentYear } = useSchool()
+  const { user } = useOutletContext() || {}
+  const isTeacher = user?.role === 'teacher'
+  // A teacher's own sections this year (class or vice class teacher).
+  const [mySections, setMySections] = useState([])
+  const [sectionId, setSectionId] = useState('')
+  const fileRef = useRef(null)
   const [grades, setGrades] = useState([])
   const [subjects, setSubjects] = useState([])
   const [selectedGrade, setSelectedGrade] = useState('')
@@ -28,11 +35,20 @@ function Homework() {
   useEffect(() => {
     if (!currentSchool) return
     academicApi.listGrades(currentSchool.id)
-      .then(r => { const g = r.items || []; setGrades(g); if (g.length) setSelectedGrade(g[0].id) })
+      .then(async r => {
+        let g = r.items || []
+        if (isTeacher) {
+          // Teachers only see and set homework for their own class.
+          const secs = ((await classMediaApi.sections(currentSchool.id).catch(() => ({ items: [] }))).items || []).filter(s => s.is_current_year)
+          setMySections(secs)
+          g = g.filter(gr => secs.some(s => s.grade_level_id === gr.id))
+        }
+        setGrades(g); if (g.length) setSelectedGrade(g[0].id)
+      })
       .catch(() => {})
     studentsApi.list({ school_id: currentSchool.id, limit: 500 })
       .then(r => setStudents(r.items || [])).catch(() => {})
-  }, [currentSchool])
+  }, [currentSchool, isTeacher])
 
   useEffect(() => {
     if (!currentSchool || !currentYear || !selectedGrade) return
@@ -48,13 +64,16 @@ function Homework() {
   async function handleCreate(e) {
     e.preventDefault()
     try {
+      const sectionsHere = mySections.filter(sec => sec.grade_level_id === selectedGrade)
       await homeworkApi.create({
         school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade,
+        class_section_id: isTeacher ? (sectionId || sectionsHere[0]?.id) : undefined,
         title: form.title, description: form.description,
         subject_id: form.subject_id || undefined,
         assigned_date: form.assigned_date,
         due_date: form.due_date,
-      })
+      }, fileRef.current?.files?.[0])
+      if (fileRef.current) fileRef.current.value = 
       setShowForm(false)
       setForm({ title: '', description: '', subject_id: '', assigned_date: new Date().toISOString().split('T')[0], due_date: '' })
       homeworkApi.list({ school_id: currentSchool.id, academic_year_id: currentYear.id, grade_level_id: selectedGrade })
@@ -139,6 +158,14 @@ function Homework() {
           <div className="form-row">
             <label className="form-field"><span>Assigned Date</span><input type="date" value={form.assigned_date} onChange={e => setForm({ ...form, assigned_date: e.target.value })} /></label>
             <label className="form-field"><span>Due Date *</span><input type="date" required value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} /></label>
+            {isTeacher && mySections.filter(sec => sec.grade_level_id === selectedGrade).length > 1 && (
+              <label className="form-field"><span>Section *</span>
+                <select value={sectionId} onChange={e => setSectionId(e.target.value)}>
+                  {mySections.filter(sec => sec.grade_level_id === selectedGrade).map(sec => <option key={sec.id} value={sec.id}>{sec.grade_name} {sec.section_name}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="form-field"><span>Attachment (image or PDF, optional)</span><input ref={fileRef} type="file" accept="application/pdf,image/*" /></label>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button type="submit" className="btn btn--primary">Create</button>
@@ -167,6 +194,11 @@ function Homework() {
                           {sub && <span className="badge badge--muted" style={{ marginLeft: '6px' }}>{sub.name}</span>}
                         </span>
                         {a.description && <span className="hw-item__desc">{a.description}</span>}
+                        {a.attachment_url && (
+                          <a href={a.attachment_url} target="_blank" rel="noreferrer" className="hw-item__desc" onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Paperclip size={13} /> {a.attachment_name || 'Attachment'}
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

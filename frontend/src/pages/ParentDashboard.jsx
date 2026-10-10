@@ -131,6 +131,11 @@ function ParentDashboard() {
                       <td>
                         {hw.title}
                         {hw.description && <div className="data-table__muted">{hw.description}</div>}
+                        {hw.attachment_url && (
+                          <a href={hw.attachment_url} target="_blank" rel="noreferrer" className="data-table__muted" style={{ display: 'block' }}>
+                            📎 {hw.attachment_name || 'Attachment'}
+                          </a>
+                        )}
                       </td>
                       <td className="data-table__muted">{fmtDate(hw.due_date)}</td>
                       <td>

@@ -20,6 +20,7 @@ type Repository struct {
 type Section struct {
 	ID           uuid.UUID `json:"id"`
 	SchoolID     uuid.UUID `json:"school_id"`
+	GradeLevelID uuid.UUID `json:"grade_level_id"`
 	GradeName    string    `json:"grade_name"`
 	SectionName  string    `json:"section_name"`
 	AcademicYear string    `json:"academic_year"`
@@ -51,7 +52,7 @@ type Item struct {
 }
 
 const sectionSelect = `
-	SELECT cs.id, cs.school_id, gl.name, cs.name, ay.name, ay.is_current, %s,
+	SELECT cs.id, cs.school_id, cs.grade_level_id, gl.name, cs.name, ay.name, ay.is_current, %s,
 		(SELECT count(*) FROM class_media m WHERE m.class_section_id = cs.id AND m.kind = 'photo'),
 		(SELECT count(*) FROM class_media m WHERE m.class_section_id = cs.id AND m.kind = 'document')
 	FROM class_sections cs
@@ -92,7 +93,7 @@ func (r *Repository) Sections(ctx context.Context, role string, userID, schoolID
 	out := []Section{}
 	for rows.Next() {
 		var s Section
-		if err := rows.Scan(&s.ID, &s.SchoolID, &s.GradeName, &s.SectionName, &s.AcademicYear, &s.IsCurrent, &s.Children, &s.PhotoCount, &s.DocCount); err != nil {
+		if err := rows.Scan(&s.ID, &s.SchoolID, &s.GradeLevelID, &s.GradeName, &s.SectionName, &s.AcademicYear, &s.IsCurrent, &s.Children, &s.PhotoCount, &s.DocCount); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

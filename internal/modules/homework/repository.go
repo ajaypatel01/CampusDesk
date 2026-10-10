@@ -26,11 +26,13 @@ func (r *Repository) CreateAssignment(ctx context.Context, a *domain.HomeworkAss
 	row := r.pool.QueryRow(ctx, `
 		INSERT INTO homework_assignments
 			(school_id, academic_year_id, grade_level_id, class_section_id, subject_id,
-			 title, description, assigned_by, assigned_date, due_date)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			 title, description, assigned_by, assigned_date, due_date,
+			 attachment_key, attachment_name, attachment_type, attachment_size)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULLIF($11,''),NULLIF($12,''),NULLIF($13,''),NULLIF($14,0))
 		RETURNING id, created_at, updated_at`,
 		a.SchoolID, a.AcademicYearID, a.GradeLevelID, a.ClassSectionID, a.SubjectID,
 		a.Title, a.Description, a.AssignedBy, a.AssignedDate, a.DueDate,
+		a.AttachmentKey, a.AttachmentName, a.AttachmentType, a.AttachmentSize,
 	)
 	return row.Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 }
@@ -39,10 +41,12 @@ func (r *Repository) GetAssignment(ctx context.Context, id uuid.UUID) (*domain.H
 	var a domain.HomeworkAssignment
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, school_id, academic_year_id, grade_level_id, class_section_id, subject_id,
-			title, COALESCE(description,''), assigned_by, assigned_date, due_date, created_at, updated_at
+			title, COALESCE(description,''), assigned_by, assigned_date, due_date, created_at, updated_at,
+			COALESCE(attachment_key,''), COALESCE(attachment_name,''), COALESCE(attachment_type,''), COALESCE(attachment_size,0)
 		FROM homework_assignments WHERE id=$1`, id,
 	).Scan(&a.ID, &a.SchoolID, &a.AcademicYearID, &a.GradeLevelID, &a.ClassSectionID, &a.SubjectID,
-		&a.Title, &a.Description, &a.AssignedBy, &a.AssignedDate, &a.DueDate, &a.CreatedAt, &a.UpdatedAt)
+		&a.Title, &a.Description, &a.AssignedBy, &a.AssignedDate, &a.DueDate, &a.CreatedAt, &a.UpdatedAt,
+		&a.AttachmentKey, &a.AttachmentName, &a.AttachmentType, &a.AttachmentSize)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -52,7 +56,8 @@ func (r *Repository) GetAssignment(ctx context.Context, id uuid.UUID) (*domain.H
 func (r *Repository) ListAssignments(ctx context.Context, schoolID, yearID, gradeLevelID uuid.UUID) ([]domain.HomeworkAssignment, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, school_id, academic_year_id, grade_level_id, class_section_id, subject_id,
-			title, COALESCE(description,''), assigned_by, assigned_date, due_date, created_at, updated_at
+			title, COALESCE(description,''), assigned_by, assigned_date, due_date, created_at, updated_at,
+			COALESCE(attachment_key,''), COALESCE(attachment_name,''), COALESCE(attachment_type,''), COALESCE(attachment_size,0)
 		FROM homework_assignments
 		WHERE school_id=$1 AND academic_year_id=$2 AND grade_level_id=$3
 		ORDER BY due_date DESC`, schoolID, yearID, gradeLevelID)
@@ -64,7 +69,8 @@ func (r *Repository) ListAssignments(ctx context.Context, schoolID, yearID, grad
 	for rows.Next() {
 		var a domain.HomeworkAssignment
 		if err := rows.Scan(&a.ID, &a.SchoolID, &a.AcademicYearID, &a.GradeLevelID, &a.ClassSectionID, &a.SubjectID,
-			&a.Title, &a.Description, &a.AssignedBy, &a.AssignedDate, &a.DueDate, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			&a.Title, &a.Description, &a.AssignedBy, &a.AssignedDate, &a.DueDate, &a.CreatedAt, &a.UpdatedAt,
+			&a.AttachmentKey, &a.AttachmentName, &a.AttachmentType, &a.AttachmentSize); err != nil {
 			return nil, err
 		}
 		items = append(items, a)
@@ -134,6 +140,7 @@ func (r *Repository) GetWardHomework(ctx context.Context, studentID, yearID uuid
 	rows, err := r.pool.Query(ctx, `
 		SELECT ha.id, ha.school_id, ha.academic_year_id, ha.grade_level_id, ha.class_section_id, ha.subject_id,
 			ha.title, COALESCE(ha.description,''), ha.assigned_by, ha.assigned_date, ha.due_date, ha.created_at, ha.updated_at,
+			COALESCE(ha.attachment_key,''), COALESCE(ha.attachment_name,''), COALESCE(ha.attachment_type,''), COALESCE(ha.attachment_size,0),
 			COALESCE(hs.status,''), hs.submitted_date
 		FROM enrollments e
 		JOIN class_sections cs ON cs.id = e.class_section_id
@@ -152,6 +159,7 @@ func (r *Repository) GetWardHomework(ctx context.Context, studentID, yearID uuid
 		var it WardHomeworkItem
 		if err := rows.Scan(&it.ID, &it.SchoolID, &it.AcademicYearID, &it.GradeLevelID, &it.ClassSectionID, &it.SubjectID,
 			&it.Title, &it.Description, &it.AssignedBy, &it.AssignedDate, &it.DueDate, &it.CreatedAt, &it.UpdatedAt,
+			&it.AttachmentKey, &it.AttachmentName, &it.AttachmentType, &it.AttachmentSize,
 			&it.SubmissionStatus, &it.SubmittedDate); err != nil {
 			return nil, err
 		}
@@ -181,4 +189,30 @@ func (r *Repository) GetStudentSubmissions(ctx context.Context, studentID, yearI
 		items = append(items, s)
 	}
 	return items, rows.Err()
+}
+
+// TeacherSection is a class section where a teacher is the class or vice
+// class teacher.
+type TeacherSection struct {
+	ID, GradeLevelID, SchoolID, AcademicYearID uuid.UUID
+}
+
+func (r *Repository) TeacherSections(ctx context.Context, teacherID uuid.UUID) ([]TeacherSection, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT cs.id, cs.grade_level_id, cs.school_id, cs.academic_year_id FROM class_sections cs
+		WHERE cs.homeroom_teacher_id = $1
+		   OR EXISTS (SELECT 1 FROM class_section_vice_teachers v WHERE v.class_section_id = cs.id AND v.user_id = $1)`, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TeacherSection
+	for rows.Next() {
+		var t TeacherSection
+		if err := rows.Scan(&t.ID, &t.GradeLevelID, &t.SchoolID, &t.AcademicYearID); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
