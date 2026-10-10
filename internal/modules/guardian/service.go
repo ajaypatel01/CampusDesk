@@ -2,6 +2,7 @@ package guardian
 
 import (
 	"context"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/numtext"
 	"strings"
 
 	"github.com/ajaypatel01/CampusDesk/internal/domain"
@@ -41,7 +42,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Guardian,
 		FirstName:    strings.TrimSpace(in.FirstName),
 		LastName:     strings.TrimSpace(in.LastName),
 		Email:        strings.TrimSpace(in.Email),
-		Phone:        strings.TrimSpace(in.Phone),
+		Phone:        numtext.Clean(in.Phone),
 		Relation:     strings.TrimSpace(in.Relation),
 		AadharNumber: strings.TrimSpace(in.Aadhar),
 	}
@@ -79,7 +80,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in CreateInput) (*do
 		FirstName:    strings.TrimSpace(in.FirstName),
 		LastName:     strings.TrimSpace(in.LastName),
 		Email:        strings.TrimSpace(in.Email),
-		Phone:        strings.TrimSpace(in.Phone),
+		Phone:        numtext.Clean(in.Phone),
 		Relation:     strings.TrimSpace(in.Relation),
 		AadharNumber: strings.TrimSpace(in.Aadhar),
 	}
