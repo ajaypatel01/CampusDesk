@@ -75,7 +75,7 @@ function FeeReport() {
     const buckets = QUARTER_LABELS.map(label => ({ label, collected: 0, pending: 0 }))
     let unscheduled = 0
     for (const row of sheet?.items || []) {
-      const datedCells = row.installments.filter(c => c.due_date && c.planned_amount > 0)
+      const datedCells = (row.installments || []).filter(c => c.due_date && c.planned_amount > 0)
       if (datedCells.length === 0) {
         // No installment plan/due-dates configured for this student's fee structure —
         // there's nothing to bucket by quarter, so fall back to their real balance
@@ -233,7 +233,7 @@ function FeeReport() {
           <tbody>
             {loadingSheet ? (
               <tr><td colSpan={99} className="data-table__empty">Loading...</td></tr>
-            ) : !sheet || sheet.items.length === 0 ? (
+            ) : !sheet?.items?.length ? (
               <tr><td colSpan={99} className="data-table__empty">No fee accounts found</td></tr>
             ) : sheet.items.map(row => (
               <tr key={row.student_id}>
@@ -243,7 +243,7 @@ function FeeReport() {
                 </td>
                 <td className="data-table__muted">{row.grade_level_name}</td>
                 {Array.from({ length: sheet.max_installments }, (_, i) => {
-                  const cell = row.installments[i]
+                  const cell = row.installments?.[i]
                   if (!cell) return <td key={i}>—</td>
                   return (
                     <td key={i}>

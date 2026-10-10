@@ -230,7 +230,7 @@ func (s *Service) InstallmentSheet(ctx context.Context, schoolID, yearID uuid.UU
 		return nil, err
 	}
 
-	resp := &InstallmentSheetResponse{}
+	resp := &InstallmentSheetResponse{Items: []StudentInstallmentRow{}}
 	maxInstallments := 0
 	for _, a := range accounts {
 		totalDue := a.tuitionFee - a.discountAmount + a.vanFee + a.previousYearDues + a.lateFee
