@@ -18,6 +18,13 @@ type HomeworkAssignment struct {
 	AssignedBy     *uuid.UUID `json:"assigned_by,omitempty"`
 	AssignedDate   time.Time  `json:"assigned_date"`
 	DueDate        time.Time  `json:"due_date"`
+	// One optional image or PDF (stored in S3); URL is a short-lived link
+	// filled in when the homework is listed.
+	AttachmentName string `json:"attachment_name,omitempty"`
+	AttachmentType string `json:"attachment_type,omitempty"`
+	AttachmentSize int    `json:"attachment_size,omitempty"`
+	AttachmentURL  string `json:"attachment_url,omitempty"`
+	AttachmentKey  string `json:"-"`
 	Timestamps
 }
 

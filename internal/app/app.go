@@ -187,7 +187,7 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		classmedia.New(pool, storageClient),
 		idcard.New(pool, storageClient),
 		results.New(pool, archiver),
-		homework.New(pool),
+		homework.New(pool, storageClient),
 		communications.New(pool, waClient),
 		staff.New(pool),
 		tcvoucher.New(pool),
