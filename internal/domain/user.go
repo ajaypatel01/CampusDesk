@@ -25,6 +25,9 @@ type User struct {
 	// from a guardian/staff profile's contact number, since that isn't
 	// necessarily the account owner's own phone.
 	PhoneNumber *string `json:"phone_number,omitempty"`
+	// OwnPassword is set once the user chooses their own password; until
+	// then a parent can also log in with a child's first name + "@123".
+	OwnPassword bool `json:"own_password"`
 	Timestamps
 }
 

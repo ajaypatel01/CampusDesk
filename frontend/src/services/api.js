@@ -146,6 +146,8 @@ export const usersApi = {
   // the caller must still clear its own stored token and redirect, same as
   // a normal logout, right after this resolves (or fails/times out).
   logoutEverywhere: () => request('/auth/logout-everywhere', { method: 'POST' }),
+  // Returns a fresh { user, token }: other sessions are logged out.
+  changePassword: (currentPassword, newPassword) => request('/auth/password/change', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
   // The caller's own profile -- works for every role, unlike get(id) above
   // which registrars can't use on themselves.
   me: () => request('/auth/me'),

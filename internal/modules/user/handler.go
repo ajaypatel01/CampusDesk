@@ -200,6 +200,35 @@ func (h *Handler) LogoutEverywhere(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
+// ChangePassword sets the caller's own password. The response carries a
+// fresh token: every other session is logged out.
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var in struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	resp, err := h.svc.ChangePassword(r.Context(), userID, in.CurrentPassword, in.NewPassword)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, resp)
+}
+
 // RequestPasswordReset always responds success, whether or not the email
 // belongs to an account -- see Service.RequestPasswordReset.
 func (h *Handler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
