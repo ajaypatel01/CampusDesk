@@ -20,6 +20,10 @@ type Config struct {
 	// FrontendURL is the base URL of the deployed web app, used to build
 	// links that get emailed out (e.g. a password reset link).
 	FrontendURL string
+	// Fast2SMS sends OTP codes by SMS (internal/platform/fast2sms); off
+	// until FAST2SMS_API_KEY is set.
+	Fast2SMSAPIKey string
+	Fast2SMSURL    string
 }
 
 type StorageConfig struct {
@@ -123,7 +127,9 @@ func Load() (*Config, error) {
 			OTPLanguage:      getEnv("WHATSAPP_OTP_LANGUAGE", "en"),
 			OTPSchoolSenders: parsePairs(os.Getenv("WHATSAPP_OTP_SENDERS")),
 		},
-		FrontendURL: getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
+		FrontendURL:    getEnv("FRONTEND_URL", "https://13-202-93-187.sslip.io"),
+		Fast2SMSAPIKey: os.Getenv("FAST2SMS_API_KEY"),
+		Fast2SMSURL:    os.Getenv("FAST2SMS_API_URL"),
 	}, nil
 }
 

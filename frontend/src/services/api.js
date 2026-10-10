@@ -153,7 +153,7 @@ export const usersApi = {
   // yet saved anywhere; confirm attaches it to the caller's own account.
   requestPhoneVerification: (phone) => request('/auth/phone/verify/request', { method: 'POST', body: JSON.stringify({ phone }) }),
   confirmPhoneVerification: (phone, otp) => request('/auth/phone/verify/confirm', { method: 'POST', body: JSON.stringify({ phone, otp }) }),
-  // WhatsApp OTP login: staff by the number verified above, parents by the
+  // OTP login (WhatsApp or SMS): staff by the number verified above, parents by the
   // phone on their guardian record (their login is created on first use).
   requestOTPLogin: (phone) => request('/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone }) }),
   verifyOTPLogin: (phone, otp) => request('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, otp }) }),

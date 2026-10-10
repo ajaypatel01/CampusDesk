@@ -34,6 +34,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/van"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/fast2sms"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/storage"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
@@ -105,6 +106,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 	}
 	userMod := user.New(pool, cfg.Auth.JWTSecret, emailClient, user.OTPSender{
 		Client: waClient, Template: cfg.WhatsApp.OTPTemplate, Language: cfg.WhatsApp.OTPLanguage, SchoolSenders: otpSenders,
+		SMS: fast2sms.New(cfg.Fast2SMSAPIKey, cfg.Fast2SMSURL),
 	}, cfg.FrontendURL)
 	schoolMod := school.New(pool)
 	permsMod := permissions.New(pool)

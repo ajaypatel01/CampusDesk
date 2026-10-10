@@ -327,12 +327,12 @@ function Settings() {
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', marginBottom: '8px' }}><Smartphone size={16} /> Phone Number</h3>
                 {me?.phone_number ? (
                   <p className="empty-text">
-                    Verified: <strong>{me.phone_number}</strong>. You can log in with a WhatsApp OTP to this number instead of your password.
+                    Verified: <strong>{me.phone_number}</strong>. You can log in with an OTP sent to this number instead of your password.
                   </p>
                 ) : (
                   <>
                     <p className="empty-text">
-                      Verify your WhatsApp number to log in with an OTP instead of your password.
+                      Verify your mobile number to log in with an OTP instead of your password.
                     </p>
                     <form className="modal__form" style={{ maxWidth: '360px' }} onSubmit={otpSent ? handleVerifyPhoneOtp : handleSendPhoneOtp}>
                       {phoneErr && <p className="sd-modal__err">{phoneErr}</p>}

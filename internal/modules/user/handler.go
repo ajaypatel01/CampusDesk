@@ -328,11 +328,12 @@ func (h *Handler) RequestPhoneVerification(w http.ResponseWriter, r *http.Reques
 			schoolID = &id
 		}
 	}
-	if err := h.svc.RequestPhoneVerification(r.Context(), in.Phone, schoolID); err != nil {
+	channel, err := h.svc.RequestPhoneVerification(r.Context(), in.Phone, schoolID)
+	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent", "channel": channel})
 }
 
 // ConfirmPhoneVerification checks the OTP and, on success, attaches phone to
@@ -380,11 +381,12 @@ func (h *Handler) RequestOTPLogin(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
 		return
 	}
-	if err := h.svc.RequestOTPLogin(r.Context(), in.Phone, in.Audience); err != nil {
+	channel, err := h.svc.RequestOTPLogin(r.Context(), in.Phone, in.Audience)
+	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent", "channel": channel})
 }
 
 func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {

@@ -350,13 +350,13 @@ func (s *Service) LogoutEverywhere(ctx context.Context, userID uuid.UUID) error 
 // RequestPhoneVerification sends a WhatsApp code to phone. The number
 // isn't saved yet -- only ConfirmPhoneVerification, after a correct code,
 // actually sets users.phone_number.
-func (s *Service) RequestPhoneVerification(ctx context.Context, phone string, schoolID *uuid.UUID) error {
+func (s *Service) RequestPhoneVerification(ctx context.Context, phone string, schoolID *uuid.UUID) (string, error) {
 	phone, err := normalizePhone(phone)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := s.repo.GetByPhone(ctx, phone); err == nil {
-		return fmt.Errorf("%w: that phone number is already in use on another account", apperr.ErrConflict)
+		return "", fmt.Errorf("%w: that phone number is already in use on another account", apperr.ErrConflict)
 	}
 	return s.sendOTP(ctx, phone, otpPurposeVerifyPhone, schoolID)
 }
@@ -439,22 +439,22 @@ func (s *Service) findOTPLogin(ctx context.Context, phone, audience string) (*ot
 // deliberately does NOT report uniform success for an unknown number,
 // since each message costs money; the tradeoff is a number can be probed
 // for whether it's registered, same as the password login's error message.
-func (s *Service) RequestOTPLogin(ctx context.Context, phone, audience string) error {
+func (s *Service) RequestOTPLogin(ctx context.Context, phone, audience string) (string, error) {
 	if !s.otp.enabled() {
-		return errOTPNotConfigured
+		return "", errOTPNotConfigured
 	}
 	phone, err := normalizePhone(phone)
 	if err != nil {
-		return err
+		return "", err
 	}
 	t, err := s.findOTPLogin(ctx, phone, audience)
 	if err != nil {
-		return err
+		return "", err
 	}
 	schoolID := &t.schoolID
 	if t.user != nil {
 		if err := checkLoginable(t.user); err != nil {
-			return err
+			return "", err
 		}
 		if len(t.guardians) == 0 {
 			schoolID = t.user.SchoolID
@@ -554,7 +554,8 @@ func (s *Service) RequestPasswordResetOTP(ctx context.Context, phone string) err
 	if err != nil {
 		return nil // unknown number: report success anyway, same reasoning as the email flow
 	}
-	return s.sendOTP(ctx, phone, otpPurposeReset, u.SchoolID)
+	_, err = s.sendOTP(ctx, phone, otpPurposeReset, u.SchoolID)
+	return err
 }
 
 func (s *Service) ConfirmPasswordResetOTP(ctx context.Context, phone, otp, newPassword string) error {
