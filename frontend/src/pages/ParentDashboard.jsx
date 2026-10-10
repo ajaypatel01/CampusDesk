@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { GraduationCap, BookOpen, BarChart2, Download, IndianRupee, Lock } from 'lucide-react'
+import { GraduationCap, BookOpen, IndianRupee } from 'lucide-react'
 import { useSchool } from '../services/SchoolContext'
 import { studentsApi, homeworkApi, resultsApi, feesApi } from '../services/api'
+import ParentResults from '../components/ParentResults'
 import './ParentDashboard.css'
 import { formatDate } from '../utils/date'
 import { studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
@@ -14,13 +15,6 @@ function installmentLabel(p) {
   const type = (p.fee_type || 'tuition').replace(/_/g, ' ')
   const label = type.charAt(0).toUpperCase() + type.slice(1)
   return p.installment_number ? `${label} - Installment ${p.installment_number}` : label
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
 }
 
 function fmtDate(d) {
@@ -44,9 +38,6 @@ function ParentDashboard() {
   const [homeworkLoading, setHomeworkLoading] = useState(false)
 
   const [exams, setExams] = useState([])
-  const [examId, setExamId] = useState('')
-  const [marksheet, setMarksheet] = useState(null)
-  const [marksheetLoading, setMarksheetLoading] = useState(false)
 
   const [feeSummary, setFeeSummary] = useState(null)
   const [feeLoading, setFeeLoading] = useState(false)
@@ -74,9 +65,8 @@ function ParentDashboard() {
       .finally(() => setHomeworkLoading(false))
 
     resultsApi.wardExams({ student_id: selectedWardId, academic_year_id: currentYear.id })
-      .then(res => { setExams(res.items || []); setExamId('') })
+      .then(res => setExams(res.items || []))
       .catch(() => setExams([]))
-    setMarksheet(null)
 
     setFeeLoading(true)
     setFeeError('')
@@ -85,30 +75,6 @@ function ParentDashboard() {
       .catch(err => { setFeeSummary(null); setFeeError(err.message || 'Failed to load fee details') })
       .finally(() => setFeeLoading(false))
   }, [selectedWardId, currentYear])
-
-  // An exam the school has locked for unpaid fees: its results stay hidden
-  // and the parent is told how much is due instead.
-  const selectedExam = exams.find(ex => ex.id === examId)
-  const lockedExam = selectedExam?.fee_locked ? selectedExam : null
-  const [marksheetError, setMarksheetError] = useState('')
-
-  function loadMarksheet() {
-    if (!examId || !selectedWardId || lockedExam) return
-    setMarksheetLoading(true); setMarksheetError('')
-    resultsApi.getMarksheet(examId, selectedWardId)
-      .then(setMarksheet)
-      .catch(err => { setMarksheet(null); setMarksheetError(err.message || 'Could not load the results') })
-      .finally(() => setMarksheetLoading(false))
-  }
-
-  async function downloadMarksheet() {
-    try {
-      const blob = await resultsApi.downloadMarksheet(examId, selectedWardId)
-      downloadBlob(blob, `marksheet_${ward?.student_code || 'ward'}.pdf`)
-    } catch (err) {
-      alert(err.message)
-    }
-  }
 
   if (loading) return <p className="loading-text">Loading...</p>
 
@@ -148,6 +114,8 @@ function ParentDashboard() {
         </div>
       )}
 
+      <ParentResults wardId={selectedWardId} wardCode={ward?.student_code} exams={exams} />
+
       <div className="parent-dashboard__grid">
         <div className="detail-card">
           <h3><BookOpen size={16} /> Class Homework</h3>
@@ -175,77 +143,6 @@ function ParentDashboard() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
-
-        <div className="detail-card">
-          <h3><BarChart2 size={16} /> Results</h3>
-          {exams.length === 0 ? (
-            <p className="empty-text">No published exams yet</p>
-          ) : (
-            <>
-              <div className="parent-dashboard__exam-row">
-                <select value={examId} onChange={e => { setExamId(e.target.value); setMarksheet(null); setMarksheetError('') }}>
-                  <option value="">Select exam</option>
-                  {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.name}{ex.fee_locked ? ' (locked)' : ''}</option>)}
-                </select>
-                <button className="btn btn--primary btn--sm" onClick={loadMarksheet} disabled={!examId || marksheetLoading || !!lockedExam}>
-                  {marksheetLoading ? 'Loading...' : 'View'}
-                </button>
-                {marksheet && (
-                  <button className="btn btn--outline btn--sm" onClick={downloadMarksheet}>
-                    <Download size={14} /> PDF
-                  </button>
-                )}
-              </div>
-
-              {lockedExam && (
-                <div className="parent-dashboard__locked" role="status">
-                  <Lock size={18} aria-hidden="true" />
-                  <div>
-                    <strong>Results are locked</strong>
-                    <p>
-                      ₹{Number(lockedExam.fee_due || 0).toLocaleString('en-IN')} fee is due. Please pay at the school office to see
-                      the {lockedExam.name} results. They unlock as soon as the payment is recorded.
-                    </p>
-                  </div>
-                </div>
-              )}
-              {!lockedExam && marksheetError && <p className="doc-msg doc-msg--error">{marksheetError}</p>}
-
-              {marksheet && (
-                <div className="marksheet-preview">
-                  <p><strong>{marksheet.exam_name}</strong> · {marksheet.academic_year}</p>
-                  <div className="table-card" style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                    <thead><tr><th>Subject</th><th>Max</th><th>Obtained</th><th>%</th><th>Grade</th><th>Status</th></tr></thead>
-                    <tbody>
-                      {(marksheet.rows || []).map((row, i) => (
-                        <tr key={i}>
-                          <td>
-                            {row.subject_name}
-                            {row.is_co_scholastic && <div className="data-table__muted">Co-scholastic — not in total</div>}
-                          </td>
-                          <td className="data-table__muted">{row.grade_letter ? '-' : row.max_marks}</td>
-                          <td>{row.is_absent ? 'Absent' : row.grade_letter ? '-' : row.marks_obtained}</td>
-                          <td className="data-table__muted">{row.is_absent || row.grade_letter ? '-' : row.percentage?.toFixed(1) + '%'}</td>
-                          <td><span className="badge badge--muted">{row.grade}</span></td>
-                          <td>
-                            <span className={`badge badge--${row.status === 'Pass' ? 'success' : row.status === 'Fail' ? 'danger' : 'muted'}`}>
-                              {row.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    </table>
-                  </div>
-                  <p className="parent-dashboard__total">
-                    Total: {marksheet.total_obtained} / {marksheet.total_max} ({marksheet.percentage?.toFixed(1)}%) · {marksheet.result}
-                  </p>
-                </div>
-              )}
-            </>
           )}
         </div>
 

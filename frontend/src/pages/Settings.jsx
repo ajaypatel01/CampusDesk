@@ -20,7 +20,9 @@ function Settings() {
   const { user } = useOutletContext() || {}
   const isAdmin = user?.role === 'super_admin' || user?.role === 'school_admin'
   const isRegistrar = user?.role === 'registrar'
-  const [activeTab, setActiveTab] = useState(isRegistrar ? 'fees' : 'school')
+  const [activeTab, setActiveTab] = useState(
+    user?.role === 'parent' || user?.role === 'teacher' ? 'account' : isRegistrar ? 'fees' : 'school'
+  )
   const [me, setMe] = useState(null)
   const [phoneInput, setPhoneInput] = useState('')
   const [otpInput, setOtpInput] = useState('')
@@ -284,9 +286,11 @@ function Settings() {
   // sections (POST/PUT /grade-levels only blocks teacher/parent; POST
   // /class-sections has no role restriction at all) -- they were just never
   // given a way to reach it from this page.
+  // Parents and teachers only manage their own account here.
+  const accountOnly = user?.role === 'parent' || user?.role === 'teacher'
   const tabs = [
     { id: 'account', label: 'My Account', icon: UserCircle },
-    ...(isRegistrar ? [
+    ...(accountOnly ? [] : isRegistrar ? [
       { id: 'grades', label: 'Grades & Sections', icon: Layers },
       { id: 'fees', label: 'Fee Structures', icon: IndianRupee },
     ] : [
@@ -372,9 +376,11 @@ function Settings() {
                   <h2>Schools</h2>
                   <p className="settings-section__desc">Manage registered schools</p>
                 </div>
-                <button className="btn btn--primary btn--sm" onClick={() => setShowSchoolModal(true)}>
-                  <Plus size={16} /> Add School
-                </button>
+                {user?.role === 'super_admin' && (
+                  <button className="btn btn--primary btn--sm" onClick={() => setShowSchoolModal(true)}>
+                    <Plus size={16} /> Add School
+                  </button>
+                )}
               </div>
               {schools.length === 0 ? (
                 <p className="empty-text">No schools registered. Add one to get started.</p>
@@ -404,7 +410,7 @@ function Settings() {
                   <h2>Academic Years</h2>
                   <p className="settings-section__desc">Manage academic year periods</p>
                 </div>
-                {currentSchool && (
+                {currentSchool && isAdmin && (
                   <button className="btn btn--primary btn--sm" onClick={() => setShowYearModal(true)}>
                     <Plus size={16} /> Add Year
                   </button>
