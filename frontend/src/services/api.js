@@ -478,6 +478,11 @@ export const permissionsApi = {
   setMatrix: (userId, overrides) => request(`/permissions/users/${userId}`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
 }
 
+export const parentLoginsApi = {
+  list: (params) => request(`/parent-logins${qs(params)}`),
+  setPassword: (body) => request('/parent-logins/password', { method: 'POST', body: JSON.stringify(body) }),
+}
+
 export const auditApi = {
   list: (params = {}) => request(`/audit-log${qs(params)}`),
 }
