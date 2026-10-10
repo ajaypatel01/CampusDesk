@@ -59,7 +59,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	emailClient := email.New(cfg.Email.ResendAPIKey, cfg.Email.FromEmail, cfg.Email.FromName)
+	emailClient := email.New(cfg.Email.ResendAPIKey, cfg.Email.FromEmail, cfg.Email.FromName).WithEndpoint(cfg.Email.Endpoint)
 
 	storageClient, err := storage.New(storage.Config{
 		Endpoint:        cfg.Storage.Endpoint,

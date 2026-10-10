@@ -28,6 +28,14 @@ func New(apiKey, from, fromName string) *Client {
 	}
 }
 
+// WithEndpoint sends to another API URL (local testing only).
+func (c *Client) WithEndpoint(url string) *Client {
+	if c != nil && url != "" {
+		c.endpoint = url
+	}
+	return c
+}
+
 func (c *Client) Enabled() bool {
 	return c != nil && c.apiKey != "" && c.from != ""
 }

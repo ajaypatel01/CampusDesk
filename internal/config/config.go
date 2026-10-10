@@ -56,6 +56,8 @@ type EmailConfig struct {
 	ResendAPIKey string
 	FromEmail    string
 	FromName     string
+	// Endpoint is only overridden for local testing against a fake API.
+	Endpoint string
 }
 
 type ServerConfig struct {
@@ -109,6 +111,7 @@ func Load() (*Config, error) {
 			ResendAPIKey: os.Getenv("RESEND_API_KEY"),
 			FromEmail:    os.Getenv("EMAIL_FROM"),
 			FromName:     getEnv("EMAIL_FROM_NAME", "CampusDesk"),
+			Endpoint:     os.Getenv("RESEND_API_URL"),
 		},
 		Storage: StorageConfig{
 			Endpoint:        os.Getenv("S3_ENDPOINT"),

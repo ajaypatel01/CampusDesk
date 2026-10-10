@@ -28,6 +28,9 @@ type User struct {
 	// OwnPassword is set once the user chooses their own password; until
 	// then a parent can also log in with a child's first name + "@123".
 	OwnPassword bool `json:"own_password"`
+	// EmailVerified: the email was confirmed with an emailed code (staff:
+	// their login email). Parents need it before changing their password.
+	EmailVerified bool `json:"email_verified"`
 	Timestamps
 }
 

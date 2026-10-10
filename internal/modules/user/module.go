@@ -85,6 +85,8 @@ func (m *Module) Mount(r chi.Router) {
 	// blocked from /users/{id} below) can read their own record.
 	r.Post("/auth/logout-everywhere", m.handler.LogoutEverywhere)
 	r.Post("/auth/password/change", m.handler.ChangePassword)
+	r.Post("/auth/email/verify/request", m.handler.RequestEmailVerification)
+	r.Post("/auth/email/verify/confirm", m.handler.ConfirmEmailVerification)
 	r.Get("/auth/me", m.handler.Me)
 	r.Post("/auth/phone/verify/request", m.handler.RequestPhoneVerification)
 	r.Post("/auth/phone/verify/confirm", m.handler.ConfirmPhoneVerification)

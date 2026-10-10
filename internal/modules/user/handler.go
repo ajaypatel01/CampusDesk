@@ -469,3 +469,59 @@ func (h *Handler) ConfirmPasswordResetOTP(w http.ResponseWriter, r *http.Request
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "reset"})
 }
+
+// RequestEmailVerification emails a code to confirm an address for the caller.
+func (h *Handler) RequestEmailVerification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := callerID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	if err := h.svc.RequestEmailVerification(r.Context(), userID, in.Email); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "sent"})
+}
+
+// ConfirmEmailVerification saves the email once the code is right.
+func (h *Handler) ConfirmEmailVerification(w http.ResponseWriter, r *http.Request) {
+	userID, ok := callerID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	u, err := h.svc.ConfirmEmailVerification(r.Context(), userID, in.Email, in.Code)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, u)
+}
+
+func callerID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	claims := httpx.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(claims.Sub)
+	if err != nil {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized")
+		return uuid.Nil, false
+	}
+	return id, true
+}
