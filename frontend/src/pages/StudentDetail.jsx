@@ -5,6 +5,7 @@ import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api
 import { useSchool } from '../services/SchoolContext'
 import CustomFieldsSection from '../components/CustomFieldsSection'
 import IssuedDocuments from '../components/IssuedDocuments'
+import StudentDocuments from '../components/StudentDocuments'
 import './StudentDetail.css'
 import { formatDate } from '../utils/date'
 import { STUDENT_STATUSES, studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
@@ -397,6 +398,14 @@ function StudentDetail() {
             </div>
           )}
         </div>
+
+        {canEditFees && (
+          <StudentDocuments
+            studentId={id}
+            student={student}
+            onProfileChanged={() => studentsApi.get(id).then(s => { setStudent(s); setForm(s) }).catch(() => {})}
+          />
+        )}
 
         <IssuedDocuments studentId={id} />
 

@@ -413,6 +413,26 @@ export const classMediaApi = {
   issued: (studentId) => request(`/issued-documents${qs({ student_id: studentId })}`),
 }
 
+// A student's papers (passbook, Aadhaar, certificates); staff only.
+export const studentDocsApi = {
+  list: (studentId) => request(`/students/${studentId}/documents`),
+  remove: (id) => request(`/student-documents/${id}`, { method: 'DELETE' }),
+  upload: (studentId, docType, file, fields, title) => {
+    const fd = new FormData()
+    fd.append('doc_type', docType)
+    if (title) fd.append('title', title)
+    Object.entries(fields || {}).forEach(([k, v]) => { if (v) fd.append(k, v) })
+    fd.append('file', file)
+    return fetch(`${BASE}/students/${studentId}/documents`, { method: 'POST', headers: authHeader(), body: fd }).then(async res => {
+      if (res.status === 413) throw new Error('File too large (at most 10 MB)')
+      let data = {}
+      try { data = await res.json() } catch (_) { /* not JSON */ }
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`)
+      return data
+    })
+  },
+}
+
 export const configApi = {
   get: () => request('/config'),
 }
