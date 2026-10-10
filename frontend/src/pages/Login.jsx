@@ -18,6 +18,7 @@ function Login({ onLogin }) {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
+  const [otpChannel, setOtpChannel] = useState('') // 'sms' | 'whatsapp'
   const [otpSending, setOtpSending] = useState(false)
 
   async function handleSubmit(e) {
@@ -48,8 +49,9 @@ function Login({ onLogin }) {
     setError('')
     setOtpSending(true)
     try {
-      await usersApi.requestOTPLogin(phone)
+      const res = await usersApi.requestOTPLogin(phone)
       setOtpSent(true)
+      setOtpChannel(res?.channel || '')
     } catch (err) {
       setError(err.message || 'Could not send OTP')
     } finally {
@@ -123,7 +125,7 @@ function Login({ onLogin }) {
         ) : (
           <form className="login-form" onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
             <label className="login-field">
-              <span>WhatsApp Number</span>
+              <span>Mobile Number</span>
               <input
                 type="tel"
                 required
@@ -134,6 +136,11 @@ function Login({ onLogin }) {
                 placeholder="98765 43210"
               />
             </label>
+            {otpSent && otpChannel && (
+              <p className="empty-text" style={{ margin: 0 }}>
+                We sent a 6-digit code {otpChannel === 'whatsapp' ? 'on WhatsApp' : 'by SMS'} to this number.
+              </p>
+            )}
             {otpSent && (
               <label className="login-field">
                 <span>OTP</span>
@@ -164,7 +171,7 @@ function Login({ onLogin }) {
         <p className="login-switch" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           {mode === 'password' ? (
             <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('otp')}>
-              <Smartphone size={14} /> Login with WhatsApp OTP instead
+              <Smartphone size={14} /> Login with OTP instead
             </button>
           ) : (
             <button type="button" className="login-field__eye" style={{ position: 'static', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => switchMode('password')}>

@@ -7,18 +7,21 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"regexp"
 	"strings"
 	"time"
 
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/fast2sms"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
 	"github.com/google/uuid"
 )
 
-// OTPSender delivers one-time codes over WhatsApp using an approved
-// Authentication template. OTP features are off until Client is configured.
+// OTPSender delivers one-time codes: on WhatsApp (an approved
+// Authentication template) when that is set up, otherwise -- or if WhatsApp
+// fails -- by SMS through Fast2SMS. OTP features are off until one is set up.
 type OTPSender struct {
 	Client   *whatsapp.Client
 	Template string
@@ -27,11 +30,14 @@ type OTPSender struct {
 	// from, so parents and staff see their own school's number. Other
 	// schools use Client's default number.
 	SchoolSenders map[uuid.UUID]string
+	SMS           *fast2sms.Client
 }
 
-func (o OTPSender) enabled() bool {
+func (o OTPSender) whatsappReady() bool {
 	return o.Client.HasToken() && o.Template != "" && (o.Client.Enabled() || len(o.SchoolSenders) > 0)
 }
+
+func (o OTPSender) enabled() bool { return o.whatsappReady() || o.SMS.Enabled() }
 
 // clientFor returns the client that sends for schoolID, or nil if that
 // school has no number and there's no default.
@@ -52,7 +58,7 @@ const (
 	otpTTL         = 5 * time.Minute
 	otpMaxAttempts = 5
 	// At most otpSendLimit codes per number per otpSendWindow, and
-	// otpDailyLimit per day, so nobody can run up the WhatsApp bill or
+	// otpDailyLimit per day, so nobody can run up the WhatsApp/SMS bill or
 	// flood someone's phone.
 	otpSendLimit  = 3
 	otpSendWindow = 15 * time.Minute
@@ -65,7 +71,14 @@ const (
 	otpPurposeReset       = "password_reset"
 )
 
-var errOTPNotConfigured = fmt.Errorf("%w: WhatsApp OTP is not set up yet", apperr.ErrInvalidInput)
+var errOTPNotConfigured = fmt.Errorf("%w: login by OTP is not set up yet", apperr.ErrInvalidInput)
+
+// Channels a code can go out on (returned to the app so it can say where
+// to look for it).
+const (
+	channelWhatsApp = "whatsapp"
+	channelSMS      = "sms"
+)
 
 // phoneRun matches one written phone number, allowing a leading + and
 // spaces, dashes or brackets between digits ("+91 98765-43210").
@@ -152,34 +165,50 @@ func (s *Service) otpHash(phone, purpose, code string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
-// sendOTP creates a new code for phone (10 digits) and sends it on
-// WhatsApp from schoolID's number. Any earlier unused code for the same
-// purpose stops working.
-func (s *Service) sendOTP(ctx context.Context, phone, purpose string, schoolID *uuid.UUID) error {
-	client := s.otp.clientFor(schoolID)
-	if !s.otp.enabled() || client == nil {
-		return errOTPNotConfigured
+// sendOTP creates a new code for phone (10 digits) and sends it -- on
+// WhatsApp from schoolID's number if WhatsApp is set up, else by SMS, and
+// by SMS if WhatsApp fails. Any earlier unused code for the same purpose
+// stops working. Returns the channel used.
+func (s *Service) sendOTP(ctx context.Context, phone, purpose string, schoolID *uuid.UUID) (string, error) {
+	var wa *whatsapp.Client
+	if s.otp.whatsappReady() {
+		wa = s.otp.clientFor(schoolID)
+	}
+	if wa == nil && !s.otp.SMS.Enabled() {
+		return "", errOTPNotConfigured
 	}
 	now := time.Now()
 	recent, today, err := s.repo.CountOTPs(ctx, phone, purpose, now.Add(-otpSendWindow), now.Add(-24*time.Hour))
 	if err != nil {
-		return err
+		return "", err
 	}
 	if recent >= otpSendLimit || today >= otpDailyLimit {
-		return fmt.Errorf("%w: too many codes requested for this number, please try again later", apperr.ErrTooMany)
+		return "", fmt.Errorf("%w: too many codes requested for this number, please try again later", apperr.ErrTooMany)
 	}
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
-		return err
+		return "", err
 	}
 	code := fmt.Sprintf("%0*d", otpLength, n.Int64())
 	if err := s.repo.CreateOTP(ctx, phone, purpose, s.otpHash(phone, purpose, code), now.Add(otpTTL)); err != nil {
-		return err
+		return "", err
 	}
-	if err := client.SendAuthCode("91"+phone, s.otp.Template, s.otp.Language, code); err != nil {
-		return fmt.Errorf("send whatsapp otp: %w", err)
+	if wa != nil {
+		err := wa.SendAuthCode("91"+phone, s.otp.Template, s.otp.Language, code)
+		if err == nil {
+			return channelWhatsApp, nil
+		}
+		if !s.otp.SMS.Enabled() {
+			log.Printf("whatsapp otp failed: %v", err)
+			return "", fmt.Errorf("send whatsapp otp: %w", err)
+		}
+		log.Printf("whatsapp otp failed, sending by sms instead: %v", err)
 	}
-	return nil
+	if err := s.otp.SMS.SendOTP(phone, code); err != nil {
+		log.Printf("sms otp failed: %v", err)
+		return "", fmt.Errorf("send sms otp: %w", err)
+	}
+	return channelSMS, nil
 }
 
 // checkOTP uses up the latest live code for phone if code matches it. Each
