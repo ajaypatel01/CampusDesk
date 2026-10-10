@@ -330,6 +330,8 @@ function Settings() {
 
               <ChangePassword />
 
+              {/* Parents log in with the number the school has; changing it is off for now. */}
+              {user?.role !== 'parent' && (
               <div style={{ marginTop: '24px' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', marginBottom: '8px' }}><Smartphone size={16} /> Phone Number</h3>
                 {me?.phone_number ? (
@@ -366,6 +368,7 @@ function Settings() {
                   </>
                 )}
               </div>
+              )}
             </div>
           )}
 
