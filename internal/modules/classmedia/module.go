@@ -58,6 +58,11 @@ func (m *Module) Mount(r chi.Router) {
 	r.Post("/class-media", m.Upload)
 	r.Delete("/class-media/{id}", m.Delete)
 	r.With(httpx.RequireRole("super_admin", "school_admin", "registrar")).Get("/issued-documents", m.ListIssued)
+	// A student's own papers (passbook, Aadhaar card, certificates): staff who manage records only.
+	staff := httpx.RequireRole("super_admin", "school_admin", "registrar")
+	r.With(staff).Get("/students/{id}/documents", m.ListStudentDocs)
+	r.With(staff).Post("/students/{id}/documents", m.UploadStudentDoc)
+	r.With(staff).Delete("/student-documents/{id}", m.DeleteStudentDoc)
 }
 
 // ---- Access ----
