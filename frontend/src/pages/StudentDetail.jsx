@@ -4,6 +4,7 @@ import { ArrowLeft, Edit2, Save, X, UserPlus, IndianRupee, ArrowRightLeft } from
 import { studentsApi, guardiansApi, feesApi, academicApi } from '../services/api'
 import { useSchool } from '../services/SchoolContext'
 import CustomFieldsSection from '../components/CustomFieldsSection'
+import IssuedDocuments from '../components/IssuedDocuments'
 import './StudentDetail.css'
 import { formatDate } from '../utils/date'
 import { STUDENT_STATUSES, studentStatusLabel, studentStatusBadge } from '../utils/studentStatus'
@@ -396,6 +397,8 @@ function StudentDetail() {
             </div>
           )}
         </div>
+
+        <IssuedDocuments studentId={id} />
 
         {!feeSummary && currentYear && (
           <div className="detail-card">

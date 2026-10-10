@@ -11,6 +11,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/academic"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/auditlog"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/books"
+	"github.com/ajaypatel01/CampusDesk/internal/modules/classmedia"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/communications"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/customfields"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/documents"
@@ -32,6 +33,7 @@ import (
 	"github.com/ajaypatel01/CampusDesk/internal/modules/tcvoucher"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/user"
 	"github.com/ajaypatel01/CampusDesk/internal/modules/van"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/archive"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/database"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/fast2sms"
@@ -166,6 +168,10 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		student.NewRepository(pool), academic.NewRepository(pool), fee.NewRepository(pool), enrollment.NewRepository(pool),
 	))
 
+	// Every issued TC / marksheet / report card is kept in S3 (no-op until
+	// S3 is configured).
+	archiver := archive.New(pool, storageClient)
+
 	mods := []modules.Module{
 		schoolMod,
 		student.New(pool, promotionHandler),
@@ -173,13 +179,14 @@ func mountProtectedModules(r chi.Router, schoolMod *school.Module, pool *pgxpool
 		enrollment.New(pool),
 		guardian.New(pool),
 		fee.New(pool, waClient),
-		documents.New(pool, emailClient, waClient),
+		documents.New(pool, emailClient, waClient, archiver),
 		van.New(pool),
 		rte.New(pool),
 		books.New(pool),
 		media.New(pool, storageClient),
+		classmedia.New(pool, storageClient),
 		idcard.New(pool, storageClient),
-		results.New(pool),
+		results.New(pool, archiver),
 		homework.New(pool),
 		communications.New(pool, waClient),
 		staff.New(pool),

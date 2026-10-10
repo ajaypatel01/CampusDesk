@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"fmt"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/archive"
 	"time"
 
 	apperr "github.com/ajaypatel01/CampusDesk/internal/platform/errors"
@@ -10,11 +11,12 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo    *Repository
+	archive *archive.Archiver
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, arch *archive.Archiver) *Service {
+	return &Service{repo: repo, archive: arch}
 }
 
 // ---- Data types ----
@@ -152,6 +154,8 @@ func (s *Service) GenerateTC(ctx context.Context, studentID uuid.UUID, dateOfLea
 	if err != nil {
 		return nil, "", fmt.Errorf("generate tc: %w", err)
 	}
+	// Keep a copy of the TC exactly as issued (download, email or WhatsApp).
+	s.archive.Save(ctx, studentID, archive.KindTC, "Transfer Certificate", pdf)
 	filename := fmt.Sprintf("tc_%s.pdf", studentID.String()[:8])
 	return pdf, filename, nil
 }

@@ -388,6 +388,29 @@ export const mediaApi = {
   },
 }
 
+// Class gallery & class documents (files in S3, links expire after ~2h).
+export const classMediaApi = {
+  sections: (schoolId) => request(`/class-media/sections${qs({ school_id: schoolId })}`),
+  list: (sectionId, kind) => request(`/class-media${qs({ section_id: sectionId, kind })}`),
+  remove: (id) => request(`/class-media/${id}`, { method: 'DELETE' }),
+  // One file per request, so each stays under the server's upload limit.
+  upload: (sectionId, kind, file, event, eventDate) => {
+    const fd = new FormData()
+    fd.append('section_id', sectionId); fd.append('kind', kind)
+    fd.append('event', event || ''); if (eventDate) fd.append('event_date', eventDate)
+    fd.append('files', file)
+    return fetch(`${BASE}/class-media`, { method: 'POST', headers: authHeader(), body: fd }).then(async res => {
+      if (res.status === 413) throw new Error('File too large')
+      let data = {}
+      try { data = await res.json() } catch (_) { /* not JSON */ }
+      if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`)
+      return data
+    })
+  },
+  // A student's archived TCs, marksheets and report cards.
+  issued: (studentId) => request(`/issued-documents${qs({ student_id: studentId })}`),
+}
+
 export const configApi = {
   get: () => request('/config'),
 }
