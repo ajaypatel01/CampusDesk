@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/numtext"
 	"strings"
 	"time"
 
@@ -131,22 +132,22 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*domain.Student, 
 		DateOfBirth:       in.DateOfBirth,
 		Gender:            gender,
 		Email:             strings.TrimSpace(in.Email),
-		Phone:             strings.TrimSpace(in.Phone),
+		Phone:             numtext.Clean(in.Phone),
 		Address:           strings.TrimSpace(in.Address),
 		AdmissionDate:     in.AdmissionDate,
 		Caste:             strings.TrimSpace(in.Caste),
 		Category:          strings.TrimSpace(in.Category),
-		AadharNumber:      strings.TrimSpace(in.AadharNumber),
-		SamagraID:         strings.TrimSpace(in.SamagraID),
-		PenNumber:         strings.TrimSpace(in.PenNumber),
-		AparID:            strings.TrimSpace(in.AparID),
-		EnrollmentNumber:  strings.TrimSpace(in.EnrollmentNumber),
+		AadharNumber:      numtext.Clean(in.AadharNumber),
+		SamagraID:         numtext.Clean(in.SamagraID),
+		PenNumber:         numtext.Clean(in.PenNumber),
+		AparID:            numtext.Clean(in.AparID),
+		EnrollmentNumber:  numtext.Clean(in.EnrollmentNumber),
 		AdmissionClass:    strings.TrimSpace(in.AdmissionClass),
 		AdmissionYear:     strings.TrimSpace(in.AdmissionYear),
 		PreviousSchool:    strings.TrimSpace(in.PreviousSchool),
 		BankName:          strings.TrimSpace(in.BankName),
 		BankIFSC:          strings.TrimSpace(in.BankIFSC),
-		BankAccountNumber: strings.TrimSpace(in.BankAccountNumber),
+		BankAccountNumber: numtext.Clean(in.BankAccountNumber),
 		BankHolderName:    strings.TrimSpace(in.BankHolderName),
 		BankBranch:        strings.TrimSpace(in.BankBranch),
 		Status:            status,
@@ -254,22 +255,22 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	st.DateOfBirth = in.DateOfBirth
 	st.Gender = gender
 	st.Email = strings.TrimSpace(in.Email)
-	st.Phone = strings.TrimSpace(in.Phone)
+	st.Phone = numtext.Clean(in.Phone)
 	st.Address = strings.TrimSpace(in.Address)
 	st.AdmissionDate = in.AdmissionDate
 	st.Caste = strings.TrimSpace(in.Caste)
 	st.Category = strings.TrimSpace(in.Category)
-	st.AadharNumber = strings.TrimSpace(in.AadharNumber)
-	st.SamagraID = strings.TrimSpace(in.SamagraID)
-	st.PenNumber = strings.TrimSpace(in.PenNumber)
-	st.AparID = strings.TrimSpace(in.AparID)
-	st.EnrollmentNumber = strings.TrimSpace(in.EnrollmentNumber)
+	st.AadharNumber = numtext.Clean(in.AadharNumber)
+	st.SamagraID = numtext.Clean(in.SamagraID)
+	st.PenNumber = numtext.Clean(in.PenNumber)
+	st.AparID = numtext.Clean(in.AparID)
+	st.EnrollmentNumber = numtext.Clean(in.EnrollmentNumber)
 	st.AdmissionClass = strings.TrimSpace(in.AdmissionClass)
 	st.AdmissionYear = strings.TrimSpace(in.AdmissionYear)
 	st.PreviousSchool = strings.TrimSpace(in.PreviousSchool)
 	st.BankName = strings.TrimSpace(in.BankName)
 	st.BankIFSC = strings.TrimSpace(in.BankIFSC)
-	st.BankAccountNumber = strings.TrimSpace(in.BankAccountNumber)
+	st.BankAccountNumber = numtext.Clean(in.BankAccountNumber)
 	st.BankHolderName = strings.TrimSpace(in.BankHolderName)
 	st.BankBranch = strings.TrimSpace(in.BankBranch)
 	prevStatus := st.Status
