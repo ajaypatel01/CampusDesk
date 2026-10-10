@@ -31,11 +31,14 @@ func (m *Module) Mount(r chi.Router) {
 	write := httpx.RequireFeature(feature, "write")
 	r.Route("/schools", func(r chi.Router) {
 		r.With(view).Get("/", m.handler.List)
-		r.With(write).Post("/", m.handler.Create)
+		// Only the owner creates or deletes schools; a school admin may edit
+		// their own school (checked in Update).
+		owner := httpx.RequireRole("super_admin")
+		r.With(owner, write).Post("/", m.handler.Create)
 		r.Route("/{id}", func(r chi.Router) {
 			r.With(view).Get("/", m.handler.Get)
-			r.With(write).Put("/", m.handler.Update)
-			r.With(write).Delete("/", m.handler.Delete)
+			r.With(httpx.RequireRole("super_admin", "school_admin"), write).Put("/", m.handler.Update)
+			r.With(owner, write).Delete("/", m.handler.Delete)
 		})
 	})
 }

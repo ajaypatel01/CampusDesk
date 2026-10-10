@@ -79,6 +79,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid id")
 		return
 	}
+	// A school admin may only edit their own school.
+	if c := httpx.ClaimsFromContext(r.Context()); c != nil && c.Role != "super_admin" && c.SchoolID != id.String() {
+		httpx.Error(w, http.StatusForbidden, "access denied: not your school")
+		return
+	}
 	var in UpdateInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid json body")
