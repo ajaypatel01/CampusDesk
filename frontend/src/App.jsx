@@ -32,6 +32,7 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ParentDashboard from './pages/ParentDashboard'
+import ClassGallery from './pages/ClassGallery'
 import ActivityLog from './pages/ActivityLog'
 import { getToken, clearToken, usersApi } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
@@ -128,6 +129,7 @@ function App() {
             <Route path="broadcasts" element={<Broadcasts />} />
             <Route path="results" element={<Results />} />
             <Route path="homework" element={<Homework />} />
+            <Route path="class-gallery" element={<ClassGallery />} />
             <Route path="id-cards" element={<IdCards />} />
             <Route path="transport" element={<Transport />} />
             <Route path="rte" element={<Rte />} />

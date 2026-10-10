@@ -24,6 +24,7 @@ import {
   PieChart,
   ClipboardCheck,
   History,
+  Images,
 } from 'lucide-react'
 import './Sidebar.css'
 
@@ -48,6 +49,7 @@ const navItems = [
   { to: '/broadcasts', icon: MessageCircle, label: 'Broadcasts', deny: ['registrar', 'parent', 'teacher'] },
   { to: '/results', icon: BarChart2, label: 'Results', deny: ['parent'] },
   { to: '/homework', icon: BookOpen, label: 'Homework', deny: ['parent'] },
+  { to: '/class-gallery', icon: Images, label: 'Class Gallery' },
   { to: '/transport', icon: Bus, label: 'Transport', deny: ['parent', 'teacher'] },
   { to: '/rte', icon: ShieldCheck, label: 'RTE', deny: ['parent', 'teacher'] },
   { to: '/books', icon: Library, label: 'Books', deny: ['registrar', 'parent', 'teacher'] },

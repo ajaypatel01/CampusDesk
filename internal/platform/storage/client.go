@@ -29,9 +29,11 @@ type Config struct {
 }
 
 func New(cfg Config) (*Client, error) {
-	awsCfg := &aws.Config{
-		Region:      aws.String(cfg.Region),
-		Credentials: credentials.NewStaticCredentials(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+	awsCfg := &aws.Config{Region: aws.String(cfg.Region)}
+	// Without keys the SDK's default chain is used -- on the server, the
+	// instance's IAM role, so no long-lived keys need storing.
+	if cfg.AccessKeyID != "" {
+		awsCfg.Credentials = credentials.NewStaticCredentials(cfg.AccessKeyID, cfg.SecretAccessKey, "")
 	}
 	if cfg.Endpoint != "" {
 		protocol := "https"
@@ -69,6 +71,15 @@ func (c *Client) Upload(key, contentType string, data []byte) error {
 	return nil
 }
 
+// Delete removes an object (with versioning on, S3 keeps the old version
+// for a while; see the bucket's lifecycle rule).
+func (c *Client) Delete(key string) error {
+	if _, err := c.svc.DeleteObject(&s3.DeleteObjectInput{Bucket: aws.String(c.bucket), Key: aws.String(key)}); err != nil {
+		return fmt.Errorf("s3 delete %s: %w", key, err)
+	}
+	return nil
+}
+
 // Download fetches an object's bytes.
 func (c *Client) Download(key string) ([]byte, error) {
 	buf := aws.NewWriteAtBuffer([]byte{})
@@ -88,6 +99,21 @@ func (c *Client) PresignedURL(key string, expiry time.Duration) (string, error) 
 	req, _ := c.svc.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
+	})
+	url, err := req.Presign(expiry)
+	if err != nil {
+		return "", fmt.Errorf("presign %s: %w", key, err)
+	}
+	return url, nil
+}
+
+// PresignedDownloadURL is PresignedURL, but the browser shows or saves the
+// file under filename rather than the object key.
+func (c *Client) PresignedDownloadURL(key, filename string, expiry time.Duration) (string, error) {
+	req, _ := c.svc.GetObjectRequest(&s3.GetObjectInput{
+		Bucket:                     aws.String(c.bucket),
+		Key:                        aws.String(key),
+		ResponseContentDisposition: aws.String(fmt.Sprintf("inline; filename=%q", filename)),
 	})
 	url, err := req.Presign(expiry)
 	if err != nil {

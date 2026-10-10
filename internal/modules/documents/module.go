@@ -1,6 +1,7 @@
 package documents
 
 import (
+	"github.com/ajaypatel01/CampusDesk/internal/platform/archive"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/email"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/httpx"
 	"github.com/ajaypatel01/CampusDesk/internal/platform/whatsapp"
@@ -12,9 +13,9 @@ type Module struct {
 	handler *Handler
 }
 
-func New(pool *pgxpool.Pool, emailClient *email.Client, waClient *whatsapp.Client) *Module {
+func New(pool *pgxpool.Pool, emailClient *email.Client, waClient *whatsapp.Client, arch *archive.Archiver) *Module {
 	repo := NewRepository(pool)
-	svc := NewService(repo)
+	svc := NewService(repo, arch)
 	return &Module{handler: NewHandler(svc, emailClient, waClient)}
 }
 

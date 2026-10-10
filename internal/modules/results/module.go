@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ajaypatel01/CampusDesk/internal/platform/archive"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,12 +21,13 @@ import (
 )
 
 type Module struct {
-	repo  *Repository
-	wards *guardian.Repository
+	repo    *Repository
+	wards   *guardian.Repository
+	archive *archive.Archiver
 }
 
-func New(pool *pgxpool.Pool) *Module {
-	return &Module{repo: NewRepository(pool), wards: guardian.NewRepository(pool)}
+func New(pool *pgxpool.Pool, arch *archive.Archiver) *Module {
+	return &Module{repo: NewRepository(pool), wards: guardian.NewRepository(pool), archive: arch}
 }
 
 func (m *Module) Name() string { return "results" }
@@ -955,6 +957,7 @@ func (m *Module) DownloadMarksheet(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "pdf generation failed")
 		return
 	}
+	m.archive.Save(r.Context(), studentID, archive.KindMarksheet, "Marksheet: "+ms.ExamName, pdfBytes)
 	filename := fmt.Sprintf("marksheet_%s_%s.pdf", ms.StudentCode, examID.String()[:8])
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
@@ -1151,6 +1154,7 @@ func (m *Module) DownloadReportCard(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "pdf generation failed")
 		return
 	}
+	m.archive.Save(r.Context(), rc.StudentID, archive.KindReportCard, "Report card", pdfBytes)
 	filename := fmt.Sprintf("report_card_%s_%s.pdf", rc.StudentCode, rc.AcademicYearID.String()[:8])
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
