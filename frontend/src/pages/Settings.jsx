@@ -4,6 +4,7 @@ import { Building, CalendarDays, Layers, Plus, Trash2, IndianRupee, UserCheck, C
 import { useSchool } from '../services/SchoolContext'
 import { schoolsApi, academicApi, feesApi, usersApi, staffApi } from '../services/api'
 import ChangePassword from '../components/ChangePassword'
+import EmailVerify from '../components/EmailVerify'
 import './Settings.css'
 import { formatDate } from '../utils/date'
 
@@ -328,7 +329,9 @@ function Settings() {
                 </div>
               </div>
 
-              <ChangePassword />
+              {user?.role === 'parent' && !me?.email_verified
+                ? <EmailVerify onVerified={setMe} />
+                : <ChangePassword />}
 
               {/* Parents log in with the number the school has; changing it is off for now. */}
               {user?.role !== 'parent' && (

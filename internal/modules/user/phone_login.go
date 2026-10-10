@@ -17,9 +17,8 @@ import (
 
 // ---- Mobile number + password login ----
 //
-// The login box takes an email or a mobile number. With a mobile number:
-// staff log in with their own password (number verified in Settings);
-// parents log in with any linked child's first name + "@123" until they
+// The login box takes an email or a mobile number. A mobile number is for
+// parents only (staff always log in with their email): parents log in with any linked child's first name + "@123" until they
 // set their own password (users.own_password), and their login is created
 // on first use exactly like WhatsApp OTP login (see findOTPLogin).
 
@@ -55,10 +54,7 @@ func (s *Service) phoneLogin(ctx context.Context, phone, password string) (*Logi
 
 // matchPhonePassword returns the login phone+password opens, or errBadLogin.
 func (s *Service) matchPhonePassword(ctx context.Context, phone, password string) (*domain.User, error) {
-	// Staff (and parents) who verified this number use their own password.
-	if u, err := s.repo.GetStaffByPhone(ctx, phone); err == nil && passwordMatches(u, password) {
-		return u, nil
-	}
+	// Only parents log in with a mobile number; staff use their email.
 	t, err := s.findOTPLogin(ctx, phone, "parent")
 	if err != nil {
 		return nil, errBadLogin
@@ -157,6 +153,9 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, current,
 	u, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+	if u.Role == domain.RoleParent && !u.EmailVerified {
+		return nil, fmt.Errorf("%w: add and verify your email first (Settings > My Account)", apperr.ErrInvalidInput)
 	}
 	ok := passwordMatches(u, current)
 	if !ok && u.Role == domain.RoleParent && !u.OwnPassword {

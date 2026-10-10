@@ -398,19 +398,15 @@ type otpLoginTarget struct {
 	schoolID  uuid.UUID       // parent: the school those records are from
 }
 
-var errNoPhoneAccount = fmt.Errorf("%w: no account found for this number -- staff can add their number in Settings, parents should ask the school office to update it", apperr.ErrUnauthorized)
+var errNoPhoneAccount = fmt.Errorf("%w: no parent account found for this number -- please ask the school office to update your mobile number (staff log in with their email)", apperr.ErrUnauthorized)
 
 func (s *Service) findOTPLogin(ctx context.Context, phone, audience string) (*otpLoginTarget, error) {
 	if audience != "" && audience != "staff" && audience != "parent" {
 		return nil, apperr.ErrInvalidInput
 	}
-	if audience != "parent" {
-		if u, err := s.repo.GetStaffByPhone(ctx, phone); err == nil {
-			return &otpLoginTarget{user: u}, nil
-		}
-		if audience == "staff" {
-			return nil, errNoPhoneAccount
-		}
+	// Only parents log in with a mobile number; staff use their email.
+	if audience == "staff" {
+		return nil, fmt.Errorf("%w: staff log in with their email address", apperr.ErrUnauthorized)
 	}
 	t := &otpLoginTarget{}
 	if u, err := s.repo.GetParentByPhone(ctx, phone); err == nil {

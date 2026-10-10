@@ -147,6 +147,8 @@ export const usersApi = {
   // a normal logout, right after this resolves (or fails/times out).
   logoutEverywhere: () => request('/auth/logout-everywhere', { method: 'POST' }),
   // Returns a fresh { user, token }: other sessions are logged out.
+  requestEmailVerification: (email) => request('/auth/email/verify/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  confirmEmailVerification: (email, code) => request('/auth/email/verify/confirm', { method: 'POST', body: JSON.stringify({ email, code }) }),
   changePassword: (currentPassword, newPassword) => request('/auth/password/change', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
   // The caller's own profile -- works for every role, unlike get(id) above
   // which registrars can't use on themselves.

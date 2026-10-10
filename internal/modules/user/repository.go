@@ -36,7 +36,7 @@ func (r *Repository) Create(ctx context.Context, u *domain.User) error {
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, created_at, updated_at FROM users WHERE id=$1`, id)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, email_verified, created_at, updated_at FROM users WHERE id=$1`, id)
 }
 
 // FindStudentIDByCode looks up a student by their scholar number (student_code) within
@@ -78,7 +78,7 @@ func (r *Repository) LinkParentToStudent(ctx context.Context, userID, studentID 
 }
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, created_at, updated_at FROM users WHERE email=$1`, email)
+	return r.scanOne(ctx, `SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, email_verified, created_at, updated_at FROM users WHERE email=$1`, email)
 }
 
 // GetByPhone looks up a user by their OTP-verified phone number -- used by
@@ -171,7 +171,7 @@ func (r *Repository) List(ctx context.Context, schoolID *uuid.UUID, status domai
 
 	limitArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err = r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, created_at, updated_at
+		SELECT id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, email_verified, created_at, updated_at
 		FROM users %s ORDER BY is_active DESC, last_name, first_name LIMIT $%d OFFSET $%d`,
 		whereClause, len(args)+1, len(args)+2), limitArgs...,
 	)
@@ -213,7 +213,7 @@ type scannable interface {
 
 func scanRow(row scannable) (*domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.TokenVersion, &u.PhoneNumber, &u.OwnPassword, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.SchoolID, &u.Email, &u.PasswordHash, &u.FirstName, &u.LastName, &u.Role, &u.Status, &u.IsActive, &u.TokenVersion, &u.PhoneNumber, &u.OwnPassword, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt)
 	return &u, err
 }
 

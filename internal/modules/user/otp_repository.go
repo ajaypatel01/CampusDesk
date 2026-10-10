@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-const userColumns = `id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, created_at, updated_at`
+const userColumns = `id, school_id, email, password_hash, first_name, last_name, role, status, is_active, token_version, phone_number, own_password, email_verified, created_at, updated_at`
 
 // phoneMatches compares users.phone_number by its last 10 digits, so a
 // number saved as "+91 98765 43210" still matches "9876543210".
