@@ -34,13 +34,14 @@ import ResetPassword from './pages/ResetPassword'
 import ParentDashboard from './pages/ParentDashboard'
 import ClassGallery from './pages/ClassGallery'
 import ActivityLog from './pages/ActivityLog'
+import ParentLogins from './pages/ParentLogins'
 import { getToken, clearToken, usersApi } from './services/api'
 import { SchoolProvider } from './services/SchoolContext'
 import { ConfigProvider } from './services/ConfigContext'
 
 // Pages a registrar isn't allowed to open, even by typing the URL directly —
 // mirrors the backend's BlockRoles("registrar") checks on the same modules.
-const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/fee-report', '/activity']
+const REGISTRAR_BLOCKED_PATHS = ['/teachers', '/staff', '/documents', '/broadcasts', '/id-cards', '/books', '/fee-report', '/activity', '/parent-logins']
 // Pages only super_admin may open — mirrors the backend's RequireRole("super_admin") check.
 const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
 // A teacher's access is intentionally narrow -- results for their own class
@@ -50,7 +51,7 @@ const SUPER_ADMIN_ONLY_PATHS = ['/payroll']
 const TEACHER_BLOCKED_PATHS = [
   '/admissions', '/students', '/fees', '/teachers', '/staff', '/ledger', '/fee-report',
   '/tc-records', '/udise-checklist', '/vouchers', '/documents', '/broadcasts',
-  '/transport', '/rte', '/books', '/id-cards', '/payroll', '/activity',
+  '/transport', '/rte', '/books', '/id-cards', '/payroll', '/activity', '/parent-logins',
 ]
 
 function RegistrarGuard({ user, children }) {
@@ -137,6 +138,7 @@ function App() {
             <Route path="udise-checklist" element={<UdiseChecklist />} />
             <Route path="settings" element={<Settings />} />
             <Route path="activity" element={<ActivityLog />} />
+            <Route path="parent-logins" element={<ParentLogins />} />
             <Route path="login" element={<Navigate to="/" replace />} />
             <Route path="register" element={<Navigate to="/" replace />} />
             <Route path="forgot-password" element={<Navigate to="/" replace />} />

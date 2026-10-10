@@ -90,6 +90,13 @@ func (m *Module) Mount(r chi.Router) {
 	r.Get("/auth/me", m.handler.Me)
 	r.Post("/auth/phone/verify/request", m.handler.RequestPhoneVerification)
 	r.Post("/auth/phone/verify/confirm", m.handler.ConfirmPhoneVerification)
+	// Parent logins are keyed by mobile number; admins can set or reset
+	// any parent's password in their school.
+	r.Route("/parent-logins", func(r chi.Router) {
+		r.Use(httpx.RequireRole("super_admin", "school_admin"))
+		r.With(view).Get("/", m.handler.ListParentLogins)
+		r.With(write).Post("/password", m.handler.SetParentPassword)
+	})
 	r.Route("/users", func(r chi.Router) {
 		// Browsing/editing other accounts is admin work -- everyone else's own
 		// profile comes from /auth/me above. The handlers further limit a
