@@ -254,7 +254,7 @@ func (r *Repository) ListReceipts(ctx context.Context, bookListID uuid.UUID) ([]
 			s.first_name || ' ' || s.last_name, s.student_code
 		FROM student_book_receipts r
 		JOIN students s ON s.id = r.student_id
-		WHERE r.book_list_id=$1
+		WHERE r.book_list_id=$1 AND s.status <> 'duplicate'
 		ORDER BY s.last_name`, bookListID)
 	if err != nil {
 		return nil, err

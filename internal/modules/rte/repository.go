@@ -58,7 +58,7 @@ func (r *Repository) ListQuotas(ctx context.Context, schoolID, yearID uuid.UUID)
 		FROM rte_quotas q
 		JOIN grade_levels gl ON gl.id = q.grade_level_id
 		LEFT JOIN fee_structures fs ON fs.grade_level_id = q.grade_level_id AND fs.academic_year_id = q.academic_year_id
-		LEFT JOIN student_fee_accounts sfa ON sfa.fee_structure_id = fs.id AND sfa.is_rte = TRUE
+		LEFT JOIN student_fee_accounts sfa ON sfa.fee_structure_id = fs.id AND sfa.is_rte = TRUE AND NOT EXISTS (SELECT 1 FROM students dup WHERE dup.id = sfa.student_id AND dup.status = 'duplicate')
 		WHERE q.school_id=$1 AND q.academic_year_id=$2
 		GROUP BY q.id, gl.id
 		ORDER BY gl.sort_order`, schoolID, yearID)
@@ -108,7 +108,7 @@ func (r *Repository) ListRTEStudents(ctx context.Context, schoolID, yearID uuid.
 		JOIN students s ON s.id = sfa.student_id
 		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
 		LEFT JOIN grade_levels gl ON gl.id = fs.grade_level_id
-		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND sfa.is_rte=TRUE
+		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND sfa.is_rte=TRUE AND s.status <> 'duplicate'
 		ORDER BY gl.sort_order, s.last_name`, schoolID, yearID)
 	if err != nil {
 		return nil, err

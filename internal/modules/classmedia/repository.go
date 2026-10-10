@@ -69,7 +69,7 @@ const parentChildren = `(SELECT string_agg(DISTINCT s.first_name, ', ')
 	JOIN students s ON s.id = e.student_id
 	JOIN student_guardians sg ON sg.student_id = e.student_id
 	JOIN guardians g ON g.id = sg.guardian_id
-	WHERE e.class_section_id = cs.id AND g.user_id = $2)`
+	WHERE e.class_section_id = cs.id AND g.user_id = $2 AND s.status <> 'duplicate')`
 
 // Sections lists what role/userID may open in schoolID.
 func (r *Repository) Sections(ctx context.Context, role string, userID, schoolID uuid.UUID) ([]Section, error) {

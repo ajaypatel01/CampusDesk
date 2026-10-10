@@ -297,7 +297,7 @@ function Students() {
         <div className="filter-select">
           <Filter size={16} />
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setOffset(0) }}>
-            <option value="">All Status</option>
+            <option value="">All Status (except duplicates)</option>
             {STUDENT_STATUSES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
           </select>
         </div>

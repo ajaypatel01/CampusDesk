@@ -93,7 +93,7 @@ func (r *Repository) GetResultSheet(ctx context.Context, examID uuid.UUID) (*Res
 	studentRows, err := r.pool.Query(ctx, `
 		SELECT s.id, TRIM(s.first_name || ' ' || s.last_name), s.student_code
 		FROM students s
-		WHERE s.id IN (
+		WHERE s.status <> 'duplicate' AND s.id IN (
 			SELECT sfa.student_id FROM student_fee_accounts sfa
 			JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
 			WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2 AND fs.grade_level_id = $3

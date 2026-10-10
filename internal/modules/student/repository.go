@@ -126,6 +126,9 @@ func (r *Repository) List(ctx context.Context, f ListFilter, limit, offset int) 
 		where += fmt.Sprintf(" AND s.status = $%d", argN)
 		args = append(args, f.Status)
 		argN++
+	} else {
+		// Duplicates only show when asked for by status.
+		where += " AND s.status <> 'duplicate'"
 	}
 	if f.Search != "" {
 		where += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.student_code ILIKE $%d)", argN, argN, argN)
@@ -329,4 +332,16 @@ func (r *Repository) StudentNameByCode(ctx context.Context, schoolID uuid.UUID, 
 		return "", nil
 	}
 	return name, err
+}
+
+// PaymentsTotal is the student's non-voided fee payments (whole rupees)
+// across all years.
+func (r *Repository) PaymentsTotal(ctx context.Context, studentID uuid.UUID) (int64, error) {
+	var total int64
+	err := r.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(fp.amount), 0)
+		FROM fee_payments fp
+		JOIN student_fee_accounts sfa ON sfa.id = fp.student_fee_account_id
+		WHERE sfa.student_id = $1 AND fp.voided = FALSE`, studentID).Scan(&total)
+	return total, err
 }
