@@ -64,7 +64,7 @@ func (r *Repository) listInstallmentAccounts(ctx context.Context, schoolID, year
 		JOIN students s ON s.id = sfa.student_id
 		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
 		JOIN grade_levels gl ON gl.id = fs.grade_level_id
-		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2`
+		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND s.status <> 'duplicate'`
 	args := []interface{}{schoolID, yearID}
 	if gradeLevelID != nil {
 		q += " AND fs.grade_level_id=$3"

@@ -200,7 +200,8 @@ func buildFeeAccountOrder(sortBy, sortOrder string) string {
 
 func (r *Repository) ListFeeAccounts(ctx context.Context, f FeeAccountFilter, limit, offset int) ([]FeeAccountSummary, int, error) {
 	args := []interface{}{f.SchoolID, f.AcademicYearID}
-	where := "WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2"
+	// Students marked duplicate are left out of every fee list and total.
+	where := "WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2 AND s.status <> 'duplicate'"
 	argN := 3
 
 	if f.Search != "" {
@@ -382,7 +383,7 @@ func (r *Repository) ListLedgerPayments(ctx context.Context, schoolID, yearID uu
 		JOIN students s ON s.id = sfa.student_id
 		JOIN fee_structures fs ON fs.id = sfa.fee_structure_id
 		JOIN grade_levels gl ON gl.id = fs.grade_level_id
-		WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2
+		WHERE sfa.school_id = $1 AND sfa.academic_year_id = $2 AND s.status <> 'duplicate'
 		ORDER BY fp.payment_date DESC, fp.created_at DESC`, schoolID, yearID)
 	if err != nil {
 		return nil, err
@@ -471,7 +472,7 @@ func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid
 			COALESCE(SUM(sfa.discount_amount), 0),
 			COALESCE(SUM(sfa.tuition_fee - sfa.discount_amount + sfa.van_fee + sfa.previous_year_dues + sfa.late_fee), 0)
 		FROM student_fee_accounts sfa
-		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2`, schoolID, yearID,
+		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND NOT EXISTS (SELECT 1 FROM students dup WHERE dup.id = sfa.student_id AND dup.status = 'duplicate')`, schoolID, yearID,
 	).Scan(&resp.TotalStudents, &resp.RTEStudents, &resp.TotalTuitionDue, &resp.TotalVanDue,
 		&resp.TotalPrevDue, &resp.TotalLateFee, &resp.TotalDiscount, &resp.GrandTotalDue)
 	if err != nil {
@@ -482,7 +483,7 @@ func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid
 		SELECT COALESCE(SUM(fp.amount), 0)
 		FROM fee_payments fp
 		JOIN student_fee_accounts sfa ON sfa.id = fp.student_fee_account_id
-		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND fp.voided=FALSE`, schoolID, yearID,
+		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND fp.voided=FALSE AND NOT EXISTS (SELECT 1 FROM students dup WHERE dup.id = sfa.student_id AND dup.status = 'duplicate')`, schoolID, yearID,
 	).Scan(&resp.TotalCollected)
 	if err != nil {
 		return nil, err
@@ -501,7 +502,7 @@ func (r *Repository) SchoolFeeSummary(ctx context.Context, schoolID, yearID uuid
 			FROM fee_payments fp
 			WHERE fp.student_fee_account_id = sfa.id AND fp.voided = FALSE
 		) paid ON TRUE
-		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2
+		WHERE sfa.school_id=$1 AND sfa.academic_year_id=$2 AND NOT EXISTS (SELECT 1 FROM students dup WHERE dup.id = sfa.student_id AND dup.status = 'duplicate')
 		GROUP BY gl.id, gl.name, gl.sort_order ORDER BY gl.sort_order`, schoolID, yearID)
 	if err != nil {
 		return nil, err

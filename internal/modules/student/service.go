@@ -272,8 +272,20 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 	st.BankAccountNumber = strings.TrimSpace(in.BankAccountNumber)
 	st.BankHolderName = strings.TrimSpace(in.BankHolderName)
 	st.BankBranch = strings.TrimSpace(in.BankBranch)
+	prevStatus := st.Status
 	if in.Status != "" {
 		st.Status = domain.StudentStatus(in.Status)
+	}
+	// A duplicate drops out of every fee total, so it may not carry real
+	// payments: those must first be moved to the student's correct record.
+	if st.Status == domain.StudentStatusDuplicate && prevStatus != domain.StudentStatusDuplicate {
+		paid, err := s.repo.PaymentsTotal(ctx, st.ID)
+		if err != nil {
+			return nil, err
+		}
+		if paid > 0 {
+			return nil, fmt.Errorf("%w: this student has ₹%s in fee payments. Move them to the correct student's record (Fees → payment → Move) before marking this one as a duplicate", apperr.ErrInvalidInput, formatRupees(paid))
+		}
 	}
 	// Marking a student inactive is what a Transfer Certificate is actually
 	// issued for -- require both fields whenever that's the resulting
@@ -294,4 +306,18 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (*do
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
+}
+
+// formatRupees writes 1234567 as "12,34,567" (Indian grouping).
+func formatRupees(v int64) string {
+	s := fmt.Sprintf("%d", v)
+	if len(s) <= 3 {
+		return s
+	}
+	head, tail := s[:len(s)-3], s[len(s)-3:]
+	for len(head) > 2 {
+		tail = head[len(head)-2:] + "," + tail
+		head = head[:len(head)-2]
+	}
+	return head + "," + tail
 }

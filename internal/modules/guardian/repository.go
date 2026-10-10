@@ -41,7 +41,8 @@ func (r *Repository) WardStudentIDs(ctx context.Context, userID uuid.UUID) ([]uu
 		SELECT sg.student_id
 		FROM student_guardians sg
 		JOIN guardians g ON g.id = sg.guardian_id
-		WHERE g.user_id = $1`, userID,
+		JOIN students s ON s.id = sg.student_id
+		WHERE g.user_id = $1 AND s.status <> 'duplicate'`, userID,
 	)
 	if err != nil {
 		return nil, err

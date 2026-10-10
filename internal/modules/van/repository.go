@@ -184,7 +184,7 @@ func (r *Repository) ListAssignments(ctx context.Context, vanID, yearID uuid.UUI
 			s.first_name || ' ' || s.last_name, s.student_code
 		FROM student_van_assignments a
 		JOIN students s ON s.id = a.student_id
-		WHERE a.van_id=$1 AND a.academic_year_id=$2 AND a.is_active=TRUE
+		WHERE a.van_id=$1 AND a.academic_year_id=$2 AND a.is_active=TRUE AND s.status <> 'duplicate'
 		ORDER BY s.last_name, s.first_name`, vanID, yearID)
 	if err != nil {
 		return nil, err

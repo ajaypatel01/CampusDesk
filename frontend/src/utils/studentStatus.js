@@ -7,6 +7,9 @@ export const STUDENT_STATUSES = [
   { value: 'defaulted', label: 'Defaulted' },
   { value: 'graduated', label: 'Graduated' },
   { value: 'transferred', label: 'Transferred' },
+  // Entered twice by mistake: hidden from every list and fee total; only
+  // shown when the Students list is filtered to this status.
+  { value: 'duplicate', label: 'Duplicate entry' },
 ]
 
 export function studentStatusLabel(status) {
@@ -17,6 +20,6 @@ export function studentStatusLabel(status) {
 // grey for everyone who has left.
 export function studentStatusBadge(status) {
   if (status === 'active') return 'success'
-  if (status === 'defaulted') return 'danger'
+  if (status === 'defaulted' || status === 'duplicate') return 'danger'
   return 'muted'
 }

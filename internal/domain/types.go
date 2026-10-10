@@ -14,6 +14,10 @@ const (
 	StudentStatusLeftWithoutTC StudentStatus = "left_without_tc"
 	// StudentStatusDefaulted marks a fee defaulter.
 	StudentStatusDefaulted StudentStatus = "defaulted"
+	// StudentStatusDuplicate marks a record entered twice by mistake. It is
+	// left out of every list and total (fees, results, broadcasts, ...) and
+	// only shows in the Students list when filtering by this status.
+	StudentStatusDuplicate StudentStatus = "duplicate"
 )
 
 type UserRole string

@@ -134,7 +134,7 @@ func (r *Repository) LookupGradeParentPhones(ctx context.Context, schoolID, grad
 		JOIN students s ON s.id = g.student_id
 		JOIN enrollments e ON e.student_id = s.id
 		LEFT JOIN class_sections cs ON cs.id = e.class_section_id
-		WHERE s.school_id = $1
+		WHERE s.school_id = $1 AND s.status <> 'duplicate'
 		  AND e.academic_year_id = $3
 		  AND cs.grade_level_id = $2
 		  AND (g.mobile <> '' OR g.phone <> '')
@@ -154,7 +154,7 @@ func (r *Repository) LookupAllParentPhones(ctx context.Context, schoolID uuid.UU
 			g.first_name || ' ' || g.last_name AS name
 		FROM guardians g
 		JOIN students s ON s.id = g.student_id
-		WHERE s.school_id = $1
+		WHERE s.school_id = $1 AND s.status <> 'duplicate'
 		  AND (g.mobile <> '' OR g.phone <> '')
 		  AND s.is_active = TRUE`, schoolID)
 	if err != nil {
